@@ -1,0 +1,11 @@
+[versions]
+agp = "9.2.0"
+appcompat = "1.6.1"
+gamesActivity = "4.0.0"
+
+[libraries]
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-games-activity = { group = "androidx.games", name = "games-activity", version.ref = "gamesActivity" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }

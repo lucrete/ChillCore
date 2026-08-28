@@ -1,0 +1,128 @@
+// Color constants
+const int RED = 0;
+const int GREEN = 1;
+const int BLUE = 2;
+const int YELLOW = 3;
+const int PURPLE = 4;
+const int CYAN = 5;
+const int ORANGE = 6;
+const int PINK = 7;
+const int WHITE = 8;
+const int BLACK = 9;
+const int GREY = 10;
+const int DARK_TEAL = 11;
+const int LIME = 12;
+const int MAGENTA = 13;
+const int NAVY = 14;
+const int GOLD = 15;
+const int CRIMSON = 16;
+const int TURQUOISE = 17;
+const int LAVENDER = 18;
+const int EMERALD = 19;
+const int AMBER = 20;
+const int CORAL = 21;
+const int INDIGO = 22;
+const int MINT = 23;
+const int MAROON = 24;
+const int SLATE = 25;
+const int COLOR_COUNT = 26;
+
+vec3 COLORS[COLOR_COUNT] = vec3[COLOR_COUNT]
+(
+    vec3(1.0, 0.0, 0.0),     // RED
+    vec3(0.0, 1.0, 0.0),     // GREEN
+    vec3(0.0, 0.0, 1.0),     // BLUE
+    vec3(1.0, 1.0, 0.0),     // YELLOW
+    vec3(0.5, 0.0, 0.5),     // PURPLE
+    vec3(0.0, 1.0, 1.0),     // CYAN
+    vec3(1.0, 0.5, 0.0),     // ORANGE
+    vec3(1.0, 0.0, 0.5),     // PINK
+    vec3(1.0, 1.0, 1.0),     // WHITE
+    vec3(0.0, 0.0, 0.0),     // BLACK
+    vec3(0.5, 0.5, 0.5),     // GREY
+    vec3(0.02, 0.29, 0.45),  // DARK_TEAL
+    vec3(0.75, 1.0, 0.0),    // LIME
+    vec3(1.0, 0.0, 1.0),     // MAGENTA
+    vec3(0.0, 0.0, 0.5),     // NAVY
+    vec3(1.0, 0.84, 0.0),    // GOLD
+    vec3(0.86, 0.08, 0.24),  // CRIMSON
+    vec3(0.25, 0.88, 0.82),  // TURQUOISE
+    vec3(0.9, 0.9, 0.98),    // LAVENDER
+    vec3(0.0, 0.61, 0.28),   // EMERALD
+    vec3(1.0, 0.75, 0.0),    // AMBER
+    vec3(1.0, 0.5, 0.31),    // CORAL
+    vec3(0.29, 0.0, 0.51),   // INDIGO
+    vec3(0.6, 1.0, 0.6),     // MINT
+    vec3(0.5, 0.0, 0.0),     // MAROON
+    vec3(0.44, 0.5, 0.56)    // SLATE
+);
+
+// Gradient name constants
+const int SUNSET = 0;
+const int OCEAN = 1;
+const int FOREST = 2;
+const int CANDY = 3;
+const int HEATMAP = 4;
+const int COSMIC = 5;
+const int RETRO_WAVE = 6;
+const int AUTUMN = 7;
+const int TROPICS = 8;
+const int MIDNIGHT = 9;
+const int GRADIENT_COUNT = 10;
+
+// Number of color stops per gradient
+const int SEGMENTS_PER_GRADIENT = 5;
+
+// Color indices for each gradient stop
+// For each gradient: (color0, color1, color2, color3, color4)
+// The gradient wraps from color4 back to color0
+const int GRADIENT_COLORS[GRADIENT_COUNT * SEGMENTS_PER_GRADIENT] = int[GRADIENT_COUNT * SEGMENTS_PER_GRADIENT]
+(    
+    // Original gradients with 5 segments
+    RED, ORANGE, PINK, PURPLE, NAVY,         // SUNSET
+    CYAN, BLUE, DARK_TEAL, NAVY, BLACK,      // OCEAN
+    GREEN, LIME, YELLOW, CYAN, EMERALD,      // FOREST
+    PINK, MAGENTA, CYAN, YELLOW, WHITE,      // CANDY
+    DARK_TEAL, SLATE, GREY, ORANGE, RED,     // HEATMAP
+    
+    // New gradients
+    INDIGO, PURPLE, MAGENTA, PINK, CORAL,    // COSMIC
+    PURPLE, MAGENTA, BLUE, CYAN, BLACK,      // RETRO_WAVE
+    CRIMSON, RED, ORANGE, AMBER, GOLD,       // AUTUMN
+    TURQUOISE, CYAN, LIME, GREEN, EMERALD,   // TROPICS
+    NAVY, INDIGO, PURPLE, BLUE, BLACK        // MIDNIGHT
+);
+
+// Gets the color at position t in the specified gradient
+// t is normalized (0.0 to 1.0) but will wrap if outside this range
+vec3 gradient(int gradientIndex, float t)
+{
+    // Wrap t to [0, 1] range
+    t = fract(t);
+    
+    // Calculate which segment we're in based on t value
+    float segmentCountFloat = float(SEGMENTS_PER_GRADIENT);
+    float scaledT = t * segmentCountFloat;
+    int segment = int(min(floor(scaledT), segmentCountFloat - 1.0));
+    
+    // Get base indices for this gradient in the arrays
+    int colorBaseIndex = gradientIndex * SEGMENTS_PER_GRADIENT;
+    
+    // Get the two colors to interpolate between (with seamless wrapping)
+    int colorIndex1 = GRADIENT_COLORS[colorBaseIndex + segment];
+    
+    // Using modulo for wraparound instead of conditional
+    int colorIndex2 = GRADIENT_COLORS[colorBaseIndex + ((segment + 1) % SEGMENTS_PER_GRADIENT)];
+    
+    vec3 color1 = COLORS[colorIndex1];
+    vec3 color2 = COLORS[colorIndex2];
+    
+    // Calculate the interpolation factor within this segment
+    float segmentT = fract(scaledT);
+    
+    // Use smoothstep for a more pleasing transition between colors
+    float smoothT = smoothstep(0.0, 1.0, segmentT);
+    
+    // Interpolate and return the result
+    return mix(color1, color2, smoothT);
+}

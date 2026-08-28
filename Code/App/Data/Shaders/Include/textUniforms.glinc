@@ -1,0 +1,10 @@
+// MSDF text uniform buffer. Bound by TextRenderer::EndFrame and updated
+// per batch by TextRenderer::FlushBatch.
+// Engine-side layout: CC::TextUniforms in Code/Core/Ui/Font/TextUniforms.h.
+// Slot must match TEXT_UNIFORMS_BINDING_SLOT in Code/Core/Rendering/UniformBindings.h.
+layout(std140, binding = 4) uniform TextUniforms
+{
+    mat4  projection;   // per-frame
+    vec4  textColor;    // per-batch
+    float pixelRange;   // per-batch
+} textUniforms;

@@ -1,0 +1,13 @@
+# Boot menu background scene
+name: BootScene
+
+objects:
+  - name: BootCube
+    transform:
+      position: [6.0, 0.0, -5.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    components:
+      - type: RenderableSphere
+        material: BlueTestPattern
+      - type: RotateRandom

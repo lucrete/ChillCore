@@ -1,0 +1,317 @@
+//////////////////
+// Day 1
+//////////////////
+RenderManager vs RenderApi:
+RenderApi: Abstraction of concrete rendering apu like OpenGl or DirectX
+- Window and API setup
+- Rendering primitive implementations:
+	- Triangles, Quads, Meshes
+RenderManager: Engine-specific rendering management. 
+- Frame buffers
+- Renderables. Renderables will call RenderApi primitive calls.
+
+Step 1:
+AppMain owns RenderManager.
+RenderManager owns RenderApi.
+RenderApi creates the OpenGl window and context.
+RenderApi draws a triangle.
+
+Step 2:
+Add a renderable.
+- Registers with RenderManager
+- Has it's Render function called.
+- Render function makes calls to RenderApi DrawTriangle primitive.
+
+AppStates:
+Main creates a CoreMain.
+CoreMain initializes all engine systems.
+Main creates an AppMain.
+AppMain initializes all application systems.
+CoreMain runs engine systems, calls AppMain update.
+When CoreMain exits, Main shuts down AppMain then CoreMain.
+
+AppStates:
+AppMain can house persistent systems.
+AppStates are exclusive contexts the app runs. Similar to concepts of 'levels' or 'scenes'.
+
+AppState lifecycle:
+AppState creation: creates the barebones instance of the state.
+Init: loads all assets owned by the AppState.
+So an instance of all AppStates is created by AppMain and registered with a StateMachine.
+The assets of a state are not loaded until the state is Init.
+This system would require slight overhead for the instances of the dormant states.
+State transitions can be done under a loading screen by connecting the state machine to a core FullScreenFade and UI.LoadingScreen system:
+- start transition
+- fade to black
+- init loading screen
+- fade to clear
+- shutdown active state
+- init new state
+- fade to black
+- shutdown loading screen
+- fade to clear
+
+AppStates would have states:
+- Fading In: rendering, no input, simulation is in active-wait-state
+- Active: Input and simulation active
+- Fading Out: rendering, no input, simulation is in ending-wait-state
+Wait-states mean the simulation is updating, so elements in the world are active, but in a non-interactive state. In the context of gameplay, players could not be harmed, or gameplay not started yet.
+
+-------------
+Step 3
+Scene Graph
+SceneObject, has a Renderables
+SceneObjects are added to the SceneGraph.
+SceneGraph calls Update on each SceneObject. If it has a Renderable, it adds itself to the RenderManager RenderQueue.
+When RenderManager Render is called, it calls each Renderable in it's queue and asks it to render itself.
+
+//////////////////
+// 
+//////////////////
+CameraManager controls which camera is active.
+Camera sets position and look at into CameraManager.
+Render creates the View-Projection matrix.
+Renderables Base have a Transform that stores their position, rotation, scale.
+Renderables Base have a PreRender() function that gets passed a reference to a structure that contains the VP matrix.
+Renderables PreRender() set the MVP in the shader.
+Renderables derived then have Render called, where the actual draw calls are made.
+
+How to manage application-specific cameras? How to add a camera from outside Core?
+Maybe be able to register a camera with CameraManager, get back an id. 
+
+Tasks:
+* Set MVP in Renderables base PreRender
+* FrameTimer for deltaSeconds.
+* Camera drift after escaping mouse controls
+* Hide mouse during mouse control.
+* Up-Down motion on FreeCam
+* Move free cam out of CameraManager and into LevelControl
+* Toggle mouse lock or not with F1.
+
+
+Build a Button-Action mapping system, where gameplay elements use actions, and acions are mapped to various inputs depending on input type and configuration.
+There will be a Action maps, where each action is assigned an Input Button. 
+There will be an active Action map, changed when input context switches, like when switching from mouse to gamepad.
+
+Architectural Decisions:
+* Should RenderManager forward calls to RenderApi, or should app just make calls to RenderApi directly?
+	* What is the nature of the RenderApi calls that are being forwarded by RenderManager? Is it just input related?
+* RenderManager is handling input because of the use of glfw. What will be the case for other graphics APIs?
+
+--------------
+Quixel Mixer for PBR texture creation
+
+//////////////////
+// 
+//////////////////
+Done:
+* Window resize
+
+Todo:
+Frag Renders:
+* Forward a hotkey from Visual Studio to the app, so you don't have to click in the window to recompile shaders.
+	-> Monitoring mode, check timestamps of saved files, reload if newer.
+* Includes for shaders.
+* Material connection of variables to shader. Recompile would auto-reconnect.
+* Launch window on second monitor if present.
+
+Global Settings:
+* ShaderIterateMode:
+	* Shader file monitoring
+	* Launch window on second monitor
+* Application Title, set in glfw window create.
+
+Tasks:
+* Make second window positioning dependent on if the second monitor is present.
+
+Done:
+* Move it into PrintMan, as console output may eventually be redirected to an in-app console.
+
+Todo:
+* Make shaders either in-world or full screen by having an MVP, and set it to identity for fullscreen.
+
+Tasks:
+* Material Manager creates all materials, using-classes do a GetMaterial.
+* Connect ShaderCompiler to MaterialManager to reconnect uniforms after recompile.
+
+//////////////////
+// 
+//////////////////
+TextureManager has CreateTexture calls that load images, bind the textures.
+MaterialManager optionally allows inclusion of a texture name. If a material is assigned a texture, it gets the uniform "mainTex".
+
+How will textures be referenced? Will each asset have a UID assigned, then scene hierarchy uses that reference.
+TextureManager can load all textures found in a folder, than the app can reference by name. Requires unique name, which won't work if multiple models use the same naming convention in their materials.
+Unity has an asset database that provides darg and drop to connect assets. For now, assets will be connected by name, a string assigned, like materials.
+
+Transform class with position, rotation, scale.
+SceneObject class has-a Transform.
+Renderable derived from SceneObject, MVP set from SceneObject values.
+References to instances of Classes derived from Renderable or SceneObject can access Transform to set position, rotation, scale.
+
+Should Renderables be-a SceneObject, or should SceneObject have-a Renderable?
+Should SceneObjects determine update order as well as render order? Render order can use scene hierarch for visibility culling, then drawing front to back. However, cpu-side update order does not need to be the same as render order. Update ordder should follow hierarchical state machine.
+
+//////////////////
+// 
+//////////////////
+Tasks:
+* MeshRenderable takes verts, incidices and maybe normals. Quad, Cube, then Sphere can derive from that.
+* RenderablePrimitive will have an enum of types: cube, sphere, line, axis. It will hold the verts etc for each type.
+
+Every mesh must have:
+* vertices
+* uvs
+* indices
+Required for lighting:
+* normals
+
+Rendering options:
+* Lit or Unlit
+* Textured or not
+* Coloured or not
+
+
+```
++----------------+-----+----------+----------+
+| Type           | Lit | Textured | Coloured |
++----------------+-----+----------+----------+
+| Mesh           |  X  |    X     |    X     |
+| Primitive      |  X  |          |    X     |
+| Procedural     |     |          |          |
+| Particle, UI   |     |    X     |    X     |
++----------------+-----+----------+----------+
+```
+Shaders:
+LitTextured: expects normals, model, lights, uvs, texture
+LitColoured: expects normals, model, lights, no uvs, texture
+UnlitTextured: expects uvs, texture, no normals
+Procedural: expects uvs, time, aspect ratio
+
+Material creation and update:
+Material will have uniforms set during init that must match the shader, and adds them to its list of uniforms found on the shader. Assert the correct uniforms are found.
+
+When renderable calls it's Render(), SetUniform() checks the uniform map if the 
+
+Done:
+* Add view pos to specular.
+
+//////////////////
+// 
+//////////////////
+Todo:
+* Doc: launch in fullscreen quad/procedural art shader
+* Toggle MSAA
+* Move asset addition into App, instead of directly in Core. Like Shaders being added to ShaderManager, and Materials to MaterialManager.
+
+Imgui:
+* Linker warnings
+* Imgui wrapper class
+* Coordinate mouse clicks inside imgui does not re-lock mouse onto 3D scene. Exlude HUD elements.
+* Input shortcut manager
+* DevUtil window:
+	* Keyboard shortcuts display
+	* expandable rendering options
+	
+Input Action Management:
+Game code uses InputActions, a context-specific name, either enum or text label.
+InputActions map to InputTriggers. These are gamepad-specific inputs, or debug keyboard input. This enforces a gamepad-oriented control scheme.
+InputTriggers map to keyboard combos or gamepad input.
+InputActions can have multiple maps or contexts, so depending on the situation, different sets of InputActions can be used.
+
+//////////////////
+// 
+//////////////////
+Linking CRT and third party libs
+Building glfw and zlib
+Including pdb files for debug link errors.
+
+///////////////////
+// 
+////////////////////
+Design a UI layout and styling system that has an html-and-css-like format. It will support a common subset of UI elements, some of which are interactable. Interaction can b triggerred by mouse or touch click, or by triggering the 'selected' element, which infers a non-mouse navigation system that can be manipulated via keys or gamepad. Interactable elements have state of enabled, disabled, selected/hovered. Support a slice-9 image and a way to define the image sections for that. Elements: panel (the container of other elements, always a root panel, optional background), button, font text, slider, switch toggles, dropdowns. Requires a high-quality text/font rendering system, which can be added first as a separate task if that makes sense.
+The UI layer will be a fullscreen quad blitted on top of the 3D scene after post-processing has been applied: 3D scene -> post effects -> UI.
+We will eventually create a UI Layout and Stying Design and Tech markdown doc in the planning folder after we iterate on the design.
+
+///////////////////
+// 
+////////////////////
+Explore options to address these items in scene hierarchy:
+**Negative:**
+- `dynamic_cast` in `GetComponent<T>()` has runtime cost (acceptable at current scale)
+- Recursive world matrix computation is O(depth) per object per frame
+- No compile-time component type safety; factory lookup is string-based
+
+Create a plan to implement DevUi elements for teh following. The first PR will put the framework in place to support through these views, and implement FrameProfile. Ask questions as needed.
+Frame Profile:
+* A visual graph of frame time, with update and render.
+* Realtime update with trailing history
+
+SceneVierarchy Tree:
+* Collapsible tree of the scene object.
+* Selecting a scen element shows its components and properties in a panel on the side.
+
+Dev Console:
+* A scrollable output of text lines added to by PrintMan.
+* A command entry line
+* A command parser to which commands with options and parameters can be added. ie render aa off  (render command subset, antialias option, off parameter)
+* Command help, with options to list all, or a specific command. Also a help option for each command, like render help shows the options/subcommands and their paramters.
+
+
+///////////////////
+// 
+////////////////////
+UI Navigation System:
+UI will have the concept of 'Screens'. A Screen will be a single active page, each with its own definition and layout. There will be a stack of screens, where a top-level main screen is shown first, then selecting a submenu pushes the new screen on the stack. Going back pops that screen and shows the previous one. Transitioning between screens disables UI input while the transision is occuring. Transition will have input disable, a UI fade out, push/pop, instantiate the new screen, fade in, renable input. Each Screen definition will include the layout (html, css) and a corresponding c++ Controller file with all setup and event handlers.
+States of the backend and UI will be:
+* UI Interactive, backend updating but not interactive (Main menu with 3D world animating in the background
+* UI Interactive, backend paused and not inteactive (Pause menu)
+* UI non-interactive, backend interactive (gameplay with HUD scoreboard timer).
+
+When UI is interactive, no input (keyboard, mouse, gamepad) is passed to the backend, neither normal gameplay nor dev free camera.
+When mouse is hovered over DevUi, input is not passed at all to UI nor backend. Dev function keys always remain active.
+
+UI screens will set text fields from a stringDb. There will be a central StringDbManager to which all UI screens will register. If the language is changed and a new underlying set of localized strings is selected, the StringDbManager calls UpdateStrings on all its registered screens, in which each of them queries to get the text for each of their strings. Question, do screens require copies of the text or can they point to the copy owned by the StringDbManager? Also for init, should screens set their text on init, or wait until all screen objects are instantiated and have registered with StringDbManager, then simply call StringDbManager.Refresh?
+
+Should All screens should perform an initial Init on boot, where any one-time init is done so that transitions from one screen to another are seamless, with all screen elements pre-allocated. Consider if this is the best approach, should initial layouts be calculated ahead or when transitioning?
+
+Read the planning workin progress UI reference folde c# docs for possible ideas.
+
+
+Add a state transition from AppStateBoot to AppStateShowcase. AppStateBoot will have interactable == UI only. After transitioning to AppStateShowcase, the UI will have a HUD and be non-interactable, world will be interactable. InputTrigger::GamepadSelect triggers a pause, which will pause World updating, set interactable == UI and transition to a pause menu. Pause menu back button returns to the previous UI hud and interactable == world. Pausing the world like this will be a perAppState 
+
+
+///////////////////
+// 
+////////////////////
+
+Create a doc in DevDocs\ChillCoreDevDocs\docs that describes teh rendering pipeline with a getting-started tone. It
+  is intended for developers to read before learning the rendering system. Do not repeat code. Use the Technical
+  Writing Guideline. Include the details above about Frame and Material uniform optimizations. This likely makes the
+  TransparencyRendering.md redundant
+  
+Open questions for you to confirm
+
+  1. Scope match — Ship APK running AppStateShowcase with touch yaw/pitch. Yes?
+  2. Build system — Standalone Android/ Gradle project alongside ChillCore.sln, no unified CMake yet. OK?
+  3. Project location — Android/ at repo root (vs. Code/App/Platforms/Android/). Preference?
+  4. GameActivity — confirm (matches sample). Or do you want plain NativeActivity?
+  5. Shader handling — auto-inject #version 310 es + precision qualifiers in ShaderManager, fix any desktop-only syntax
+  in place. OK or prefer per-target variants?
+  6. DevUi — disable for Android v1 via CC_DISABLE_DEVUI. OK?
+  7. ABI/min SDK — arm64-v8a only, minSdk 34. Confirm?
+  8. Save plan? — Should I write this to DevDocs/Planning/WorkInProgress/AndroidPortPlan.md once you've confirmed/edited
+   the answers above?
+   
+Todo:
+if (sharedMesh != nullptr)
+
+///////////////////
+//
+//////////////////
+Update index.md for instructions on how to build for android, remove the link to the planning doc.
+Add a section teh describes the Architecture, Guidelines, and KnowledgeBase folders. 
+Review the Architecture section and we will decide if a Getting Started AGD-0001 doc would be better suited as an overview.
+
+
+In all cases where the terms 'surface' and 'context' are used in reference to rendering, qualify them in-situ as they are vague without context. 

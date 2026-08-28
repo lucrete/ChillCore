@@ -1,0 +1,64 @@
+.root {
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: robotoRegular;
+}
+
+.hud-top {
+    flex-direction: row;
+    align-items: center;
+    gap: 8;
+    padding: 8;
+}
+
+.hud-timer {
+    padding: 8 16;
+    font-size: 20;
+    color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.hud-pause {
+    width: 36;
+    height: 36;
+    padding: 0;
+    text-align: center;
+    font-size: 18;
+    color: rgba(255, 255, 255, 0.85);
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+.hud-pause:hover {
+    background-color: rgba(40, 40, 70, 0.9);
+    color: #FFFFFF;
+}
+
+.hud-pause:active {
+    background-color: rgba(70, 70, 120, 1.0);
+}
+
+.joystick {
+    position: absolute;
+    bottom: 80;
+    width: 240;
+    height: 240;
+    background-image: circle256;
+    opacity: 0.45;
+}
+
+.joystick-left {
+    left: 80;
+}
+
+.joystick-right {
+    right: 80;
+}
+
+.joystick-knob {
+    width: 110;
+    height: 110;
+    background-image: circle256;
+    opacity: 0.85;
+}

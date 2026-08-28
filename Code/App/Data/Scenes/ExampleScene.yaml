@@ -1,0 +1,128 @@
+# Example Scene for ChillCore24
+name: ExampleScene
+
+materials:
+  - name: PrimaryMaterial
+    shader: LitColour
+    texture: DefaultBase.png
+    baseColor: [1.0, 0.8, 0.2, 1.0]
+    tiling: [1.0, 1.0]
+
+  - name: SecondaryMaterial
+    shader: LitColour
+    texture: TestPattern.png
+    baseColor: [1.0, 1.0, 1.0, 1.0]
+    tiling: [1.0, 1.0]
+
+  - name: TransparentBlue
+    shader: LitColour
+    baseColor: [0.3, 0.5, 1.0]
+    opacity: 0.5
+
+objects:
+  - name: Ground
+    transform:
+      position: [0.0, 0.0, 0.0]
+      rotation: [-90.0, 0.0, 0.0]
+      scale: [5.0, 5.0, 1.0]
+    components:
+      - type: RenderableQuad
+        material: SecondaryMaterial
+
+  - name: AlphaBlendTest
+    gltf: Data/Meshes/AlphaBlendModeTest.glb
+    transform:
+      position: [0.0, 1.0, 0.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+
+  - name: SampleObjectGroup
+    transform:
+      position: [-10.0, 2.0, -5.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    children:
+      - name: YellowSphere
+        transform:
+          position: [0.0, 0.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableSphere
+            material: PrimaryMaterial
+          - type: RotateRandom
+        children:
+          - name: Attachment
+            transform:
+              position: [1.5, 0.0, 0.0]
+              rotation: [0.0, 0.0, 0.0]
+              scale: [0.5, 0.5, 0.5]
+            components:
+              - type: RenderableCube
+                material: SecondaryMaterial
+      - name: TexturedCube
+        transform:
+          position: [4.0, 0.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableMesh
+            mesh: Data/Meshes/untitled.obj
+          - type: RotateRandom
+      - name: GltfSample
+        gltf: Data/Meshes/DamagedHelmet.glb
+        transform:
+          position: [8.0, 0.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+      - name: Quad01
+        transform:
+          position: [4.0, 2.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableQuad
+            material: InWorldQuad
+      - name: Quad02
+        transform:
+          position: [8.0, 2.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableQuad
+            material: InWorldQuad
+      - name: Sphere01
+        transform:
+          position: [10.0, 0.0, -5.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableMesh
+            mesh: Data/Meshes/Primitives/sphere.obj
+            material: Concrete
+      - name: Sphere02
+        transform:
+          position: [12.0, 0.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableMesh
+            mesh: Data/Meshes/Primitives/sphere.obj
+            material: DevYellow
+      - name: Sphere03
+        transform:
+          position: [14.0, 0.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.0, 1.0, 1.0]
+        components:
+          - type: RenderableMesh
+            mesh: Data/Meshes/Primitives/sphere.obj
+            material: BlueTestPattern
+      - name: TransparentSphere
+        transform:
+          position: [17.0, 0.0, 0.0]
+          rotation: [0.0, 0.0, 0.0]
+          scale: [1.5, 1.5, 1.5]
+        components:
+          - type: RenderableSphere
+            material: TransparentBlue

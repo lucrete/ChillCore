@@ -1,0 +1,60 @@
+<div class="root">
+    <div class="top-bar">
+        <p class="title">Audio Tracker</p>
+        <button class="top-bar-button" data-action="saveProject">Save</button>
+        <button class="top-bar-button" data-action="loadProject">Load</button>
+        <button class="back-button" data-action="backToMainMenu">Back to Main Menu</button>
+    </div>
+    <div class="workspace">
+        <div id="sample-panel" class="panel sample-panel">
+            <p class="panel-title">Samples</p>
+            <p id="samplesMemoryLabel" class="samples-memory">Memory: 0.0 MB</p>
+            <p class="sample-hint">Drag a WAV or OGG onto the window to import.</p>
+            <div id="samplesList" class="samples-list"></div>
+        </div>
+        <div class="right-column">
+            <div id="song-view" class="panel song-view">
+                <div class="song-header">
+                    <p class="panel-title">Song</p>
+                    <button class="song-add-track-button" data-action="addSongTrack">Add Song Track</button>
+                    <button class="song-play-button" data-action="playSong">Play Song</button>
+                    <button class="song-stop-button" data-action="stopSong">Stop</button>
+                </div>
+                <div class="transport-row">
+                    <p class="transport-label">BPM</p>
+                    <button class="transport-step-button" data-action="bpmDown">−</button>
+                    <p id="bpmValue" class="transport-value">90</p>
+                    <button class="transport-step-button" data-action="bpmUp">+</button>
+                    <p class="transport-label">Time</p>
+                    <button class="transport-step-button" data-action="tsNumDown">−</button>
+                    <p id="tsNumValue" class="transport-value">4</p>
+                    <button class="transport-step-button" data-action="tsNumUp">+</button>
+                    <p class="transport-slash">/</p>
+                    <button class="transport-step-button" data-action="tsDenDown">−</button>
+                    <p id="tsDenValue" class="transport-value">4</p>
+                    <button class="transport-step-button" data-action="tsDenUp">+</button>
+                    <p class="transport-label">Bars</p>
+                    <button class="transport-step-button" data-action="lengthDown">−</button>
+                    <p id="lengthValue" class="transport-value">8</p>
+                    <button class="transport-step-button" data-action="lengthUp">+</button>
+                </div>
+                <div id="songGrid" class="song-grid"></div>
+            </div>
+            <div id="pattern-editor" class="panel pattern-editor">
+                <div class="pattern-tabs-row">
+                    <div id="patternTabs" class="pattern-tabs"></div>
+                    <button class="pattern-tabs-add" data-action="addPattern">+</button>
+                    <button class="pattern-tabs-remove" data-action="removeCurrentPattern">−</button>
+                </div>
+                <div class="pattern-header">
+                    <p class="panel-title">Pattern</p>
+                    <button class="pattern-add-track-button" data-action="addPatternTrack">Add Track</button>
+                    <button class="pattern-audition-button" data-action="auditionPattern">Audition</button>
+                    <button class="pattern-stop-button" data-action="stopAudition">Stop</button>
+                </div>
+                <div id="patternGrid" class="pattern-grid"></div>
+                <button id="prototypeLoopButton" class="prototype-loop-button" data-action="togglePrototypeLoop">Play prototype loop</button>
+            </div>
+        </div>
+    </div>
+</div>

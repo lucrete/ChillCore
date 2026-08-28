@@ -1,0 +1,18 @@
+// Calculate the minimum distance from a point to a line segment
+float distanceToLineSegment(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    return length(pa - ba * h);
+}
+
+// Function to render a line segment with anti-aliasing
+float lineSegment(vec2 uv, vec2 point1, vec2 point2, float lineWidth) {
+    float distance = distanceToLineSegment(uv, point1, point2);
+    return smoothstep(lineWidth, lineWidth - 0.005, distance);
+}
+
+vec3 drawLine(vec3 backgroundColor, vec3 lineColor, vec2 uv, vec2 point1, vec2 point2, float lineWidth) {
+    float line = lineSegment(uv, point1, point2, lineWidth);
+    return mix(backgroundColor, lineColor, line);
+}

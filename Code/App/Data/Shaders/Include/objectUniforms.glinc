@@ -1,0 +1,10 @@
+// Per-draw uniform buffer. Bound by Gfx::RenderApi::SetPushConstants.
+// Engine-side layout: CC::ObjectUniforms in Code/Core/Rendering/ObjectUniforms.h.
+// Slot must match OBJECT_UNIFORMS_BINDING_SLOT in Code/Core/Rendering/UniformBindings.h.
+// Sized to 128 bytes — the "push tier", mapped to native push constants on
+// Vulkan / D3D12 backends.
+layout(std140, binding = 2) uniform ObjectUniforms
+{
+    mat4 mvp;
+    mat4 model;
+} objectUniforms;
