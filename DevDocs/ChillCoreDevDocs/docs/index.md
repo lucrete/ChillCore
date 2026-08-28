@@ -81,6 +81,7 @@ See [AGD-0040: Build and Targets](Architecture/AGD-0040-BuildAndTargets.md) for 
 * Add preprocessor define CC_PRINT_ENABLED to Debug configuration.
 * Configure build output directories.
 * Set Configuration Properties->Debugging Working Directory to `$(ProjectDir)..\..\App`. Asset paths in code are `Data/...`-relative from there.
+* Generate the Solution Explorer filters. `Code.vcxproj.filters` is machine-local and not committed, so a fresh clone shows every file in one flat list. Ask Claude: *"Add Visual Studio filters so that the solution explorer is presented in the exact on-disk hierarchy"*. It reads the item list out of `Code.vcxproj` and writes a filter tree that mirrors the folders under `Code`. Repeat it after adding files to the project.
 
 ## Procedural Art
 * Set the shader being worked in the ProcArt material created in MaterialManager.
