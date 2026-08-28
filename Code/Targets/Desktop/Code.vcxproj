@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{be567f87-1680-4a30-b27e-c938e166015c}</ProjectGuid>
+    <RootNamespace>Code</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>ChillCore</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\..\..\Build\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>..\..\..\Build\Intermedite\$(ShortProjectName)\$(Platform)\$(Configuration)\</IntDir>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)..\..\App</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);GLFW_INCLUDE_NONE;CC_PRINT_ENABLED;CC_DEBUG</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\..\Core\Ui;..\..\Core\Ui\Font;..\..\Core\Ui\DevUi;..\..\Core\Ui\Layout;..\..\Core\Ui\Elements;..\..\Core\Ui\Rendering;..\..\Core\Ui\Interaction;..\..\Packages\pugixml-1.15\src;..\..\Packages\nlohmann;..\..\Packages\imgui\backends;..\..\Packages\imgui;..\..\Core\Rendering\Cameras;..\..\Core\Rendering\Lighting;..\..\Core\Rendering\Materials;..\..\Core\Rendering\Renderables;..\..\Core\Rendering\ShaderManagement;..\..\Core\Rendering\TextureManagement;..\..\Core\Rendering\Uniforms;..\..\Core\Rendering\Gfx;..\..\Core\SceneManagement;..\..\Core\Components;..\..\Packages\zlib;..\..\App;..\..\Core\Rendering\Gfx\OpenGl;..\..\Core\Rendering\Gfx\GlCommon;..\..\App\ProceduralArt;..\..\App\AppStates;..\..\App\UiScreens;..\..\Packages\glfw-3.4.bin.WIN64\include;..\..\Packages\include\KHR;..\..\Packages\include\glad;..\..\Packages\include;..\..\Core\Input;..\..\Core\Platform;..\..\Core\Platform\Desktop;..\..\Core\Rendering;..\..\Core\StateMachine;..\..\Core\CCUtils;..\..\Core;..\..\Packages\rapidyaml;..\..\Packages\cgltf-1.15;..\..\Packages\stb_image;..\..\Packages\miniaudio;..\..\Core\Audio;..\..\Core\AudioTracker;..\..\Core\AudioTracker\Synthesis;..\..\Core\AudioTracker\Synthesis\Generators;..\..\Core\AudioTracker\Commands;..\..\App\AudioTracker;..\..\App\AudioTracker\UiScreens;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\..\Packages\zlib;..\..\Packages\glfw-3.4.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3_mt.lib;opengl32.lib;libz-static-d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IgnoreSpecificDefaultLibraries>LIBCMT</IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);GLFW_INCLUDE_NONE</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\..\Core\Ui;..\..\Core\Ui\Font;..\..\Core\Ui\DevUi;..\..\Core\Ui\Layout;..\..\Core\Ui\Elements;..\..\Core\Ui\Rendering;..\..\Core\Ui\Interaction;..\..\Packages\pugixml-1.15\src;..\..\Packages\nlohmann;..\..\Packages\imgui\backends;..\..\Packages\imgui;..\..\Core\Rendering\Cameras;..\..\Core\Rendering\Lighting;..\..\Core\Rendering\Materials;..\..\Core\Rendering\Renderables;..\..\Core\Rendering\ShaderManagement;..\..\Core\Rendering\TextureManagement;..\..\Core\Rendering\Uniforms;..\..\Core\Rendering\Gfx;..\..\Core\SceneManagement;..\..\Core\Components;..\..\Packages\zlib;..\..\App;..\..\Core\Rendering\Gfx\OpenGl;..\..\Core\Rendering\Gfx\GlCommon;..\..\App\ProceduralArt;..\..\App\AppStates;..\..\App\UiScreens;..\..\Packages\glfw-3.4.bin.WIN64\include;..\..\Packages\include\KHR;..\..\Packages\include\glad;..\..\Packages\include;..\..\Core\Input;..\..\Core\Platform;..\..\Core\Platform\Desktop;..\..\Core\Rendering;..\..\Core\StateMachine;..\..\Core\CCUtils;..\..\Core;..\..\Packages\rapidyaml;..\..\Packages\cgltf-1.15;..\..\Packages\stb_image;..\..\Packages\miniaudio;..\..\Core\Audio;..\..\Core\AudioTracker;..\..\Core\AudioTracker\Synthesis;..\..\Core\AudioTracker\Synthesis\Generators;..\..\Core\AudioTracker\Commands;..\..\App\AudioTracker;..\..\App\AudioTracker\UiScreens;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>..\..\Packages\zlib;..\..\Packages\glfw-3.4.bin.WIN64\lib-vc2022;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3_mt.lib;opengl32.lib;libz-static.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\App\AppMain.cpp" />
+    <ClCompile Include="..\..\App\AppStates\AppStateBoot.cpp" />
+    <ClCompile Include="..\..\App\AppStates\AppStateShowcase.cpp" />
+    <ClCompile Include="..\..\App\AppStates\AppStateAudioTest.cpp" />
+    <ClCompile Include="..\..\App\AudioTracker\AppStateAudioTracker.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\ShowcaseController.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\MainMenuController.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\OptionsController.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\ShowcaseHudController.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\PauseMenuController.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\AudioTestController.cpp" />
+    <ClCompile Include="..\..\App\AudioTracker\UiScreens\AudioTrackerController.cpp" />
+    <ClCompile Include="..\..\App\ProceduralArt\ProceduralArtController.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\CCUtils\GltfLoader.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\CCUtils\ObjLoader.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\CCUtils\PngLoader.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Input\InputActionMap.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Input\InputTriggerMap.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="MainDesktop.cpp" />
+    <ClCompile Include="..\..\Core\CCUtils\CCFile.cpp" />
+    <ClCompile Include="..\..\Core\CCUtils\CCMath.cpp" />
+    <ClCompile Include="..\..\Core\CCUtils\FrameTimer.cpp" />
+    <ClCompile Include="..\..\Core\CCUtils\PrintManager.cpp" />
+    <ClCompile Include="..\..\Core\CoreMain.cpp" />
+    <ClCompile Include="..\..\Core\Input\InputManager.cpp" />
+    <ClCompile Include="..\..\Core\Platform\PlatformFileSystem.cpp" />
+    <ClCompile Include="..\..\Core\Platform\Desktop\PlatformFileSystemDesktop.cpp" />
+    <ClCompile Include="..\..\Core\Platform\Desktop\PlatformInputGlfw.cpp" />
+    <ClCompile Include="..\..\Core\Platform\Desktop\PlatformWindowGlfw.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Cameras\CameraBase.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Cameras\CameraFree.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Cameras\CameraManager.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Cameras\CameraStatic.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Lighting\LightDirectional.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Rendering\Lighting\LightManager.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Rendering\Materials\Material.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Materials\MaterialManager.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\PipelineCache.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Gfx\OpenGl\FrameBufferOpenGl.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Gfx\GfxRenderApi.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Gfx\GlCommon\GlHandlePool.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Gfx\OpenGl\gl.c" />
+    <ClCompile Include="..\..\Core\Rendering\Gfx\OpenGl\GfxRenderApiOpenGl.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Renderables\Renderable.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Renderables\RenderableCube.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Rendering\Renderables\RenderableFullscreenQuad.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Renderables\RenderableMesh.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Rendering\Renderables\RenderableQuad.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\Renderables\RenderableSphere.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Rendering\RenderManager.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\ShaderManagement\ShaderDefinition.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\ShaderManagement\ShaderManager.cpp" />
+    <ClCompile Include="..\..\Core\Rendering\TextureManagement\Texture.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Rendering\TextureManagement\TextureManager.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\SceneManagement\Transform.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\SceneManagement\SceneObject.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\SceneManagement\Component.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\SceneManagement\SceneHierarchy.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\SceneManagement\SceneLoader.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\SceneManagement\ComponentFactory.cpp" />
+    <ClCompile Include="..\..\Core\Components\RotateRandom.cpp" />
+    <ClCompile Include="..\..\Core\StateMachine\StateMachine.cpp" />
+    <ClCompile Include="..\..\Core\Ui\DevUi\DevUi.cpp">
+      <SubType>
+      </SubType>
+    </ClCompile>
+    <ClCompile Include="..\..\Core\Ui\DevUi\CommandConsole.cpp" />
+    <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewCommandConsole.cpp" />
+    <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewFrameProfile.cpp" />
+    <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewSceneHierarchy.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Font\Font.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Font\FontManager.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Font\TextRenderer.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Layout\UiStyle.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Layout\UiCssParser.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Layout\UiHtmlParser.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Layout\UiLayoutEngine.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiElement.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiPanel.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiButton.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiText.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiSlider.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiToggle.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiDropdown.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Elements\UiJoystick.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Rendering\UiRenderer.cpp" />
+    <ClCompile Include="..\..\Core\Ui\UiManager.cpp" />
+    <ClCompile Include="..\..\Core\Ui\UiScreenSystem.cpp" />
+    <ClCompile Include="..\..\Core\Ui\StringDbManager.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Interaction\UiInputHandler.cpp" />
+    <ClCompile Include="..\..\Core\Ui\Interaction\UiCallbackMap.cpp" />
+    <ClCompile Include="..\..\Packages\pugixml-1.15\src\pugixml.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\backends\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\imgui.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\..\Packages\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\Packages\miniaudio\stb_vorbis.c" />
+    <ClCompile Include="..\..\Core\Audio\AudioManager.cpp" />
+    <ClCompile Include="..\..\Core\Audio\Sound.cpp" />
+    <ClCompile Include="..\..\Core\Audio\MiniaudioImpl.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\TrackerCommandHistory.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\TrackerClock.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\TrackerEngine.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Synthesis\Synthesis.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Synthesis\Generators\KickGenerator.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Synthesis\Generators\SnareGenerator.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Synthesis\Generators\HiHatGenerator.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\TrackerPaths.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\SampleLibrary.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\AddPatternTrackCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\ToggleStepCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\AssignSourceToPatternTrackCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\RemovePatternTrackCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\AddPatternCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\RemovePatternCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\AddSongTrackCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\PlacePatternInSongCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\TogglePatternTrackMutedCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\ToggleSongTrackMutedCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\SetBpmCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\SetTimeSignatureCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\Commands\SetSongLengthCommand.cpp" />
+    <ClCompile Include="..\..\Core\AudioTracker\TrackerProjectFile.cpp" />
+    <ClCompile Include="..\..\Core\CCUtils\Sha1.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\App\AppMain.h" />
+    <ClInclude Include="..\..\App\AppStates\AppStateBoot.h" />
+    <ClInclude Include="..\..\App\AppStates\AppStateShowcase.h" />
+    <ClInclude Include="..\..\App\AppStates\AppStateAudioTest.h" />
+    <ClInclude Include="..\..\App\AudioTracker\AppStateAudioTracker.h" />
+    <ClInclude Include="..\..\App\UiScreens\ShowcaseController.h" />
+    <ClInclude Include="..\..\App\UiScreens\MainMenuController.h" />
+    <ClInclude Include="..\..\App\UiScreens\OptionsController.h" />
+    <ClInclude Include="..\..\App\UiScreens\ShowcaseHudController.h" />
+    <ClInclude Include="..\..\App\UiScreens\PauseMenuController.h" />
+    <ClInclude Include="..\..\App\UiScreens\AudioTestController.h" />
+    <ClInclude Include="..\..\App\AudioTracker\UiScreens\AudioTrackerController.h" />
+    <ClInclude Include="..\..\App\ProceduralArt\ProceduralArtController.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\AppMainInterface.h" />
+    <ClInclude Include="..\..\Core\CCUtils\CCAssert.h" />
+    <ClInclude Include="..\..\Core\CCUtils\CCFile.h" />
+    <ClInclude Include="..\..\Core\CCUtils\CCMat4x4.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\CCUtils\CCColour.h" />
+    <ClInclude Include="..\..\Core\CCUtils\CCMath.h" />
+    <ClInclude Include="..\..\Core\CCUtils\CCQuaternion.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\CCUtils\CCVector2.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\CCUtils\CCVector3.h" />
+    <ClInclude Include="..\..\Core\CCUtils\CCVector4.h" />
+    <ClInclude Include="..\..\Core\CCUtils\GltfLoader.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\CCUtils\ObjLoader.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\CCUtils\PngLoader.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\CCUtils\FrameTimer.h" />
+    <ClInclude Include="..\..\Core\CCUtils\PrintManager.h" />
+    <ClInclude Include="..\..\Core\CoreMain.h" />
+    <ClInclude Include="..\..\Core\Input\InputActionMap.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Input\InputCodes.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Input\InputManager.h" />
+    <ClInclude Include="..\..\Core\Platform\PlatformFileSystem.h" />
+    <ClInclude Include="..\..\Core\Platform\Desktop\PlatformFileSystemDesktop.h" />
+    <ClInclude Include="..\..\Core\Platform\PlatformInput.h" />
+    <ClInclude Include="..\..\Core\Platform\Desktop\PlatformInputGlfw.h" />
+    <ClInclude Include="..\..\Core\Platform\Desktop\PlatformWindowGlfw.h" />
+    <ClInclude Include="..\..\Core\Platform\PlatformWindow.h" />
+    <ClInclude Include="..\..\Core\Input\InputTriggerMap.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\Cameras\CameraBase.h" />
+    <ClInclude Include="..\..\Core\Rendering\Cameras\CameraFree.h" />
+    <ClInclude Include="..\..\Core\Rendering\Cameras\CameraManager.h" />
+    <ClInclude Include="..\..\Core\Rendering\Cameras\CameraStatic.h" />
+    <ClInclude Include="..\..\Core\Rendering\Lighting\LightDirectional.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\Lighting\LightManager.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\Uniforms\FrameUniforms.h" />
+    <ClInclude Include="..\..\Core\Rendering\Renderables\QuadMesh.h" />
+    <ClInclude Include="..\..\Core\Rendering\Materials\Material.h" />
+    <ClInclude Include="..\..\Core\Rendering\Materials\MaterialManager.h" />
+    <ClInclude Include="..\..\Core\Rendering\Uniforms\MaterialUniforms.h" />
+    <ClInclude Include="..\..\Core\Rendering\PipelineCache.h" />
+    <ClInclude Include="..\..\Core\Rendering\Uniforms\ObjectUniforms.h" />
+    <ClInclude Include="..\..\Core\Rendering\Uniforms\UniformBindings.h" />
+    <ClInclude Include="..\..\Core\Ui\Font\TextUniforms.h" />
+    <ClInclude Include="..\..\Core\Ui\Rendering\UiUniforms.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\OpenGl\FrameBufferOpenGl.h" />
+    <ClInclude Include="..\..\Core\Rendering\Renderables\Renderable.h" />
+    <ClInclude Include="..\..\Core\Rendering\Renderables\RenderableCube.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\Renderables\RenderableFullscreenQuad.h" />
+    <ClInclude Include="..\..\Core\Rendering\Renderables\RenderableMesh.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\Renderables\RenderableQuad.h" />
+    <ClInclude Include="..\..\Core\Rendering\Renderables\RenderableSphere.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GfxCapabilities.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GfxDescriptions.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GfxEnums.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GfxHandles.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GfxRenderApi.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GlCommon\GlHandlePool.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\GlCommon\GlScopeTimer.h" />
+    <ClInclude Include="..\..\Core\Rendering\Gfx\OpenGl\GfxRenderApiOpenGl.h" />
+    <ClInclude Include="..\..\Core\Rendering\RenderManager.h" />
+    <ClInclude Include="..\..\Core\Rendering\ShaderManagement\ShaderDefinition.h" />
+    <ClInclude Include="..\..\Core\Rendering\ShaderManagement\ShaderManager.h" />
+    <ClInclude Include="..\..\Core\Rendering\TextureManagement\Texture.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Rendering\TextureManagement\TextureManager.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\SceneManagement\Transform.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\SceneManagement\SceneObject.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\SceneManagement\Component.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\SceneManagement\SceneHierarchy.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\SceneManagement\SceneLoader.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\SceneManagement\ComponentFactory.h" />
+    <ClInclude Include="..\..\Core\Components\RotateRandom.h" />
+    <ClInclude Include="..\..\Core\StateMachine\StateMachine.h" />
+    <ClInclude Include="..\..\Core\StateMachine\StateMachineState.h" />
+    <ClInclude Include="..\..\Core\Ui\DevUi\DevUi.h">
+      <SubType>
+      </SubType>
+    </ClInclude>
+    <ClInclude Include="..\..\Core\Ui\DevUi\CommandConsole.h" />
+    <ClInclude Include="..\..\Core\Ui\DevUi\DevUiView.h" />
+    <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewCommandConsole.h" />
+    <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewFrameProfile.h" />
+    <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewSceneHierarchy.h" />
+    <ClInclude Include="..\..\Core\Ui\Font\Font.h" />
+    <ClInclude Include="..\..\Core\Ui\Font\FontManager.h" />
+    <ClInclude Include="..\..\Core\Ui\Font\TextRenderer.h" />
+    <ClInclude Include="..\..\Core\Ui\Layout\UiStyle.h" />
+    <ClInclude Include="..\..\Core\Ui\Layout\UiCssParser.h" />
+    <ClInclude Include="..\..\Core\Ui\Layout\UiHtmlParser.h" />
+    <ClInclude Include="..\..\Core\Ui\Layout\UiLayoutEngine.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiElement.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiPanel.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiButton.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiText.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiSlider.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiToggle.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiDropdown.h" />
+    <ClInclude Include="..\..\Core\Ui\Elements\UiJoystick.h" />
+    <ClInclude Include="..\..\Core\Ui\Rendering\UiRenderer.h" />
+    <ClInclude Include="..\..\Core\Ui\UiManager.h" />
+    <ClInclude Include="..\..\Core\Ui\UiScreenSystem.h" />
+    <ClInclude Include="..\..\Core\Ui\UiScreenController.h" />
+    <ClInclude Include="..\..\Core\Ui\UiScreenDef.h" />
+    <ClInclude Include="..\..\Core\Ui\StringDbManager.h" />
+    <ClInclude Include="..\..\Core\Ui\Interaction\UiInputHandler.h" />
+    <ClInclude Include="..\..\Core\Ui\Interaction\UiCallbackMap.h" />
+    <ClInclude Include="..\..\Packages\glfw-3.4.bin.WIN64\include\GLFW\glfw3.h" />
+    <ClInclude Include="..\..\Packages\glfw-3.4.bin.WIN64\include\GLFW\glfw3native.h" />
+    <ClInclude Include="..\..\Packages\imgui\backends\imgui_impl_glfw.h" />
+    <ClInclude Include="..\..\Packages\imgui\backends\imgui_impl_opengl3.h" />
+    <ClInclude Include="..\..\Packages\imgui\imconfig.h" />
+    <ClInclude Include="..\..\Packages\imgui\imgui.h" />
+    <ClInclude Include="..\..\Packages\imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\Packages\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\..\Packages\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\..\Packages\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\..\Packages\cgltf-1.15\cgltf.h" />
+    <ClInclude Include="..\..\Packages\stb_image\stb_image.h" />
+    <ClInclude Include="..\..\Packages\miniaudio\miniaudio.h" />
+    <ClInclude Include="..\..\Core\Audio\AudioManager.h" />
+    <ClInclude Include="..\..\Core\Audio\Sound.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerCommandHistory.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerClock.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerEngine.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Synthesis\Synthesis.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Synthesis\SynthPresets.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Synthesis\Generators\KickGenerator.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Synthesis\Generators\SnareGenerator.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Synthesis\Generators\HiHatGenerator.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerPaths.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\SampleLibrary.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackSource.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Pattern.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerProject.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\AddPatternTrackCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\ToggleStepCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\AssignSourceToPatternTrackCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\RemovePatternTrackCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\AddPatternCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\RemovePatternCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\AddSongTrackCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\PlacePatternInSongCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\TogglePatternTrackMutedCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\ToggleSongTrackMutedCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\SetBpmCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\SetTimeSignatureCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\Commands\SetSongLengthCommand.h" />
+    <ClInclude Include="..\..\Core\AudioTracker\TrackerProjectFile.h" />
+    <ClInclude Include="..\..\Core\CCUtils\Sha1.h" />
+    <ClInclude Include="..\..\Packages\include\glad\gl.h" />
+    <ClInclude Include="..\..\Packages\include\KHR\khrplatform.h" />
+    <ClInclude Include="..\..\Packages\include\linmath.h" />
+    <ClInclude Include="..\..\Packages\nlohmann\json.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\App\Data\Fonts\robotoBold.json" />
+    <None Include="..\..\App\Data\Fonts\robotoBold.png" />
+    <None Include="..\..\App\Data\Fonts\robotoLight.json" />
+    <None Include="..\..\App\Data\Fonts\robotoLight.png" />
+    <None Include="..\..\App\Data\Fonts\robotoMedium.json" />
+    <None Include="..\..\App\Data\Fonts\robotoMedium.png" />
+    <None Include="..\..\App\Data\Fonts\robotoRegular.json" />
+    <None Include="..\..\App\Data\Fonts\robotoRegular.png" />
+    <None Include="..\..\App\Data\Meshes\AlphaBlendModeTest.glb" />
+    <None Include="..\..\App\Data\Meshes\DamagedHelmet.glb" />
+    <None Include="..\..\App\Data\Meshes\gumpwave.png" />
+    <None Include="..\..\App\Data\Meshes\untitled.mtl" />
+    <None Include="..\..\App\Data\Meshes\untitled.obj" />
+    <None Include="..\..\App\Data\Meshes\Primitives\sphere.obj" />
+    <None Include="..\..\App\Data\Scenes\BootScene.yaml" />
+    <None Include="..\..\App\Data\Scenes\ExampleScene.yaml" />
+    <None Include="..\..\App\Data\Shaders\defaultBasic.glsl" />
+    <None Include="..\..\App\Data\Shaders\defaultError.glsl" />
+    <None Include="..\..\App\Data\Shaders\Include\drawLine.glinc" />
+    <None Include="..\..\App\Data\Shaders\Include\frameUniforms.glinc" />
+    <None Include="..\..\App\Data\Shaders\Include\gradients.glinc" />
+    <None Include="..\..\App\Data\Shaders\Include\materialUniforms.glinc" />
+    <None Include="..\..\App\Data\Shaders\Include\objectUniforms.glinc" />
+    <None Include="..\..\App\Data\Shaders\Include\textUniforms.glinc" />
+    <None Include="..\..\App\Data\Shaders\Include\uiUniforms.glinc" />
+    <None Include="..\..\App\Data\Shaders\ProceduralArt\gradientViewer.glsl" />
+    <None Include="..\..\App\Data\Shaders\ProceduralArt\mandelbrot2d.glsl" />
+    <None Include="..\..\App\Data\Shaders\ProceduralArt\radialWaves.glsl" />
+    <None Include="..\..\App\Data\Shaders\ProceduralArt\trigWaves.glsl" />
+    <None Include="..\..\App\Data\Shaders\ProceduralArt\unitCircleRipples.glsl" />
+    <None Include="..\..\App\Data\Shaders\Rendering\fullScreenBlit.glsl" />
+    <None Include="..\..\App\Data\Shaders\Rendering\fullScreenFade.glsl" />
+    <None Include="..\..\App\Data\Shaders\Rendering\fullScreenQuad.glsl" />
+    <None Include="..\..\App\Data\Shaders\Rendering\litColour.glsl" />
+    <None Include="..\..\App\Data\Shaders\Rendering\pbr.glsl" />
+    <None Include="..\..\App\Data\Shaders\Rendering\texture.glsl" />
+    <None Include="..\..\App\Data\Shaders\Ui\msdfText.glsl" />
+    <None Include="..\..\App\Data\Shaders\Ui\uiQuad.glsl" />
+    <None Include="..\..\App\Data\Strings\en.yaml" />
+    <None Include="..\..\App\Data\Textures\circle256.png" />
+    <None Include="..\..\App\Data\Textures\DefaultBase.png" />
+    <None Include="..\..\App\Data\Textures\glassPanel.png" />
+    <None Include="..\..\App\Data\Textures\glossyButton.png" />
+    <None Include="..\..\App\Data\Textures\TestPattern.png" />
+    <None Include="..\..\App\Data\Ui\AudioTest.css" />
+    <None Include="..\..\App\Data\Ui\AudioTest.html" />
+    <None Include="..\..\App\Data\Ui\AudioTracker.css" />
+    <None Include="..\..\App\Data\Ui\AudioTracker.html" />
+    <None Include="..\..\App\Data\Ui\MainMenu.css" />
+    <None Include="..\..\App\Data\Ui\MainMenu.html" />
+    <None Include="..\..\App\Data\Ui\Options.css" />
+    <None Include="..\..\App\Data\Ui\Options.html" />
+    <None Include="..\..\App\Data\Ui\PauseMenu.css" />
+    <None Include="..\..\App\Data\Ui\PauseMenu.html" />
+    <None Include="..\..\App\Data\Ui\Showcase.css" />
+    <None Include="..\..\App\Data\Ui\Showcase.html" />
+    <None Include="..\..\App\Data\Ui\ShowcaseHud.css" />
+    <None Include="..\..\App\Data\Ui\ShowcaseHud.html" />
+    <None Include="..\..\App\Data\Ui\TestMenu.css" />
+    <None Include="..\..\App\Data\Ui\TestMenu.html" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

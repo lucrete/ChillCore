@@ -1,0 +1,13 @@
+// Per-material uniform buffer. Bound by Material::SetStandardUniforms.
+// Engine-side layout: CC::MaterialUniforms in Code/Core/Rendering/MaterialUniforms.h.
+// Slot must match MATERIAL_UNIFORMS_BINDING_SLOT in Code/Core/Rendering/UniformBindings.h.
+// Scalars packed into the w of surrounding vec4s to match std140 alignment.
+layout(std140, binding = 1) uniform MaterialUniforms
+{
+    vec4  baseColorAndOpacity;          // xyz = baseColor,      w = opacity
+    vec4  textureTilingAndAlphaCutoff;  // xy  = textureTiling,  z = alphaCutoff, w = unused
+    vec4  pbrFactors;                   // x   = metallicFactor, y = roughnessFactor, zw = unused
+    vec4  emissiveFactorPadded;         // xyz = emissiveFactor, w = unused
+    ivec4 alphaAndDebugMode;            // x   = alphaMode,      y = debugMode,   zw = unused
+    ivec4 textureFlags;                 // x   = hasNormal,      y = hasMetallicRoughness, z = hasOcclusion, w = hasEmissive
+} material;

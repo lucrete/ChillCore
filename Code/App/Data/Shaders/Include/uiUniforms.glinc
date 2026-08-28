@@ -1,0 +1,7 @@
+// UI quad uniform buffer. Bound by UiRenderer::EndFrame.
+// Engine-side layout: CC::UiUniforms in Code/Core/Ui/Rendering/UiUniforms.h.
+// Slot must match UI_UNIFORMS_BINDING_SLOT in Code/Core/Rendering/UniformBindings.h.
+layout(std140, binding = 3) uniform UiUniforms
+{
+    mat4 projection;
+} uiUniforms;

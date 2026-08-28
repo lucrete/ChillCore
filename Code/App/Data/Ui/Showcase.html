@@ -1,0 +1,117 @@
+<div class="root">
+
+    <!-- Left column: Text + Buttons -->
+    <div class="column">
+
+        <div class="section">
+            <button class="btn-back" data-action="back">Back</button>
+        </div>
+
+        <div class="section">
+            <span class="section-title">TEXT ELEMENTS</span>
+            <p class="heading">UI Showcase</p>
+            <p class="body-text">Body text with word wrapping for longer content that spans multiple lines in a panel.</p>
+            <span class="caption">Caption text for small details</span>
+            <span class="highlight">Highlighted inline text</span>
+        </div>
+
+        <div class="section">
+            <span class="section-title">BUTTONS</span>
+            <button class="btn-primary" data-action="primary">Primary Action</button>
+            <button class="btn" data-action="secondary">Secondary Action</button>
+            <button class="btn-danger" data-action="danger">Delete Item</button>
+            <div class="divider"></div>
+            <div class="btn-row">
+                <button class="btn-small" data-action="prev">Prev</button>
+                <button class="btn-small" data-action="play">Play</button>
+                <button class="btn-small" data-action="next">Next</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right column: Sliders + Toggles + Dropdown + Info -->
+    <div class="column">
+
+        <div class="section">
+            <span class="section-title">SLIDERS</span>
+            <div class="slider-row">
+                <span class="slider-label">Volume</span>
+                <input type="range" class="slider" min="0" max="100" value="75" data-action="volume" />
+            </div>
+            <div class="slider-row">
+                <span class="slider-label">Brightness</span>
+                <input type="range" class="slider" min="0" max="100" value="50" data-action="brightness" />
+            </div>
+            <div class="slider-row">
+                <span class="slider-label">FOV</span>
+                <input type="range" class="slider" min="60" max="120" value="90" data-action="fov" />
+            </div>
+        </div>
+
+        <div class="section">
+            <span class="section-title">TOGGLES</span>
+            <div class="toggle-row">
+                <span class="toggle-label">Fullscreen</span>
+                <input type="checkbox" class="toggle" data-action="fullscreen" />
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">VSync</span>
+                <input type="checkbox" class="toggle" checked="checked" data-action="vsync" />
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show FPS</span>
+                <input type="checkbox" class="toggle" data-action="showfps" />
+            </div>
+        </div>
+
+        <div class="section">
+            <span class="section-title">DROPDOWN</span>
+            <select class="dropdown" data-action="quality">
+                <option>Low</option>
+                <option selected="selected">Medium</option>
+                <option>High</option>
+                <option>Ultra</option>
+            </select>
+        </div>
+
+        <div class="section">
+            <span class="section-title">STATUS</span>
+            <div class="info-row">
+                <span class="info-label">Resolution</span>
+                <span class="info-value">1920 x 1080</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Renderer</span>
+                <span class="info-value">OpenGL 3.3</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">UI System</span>
+                <span class="info-value">Phase 2</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Third column: Background image tests -->
+    <div class="column">
+
+        <div class="textured-panel">
+            <span class="section-title">TEXTURED QUAD</span>
+            <p class="body-text">Stretched texture background without slicing.</p>
+        </div>
+
+        <div class="slice9-panel">
+            <span class="section-title">SLICE-9</span>
+            <p class="body-text">9-slice texture background with fixed corners and stretched edges.</p>
+        </div>
+
+        <div class="section">
+            <span class="section-title">TEXTURED BUTTONS</span>
+            <button class="btn-textured" data-action="btnTextured">Textured Quad</button>
+            <button class="btn-slice9" data-action="btnSlice9">Slice-9 Button</button>
+        </div>
+
+    </div>
+
+</div>

@@ -1,0 +1,12 @@
+// Per-frame uniform buffer. Bound by RenderManager::UploadFrameUniforms.
+// Engine-side layout: CC::FrameUniforms in Code/Core/Rendering/FrameUniforms.h.
+// Slot must match FRAME_UNIFORMS_BINDING_SLOT in Code/Core/Rendering/UniformBindings.h.
+// Scalars are packed into the w of surrounding vec4s to dodge std140 padding.
+layout(std140, binding = 0) uniform FrameUniforms
+{
+    mat4 viewProj;
+    vec4 cameraPositionAndTime;       // xyz = camera world position, w = timeAbsolute
+    vec4 ambientLightColorAndIntensity; // xyz = color,              w = intensity
+    vec4 directionalLightDirAndIntensity; // xyz = direction,        w = intensity
+    vec4 directionalLightColor;       // xyz = color,                w = unused
+} frameUniforms;

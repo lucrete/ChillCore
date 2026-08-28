@@ -1,0 +1,206 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+ChillCore24 is a C++ realtime 3D rendering and interaction engine for Windows using Visual Studio 2022 and OpenGL.
+
+## Context Startup
+Always start by reading:
+* DevDocs\ChillCoreDevDocs\docs\Guidelines\CodingGuidelines.md
+* DevDocs\ChillCoreDevDocs\docs\Guidelines\TechnicalWritingStyleGuide.md
+
+## Coding Standard
+
+Follow the coding standard defined in `DevDocs/ChillCoreDevDocs/docs/Guidelines/CodingGuidelines.md`, not what is in the code.
+* Code exists with legacy style and conventions. Do not alter existing coding style unless instructed to do so.
+* Always use the style as defined in the standard, even when adding to or modifying existing code with legacy style, ie no chameleon-coding.
+
+### Naming
+* camelCase: variables, function parameters
+* PascalCase: files, folders, classes, structs, functions, properties, enum members
+* SCREAMING_SNAKE_CASE: macros, defines, header guards, const variables
+* Descriptive names, no abbreviated words. Single-letter variables only for tight loop iterators.
+* Prefix bools with a verb: `isActive`, `doNotify`
+
+### Structure
+* Allman-style braces (opening brace on new line). Always use braces, even for one-line bodies.
+* `#ifndef CLASSNAME_H` include guards, not `#pragma once`
+* Constructor init lists: one member per line, comma at start, aligned
+* Class member order: public → protected → private
+* .cpp file order: main header, stdlib includes, project includes, namespace, static init, ctor/dtor, Get(), public methods, private helpers
+
+### Functions
+* **Single exit**: One return per function. No early returns. Use result variables and conditional logic instead.
+* Const reference for complex types, by value for primitives, raw pointer for ownership transfer
+* Mark getters `const`. Provide const and non-const overloads where needed.
+
+### Patterns
+* Singleton: static instance pointer, `Get()` accessor, CC_ASSERT in ctor and Get()
+* `enum class` for standalone enums. Unscoped `enum` inside a `namespace` for grouped constants needing implicit conversion. Include Max/Count sentinel.
+* `static constexpr` for compile-time constants
+* `CC_ASSERT(condition, message)` for debug invariants
+* Prefer raw arrays with `static const int MAX_X` when possible
+* `std::unique_ptr<T>` for owned resources in containers, raw `new`/`delete` for singleton subsystems
+
+### Comments
+* Only where extra explanation is needed. Prefer self-commenting code.
+* Use comment header blocks for sections:
+```
+// ========================
+// Section
+// ========================
+```
+
+## Planning Docs
+- Planning docs live in `DevDocs\ChillCoreDevDocs\docs\Planning`. They describe outstanding work only; completed work moves into an Architectural Guide Doc under `docs\Architecture` and is removed from the plan.
+- `01_TechBacklog.md` is the index of outstanding work across every workstream. Read it to find what is open; update it when work lands or new work is identified.
+- `02_Roadmap.md` gives the recommended implementation order and the dependencies behind it.
+- The per-workstream plans are `RenderingPlan.md`, `AudioTrackerPlan.md`, `PlatformAndBuildPlan.md`, and `PersistencePlan.md`.
+- When asked to save the current plan, add it to the relevant workstream plan, or create a new one alongside them if it does not fit.
+
+## Build Commands
+
+Open solution: `Code/Targets/Desktop/ChillCore.sln`
+
+Android builds from `Code/Targets/Android/` via Gradle -> CMake -> NDK. Claude does not build either target.
+
+- **Build:** Ctrl+Shift+B
+- **Run:** Ctrl+F5
+- **Debug:** F5
+
+Output goes to `Build/x64/{Debug|Release}/`
+
+**Claude does not build.** Builds and runs are driven by the user in Visual Studio 2022. Do not invoke MSBuild, devenv, cl.exe, or any other build tooling. Implement and edit; the user will compile and report any errors back. Static analysis (re-reading the code, checking includes and APIs) is the substitute for compile-time validation on Claude's side.
+
+### Project Configuration Requirements
+
+- Preprocessor define `CC_PRINT_ENABLED` in Debug configuration
+- Debugger working directory set to `$(ProjectDir)..\..\App` (i.e. `Code/App`). Asset paths in code are `Data/...`-relative from there.
+- Static CRT linking (`/MT`) - all dependencies must be compiled with `/MT`
+
+## Project Goals
+
+### Direct Boot into Any AppState
+
+Any AppState must be runnable as the initial state without first passing through `AppStateBoot` or the main menu. This enables rapid iteration on new scenes — change one line in `AppMain::Init()` (`GotoState("MyNewState")`) and the app boots straight into the work-in-progress state.
+
+Implication: all global setup — UI SFX preloading, screen registration, action map contexts shared across states, etc. — must live in a location that runs before any AppState's `Init()`. `AppMain::Init()` is the canonical home for app-level globals; engine subsystems live in `CoreMain::Init()`. Do not put global setup inside an individual AppState's `Init()`. See AGD-0020.
+
+## Architecture
+
+### Execution Flow
+
+```
+Main.cpp → CoreMain (engine subsystems) → AppMain (app-specific)
+                                              └→ StateMachine → AppStates
+```
+
+CoreMain owns all engine subsystems: RenderManager, InputManager, DevUi, PrintManager.
+AppMain contains application-specific code and its own state machine with AppStates.
+
+### Core Loop (CoreMain::Run)
+
+```cpp
+while (!done) {
+    inputManager->Update();
+    devUi->Update();
+    renderManager->StartFrame();
+    appMain->Update();
+    renderManager->Render();
+    renderManager->EndFrame();
+}
+```
+
+### Namespace Convention
+
+- **CC::** Core engine functionality (rendering, input, math, scene management)
+- **No namespace:** Application-specific code in App folder
+
+### Singleton Pattern
+
+Major systems use singleton access: `RenderManager::Instance()`, `InputManager::Get()`, `ShaderManager::Get()`, etc.
+
+## Directory Structure
+
+```
+Code/
+├── App/                    # Application-specific code (no namespace)
+│   ├── AppMain.cpp/h
+│   ├── AppStates/          # State machine states
+│   ├── AudioTracker/       # AudioTracker AppState + UI controllers
+│   ├── UiScreens/          # Screen controllers
+│   ├── ProceduralArt/      # Procedural shader effects
+│   └── Data/               # Assets (shaders, textures, meshes, ui, audio)
+│       └── Shaders/
+│           ├── Rendering/  # Standard rendering shaders
+│           ├── ProceduralArt/
+│           └── Include/    # .glinc include files
+├── Core/                   # Engine code (CC:: namespace)
+│   ├── Audio/              # miniaudio wrapper
+│   ├── AudioTracker/       # Tracker engine, project model, Synthesis/
+│   ├── CCUtils/            # Math, utilities
+│   ├── Components/
+│   ├── Input/              # 3-layer input system
+│   ├── Platform/           # PlatformWindow / Input / FileSystem
+│   │   ├── Desktop/        # GLFW backends
+│   │   └── Android/        # EGL + GameActivity + AAssetManager backends
+│   ├── Rendering/          # Graphics pipeline
+│   │   ├── Cameras/
+│   │   ├── Renderables/
+│   │   └── Gfx/            # CC::Gfx abstraction
+│   │       ├── OpenGl/     # Desktop GL 4.3 backend
+│   │       ├── Gles/       # Android GLES 3.1 backend
+│   │       └── GlCommon/   # Helpers shared by both GL backends
+│   ├── SceneManagement/    # Transform, SceneObject
+│   ├── StateMachine/
+│   └── Ui/                 # Layout, elements, DevUi
+├── Targets/                # Per-platform entry points and build files
+│   ├── Desktop/            # ChillCore.sln, Code.vcxproj, MainDesktop.cpp
+│   └── Android/            # Gradle project, CMakeLists.txt, MainAndroid.cpp
+└── Packages/               # Third-party (glfw, imgui, zlib, glad, pugixml)
+```
+Do not modify code in the Packages folder. Only App, Core, and Targets.
+
+## Rendering System
+
+- **RenderManager:** Central interface, owns all rendering subsystems
+- **CC::Gfx::RenderApi:** Graphics API abstraction — opaque handles, descriptor structs, baked pipeline objects, render-pass brackets. Backends: `RenderApiOpenGl` (desktop GL 4.3), `RenderApiGles` (Android GLES 3.1). No GL type crosses this boundary. See AGD-0080.
+- **ShaderManager:** Compiles GLSL shaders, supports hot-reloading via `hotloadShader`
+- **MaterialManager:** Creates and manages materials
+- **Renderable:** Base class for drawable objects (Quad, Cube, Sphere, Mesh, FullscreenQuad)
+
+### Shader Format
+
+Shaders use a two-part format with `#shader vertex` and `#shader fragment` sections. Include files use `.glinc` extension and are resolved via `#include "path/file.glinc"`.
+
+### Standard Material Uniforms (auto-set)
+
+`mvp`, `model`, `cameraPosition`, `timeAbsolute`, `ambientLightIntensity`, `ambientLightColor`, `lightIntensity`, `lightDir`, `lightColor`, `mainTex`, `baseColor`, `textureTiling`
+
+## Input System (3-Layer Model)
+
+1. **Physical Input:** Keyboard, mouse, gamepad via GLFW
+2. **Triggers:** Gamepad-centric logical inputs (D-Pad, face buttons, etc.)
+3. **Actions:** Application-specific, context-based mappings
+
+Gamepad-first philosophy: keyboard bindings map to gamepad-style triggers. Developer triggers (keyboard-based) exist for debug builds only.
+
+### Default Controls
+
+- **F9:** Toggle free camera
+- **WASD + Mouse:** Free camera movement
+- **F1:** Unlock mouse
+- **F2:** Toggle fullscreen quad
+- **F10:** Toggle fullscreen/windowed
+- **ESC:** Exit
+
+## Key Development Notes
+
+- Read files before modifying - understand existing patterns first
+- New dependencies must be compiled with `/MT` flag for static CRT linking
+- Shader hot-reloading: set shader in `ShaderManager::hotloadShader` for development
+- Debugger working directory must be `Code/App` for asset loading; asset paths are `Data/...`-relative
+- App window opens on secondary monitor if available
+- File I/O goes through `CC::PlatformFileSystem::Get()`; see Guidelines/CodingGuidelines.md "File I/O" and AGD-0030.
