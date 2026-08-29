@@ -132,16 +132,9 @@ Wave B's context-loss policy is a cold restart on the premise that persistence r
 
 ## Build pipeline
 
-The pipeline builds and runs the desktop target; AGD-0040 describes it. Design for what remains is in `BuildPipelinePlan.md`.
+The pipeline builds a self-contained desktop output directory and runs it; AGD-0040 describes it. Design for what remains is in `BuildPipelinePlan.md`.
 
-### Runtime data in the build output (**Ready**)
-
-A built executable does not run in place — it resolves `Data/...` against the working directory, and only the application source directory satisfies that. Copy the runtime data tree into the output directory beside the executable, incrementally, removing files deleted from source.
-
-- Blocks packaged distribution.
-- Open: whether the copy belongs in the CMake build or in the pipeline around it.
-
-### Packaged distribution (**Blocked** — runtime data)
+### Packaged distribution (**Ready**)
 
 An archive of the output directory named by build identifier, produced as a pipeline step. Labelled builds only. Installer, signing, and documentation bundling are separate and later.
 

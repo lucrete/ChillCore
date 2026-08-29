@@ -41,6 +41,8 @@ BUILD_ROOT = os.path.join(REPOSITORY_ROOT, "Build")
 LOGS_ROOT = os.path.join(BUILD_ROOT, "Logs")
 CMAKE_BINARY_DIRECTORY = os.path.join(BUILD_ROOT, "CMake", "Desktop")
 COUNTER_PATH = os.path.join(BUILD_ROOT, "BuildCounter.json")
+RUNTIME_DATA_SOURCE = os.path.join(CODE_ROOT, "App", "Data")
+RUNTIME_DATA_FOLDER_NAME = "Data"
 GENERATED_HEADER_PATH = os.path.join(CODE_ROOT, "Core", "BuildInfoGenerated.h")
 
 
@@ -262,6 +264,85 @@ def RunCapturing(command, logLines):
 
 
 # ============================================================================
+# Runtime data
+#
+# The executable resolves assets relative to its working directory, so a build
+# output directory is only runnable if the data tree sits beside the
+# executable under its original folder name.
+#
+# This runs in the pipeline rather than in the build. A build started from the
+# IDE deliberately does not copy: the debugger starts in the application
+# directory and reads the source tree, so the interactive loop would be paying
+# for a copy it never reads — a cost that grows with the asset tree.
+# ============================================================================
+
+def GetOutputDirectory(configuration):
+    return os.path.join(BUILD_ROOT, "x64", configuration)
+
+
+def IsCopyNeeded(sourcePath, destinationPath):
+    """True when the destination is missing or does not match the source."""
+    isNeeded = True
+
+    if os.path.isfile(destinationPath):
+        sourceInfo = os.stat(sourcePath)
+        destinationInfo = os.stat(destinationPath)
+        isNeeded = (sourceInfo.st_size != destinationInfo.st_size
+                    or sourceInfo.st_mtime > destinationInfo.st_mtime)
+
+    return isNeeded
+
+
+def CopyRuntimeData(configuration, logLines):
+    """Mirror the runtime data tree beside the executable.
+
+    Returns counts of what was copied and what was pruned. Pruning matters:
+    an asset deleted from source but left in the output keeps working until
+    it does not, which is worse than one that is plainly missing.
+    """
+    summary = {"copied": 0, "pruned": 0, "unchanged": 0}
+    destinationRoot = os.path.join(GetOutputDirectory(configuration),
+                                   RUNTIME_DATA_FOLDER_NAME)
+    sourceFiles = set()
+
+    for directoryPath, directoryNames, fileNames in os.walk(RUNTIME_DATA_SOURCE):
+        relativeDirectory = os.path.relpath(directoryPath, RUNTIME_DATA_SOURCE)
+        destinationDirectory = os.path.join(destinationRoot, relativeDirectory)
+        os.makedirs(destinationDirectory, exist_ok=True)
+
+        for fileName in fileNames:
+            sourcePath = os.path.join(directoryPath, fileName)
+            destinationPath = os.path.join(destinationDirectory, fileName)
+            sourceFiles.add(os.path.normpath(destinationPath))
+
+            if IsCopyNeeded(sourcePath, destinationPath):
+                shutil.copy2(sourcePath, destinationPath)
+                summary["copied"] += 1
+            else:
+                summary["unchanged"] += 1
+
+    # Anything in the destination with no counterpart in source is stale.
+    for directoryPath, directoryNames, fileNames in os.walk(destinationRoot, topdown=False):
+        for fileName in fileNames:
+            destinationPath = os.path.normpath(os.path.join(directoryPath, fileName))
+
+            if destinationPath not in sourceFiles:
+                os.remove(destinationPath)
+                summary["pruned"] += 1
+
+        if not os.listdir(directoryPath) and directoryPath != destinationRoot:
+            os.rmdir(directoryPath)
+
+    message = ("Runtime data: " + str(summary["copied"]) + " copied, " +
+               str(summary["pruned"]) + " pruned, " +
+               str(summary["unchanged"]) + " unchanged -> " + destinationRoot)
+    print(message)
+    logLines.append(message)
+
+    return summary
+
+
+# ============================================================================
 # Diagnostic parsing
 # ============================================================================
 
@@ -390,6 +471,12 @@ def WriteReport(reportPath, summary, diagnostics):
     lines.append("| Duration | " + format(summary["durationSeconds"], ".1f") + "s |")
     lines.append("| Errors | " + str(len(errors)) + " |")
     lines.append("| Warnings | " + str(len(warnings)) + " |")
+    lines.append("| Output | `" + summary["outputDirectory"] + "` |")
+
+    runtimeData = summary["runtimeData"]
+    lines.append("| Runtime data | " + str(runtimeData["copied"]) + " copied, " +
+                 str(runtimeData["pruned"]) + " pruned, " +
+                 str(runtimeData["unchanged"]) + " unchanged |")
     lines.append("")
 
     if errors:
@@ -485,6 +572,12 @@ def Run():
         if exitCode != 0:
             exitCode = EXIT_BUILD_FAILED
 
+        # Only a successful build has an executable worth placing data beside.
+        dataSummary = {"copied": 0, "pruned": 0, "unchanged": 0}
+
+        if exitCode == EXIT_SUCCESS:
+            dataSummary = CopyRuntimeData(arguments.configuration, logLines)
+
         durationSeconds = time.monotonic() - startTime
         diagnostics = ParseDiagnostics(logLines)
         errorCount = len([entry for entry in diagnostics if entry["severity"] == "error"])
@@ -505,6 +598,8 @@ def Run():
             "cmakePath": cmakePath,
             "configurePreset": CONFIGURE_PRESET,
             "buildPreset": BUILD_PRESETS[arguments.configuration],
+            "outputDirectory": GetOutputDirectory(arguments.configuration),
+            "runtimeData": dataSummary,
         }
 
         with open(os.path.join(outputDirectory, "Build.log"), "w",

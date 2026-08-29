@@ -27,6 +27,8 @@ Three parameters, each defaulting to the first option:
 
 Any argument suppresses every prompt; unspecified parameters take their defaults. There is deliberately no platform, target, or run-after-build option.
 
+A successful build also mirrors the runtime data tree into the output directory as `Data/`, beside the executable, so `Build/x64/<Configuration>/` runs in place. Only files whose source is newer are copied, and files deleted from source are removed from the output. A build started from Visual Studio does not do this — it does not need to, because the debugger starts in `Code/App` and reads the source tree directly.
+
 Exit codes: `0` success, `1` compile or link errors, `2` invalid usage, `3` missing toolchain, `4` internal script failure. Compilation failure is separate from pipeline failure so automation can tell a broken build from a broken build system.
 
 #### Running

@@ -9,11 +9,10 @@ Implementation order for the work inventoried in `01_TechBacklog.md`. The backlo
 
 ## What actually gates what
 
-Two hard dependencies remain. Everything else is preference.
+One hard dependency remains. Everything else is preference.
 
 | This | Cannot start until | Because |
 | --- | --- | --- |
-| Packaged distribution | Runtime data in the build output | An archive of an output directory that does not contain its data is an archive of something that does not run. |
 | Honest recovery from graphics-context loss | Persistence | The policy is a deliberate cold restart on the premise that persistence restores the user's place. Without it, the restart lands on the boot screen. |
 
 One soft dependency remains:
@@ -54,13 +53,11 @@ Persistence follows because it is what makes the context-loss policy honest. It 
 
 ## Stage 4 — Finish the build pipeline
 
-**Runtime data in the build output**, then **automated testing**, then **packaged distribution**.
+**Automated testing**, then **packaged distribution**.
 
-The build system now compiles, runs, and reports. What it cannot do is hand anyone a working copy of the result.
+The build system compiles, runs, reports, and produces an output directory that runs in place. What it cannot do is hand a copy of that to anyone else, or tell you whether it still works.
 
-Data first, because it is the smallest change with the largest effect: it turns the output directory into something that runs, which is the precondition for both of the others. Without it, an archive contains an executable that fails on first launch, and a test run has to reproduce the same working-directory dance the developer does by hand.
-
-Automated testing next rather than last. The run-and-capture machinery already exists, so the first tests — the engine starts, loads a scene, shuts down clean — cost little and immediately protect everything below them. Each further target added in Stage 5 is a chance to break the shared engine quietly; a test that runs on every build is what catches that on the day it happens rather than at the next manual check.
+Automated testing first. The run-and-capture machinery already exists, so the first tests — the engine starts, loads a scene, shuts down clean — cost little and immediately protect everything below them. Each further target added in Stage 5 is a chance to break the shared engine quietly; a test that runs on every build is what catches that on the day it happens rather than at the next manual check.
 
 Packaged distribution closes the stage. It is the cheapest of the three once the output directory is self-contained, and it is the point at which the build stops being something only this machine can produce.
 

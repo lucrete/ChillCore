@@ -95,7 +95,14 @@ A command-line entry point serves two callers from one implementation: it prompt
 - Three parameters: whether to label the build, the configuration, and whether to rebuild from scratch.
 - Each build writes a folder holding the raw log, a machine-readable diagnostic list, and a report for a person. Unlabelled builds overwrite one fixed location so a consumer never has to discover an identifier.
 - Exit codes distinguish a failed compilation from a broken pipeline or a missing toolchain.
-- A companion script launches what was built, from the directory its asset paths are relative to, and captures the log — under a debugger when one is available, so a fault yields a stack rather than an exit code.
+- After a successful build, the runtime data tree is mirrored into the output directory beside the executable, so the output directory runs in place.
+- A companion script launches what was built and captures the log — under a debugger when one is available, so a fault yields a stack rather than an exit code.
+
+### Runtime data in the output
+
+Assets are addressed relative to the working directory, so an output directory only runs if the data tree sits beside the executable under its original folder name. The pipeline mirrors it there after a successful build: files whose source is newer are copied, and files with no counterpart in source are removed. Pruning is the half that is easy to skip and expensive to omit — an asset deleted from source but left in the output keeps working until it does not.
+
+The copy belongs to the pipeline, not to the build. An interactive build deliberately does not perform it: the debugger starts in the application directory and reads the source tree, so an edited asset is visible without a build, and the edit-build-debug loop is never charged for a copy it does not read. That charge would grow with the asset tree, and the interactive loop is the one run most often.
 
 ### Build identity
 
@@ -106,7 +113,7 @@ The identifier is displayed in both the developer overlay and the application's 
 ## Limitations
 
 - Android builds one processor architecture only. There is no support for older or alternative architectures.
-- Asset loading depends on the working directory being the application directory; assets are addressed relative to it rather than to the executable, so a built executable does not run in place.
+- Assets are addressed relative to the working directory rather than to the executable. The pipeline's data copy is what makes an output directory runnable; an executable moved out of that directory on its own will not find its assets.
 - No offline shader processing step exists. Shader variants are produced at load time.
 - The pipeline builds the desktop target only. Android is still built through Gradle directly.
 - Toolchain resolution prefers the CMake bundled with the installed Visual Studio, because a CMake on PATH is routinely older than the installed toolset and does not know its generator.
