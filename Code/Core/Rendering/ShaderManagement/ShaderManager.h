@@ -17,6 +17,10 @@ namespace CC
 
         Gfx::ShaderHandle GetShaderHandle(const std::string& shaderName);
 
+        // Layout of the shader-declared CustomParams block. Null when the
+        // shader is unknown; empty when it declares no block.
+        const CustomParamLayout* GetCustomParamLayout(const std::string& shaderName) const;
+
         void CompileShader(const std::string& shaderName);
         bool IsShaderCompiled(const std::string& shaderName);
 

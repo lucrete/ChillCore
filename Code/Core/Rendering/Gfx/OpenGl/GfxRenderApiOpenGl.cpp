@@ -1266,7 +1266,7 @@ namespace CC::Gfx
         CC_ASSERT(sizeBytes > 0 && sizeBytes <= OBJECT_UNIFORMS_SIZE_BYTES,
             "SetPushConstants: size out of range");
 
-        // Lazy create the single push-tier UBO. Bind it once at the push
+        // Lazy create the single push-constant UBO. Bind it once at the push
         // slot; subsequent draws only need glBufferSubData.
         if (pushConstantsUbo == 0)
         {
@@ -1501,84 +1501,5 @@ namespace CC::Gfx
     bool RenderApiOpenGl::IsGpuTimerSupported() const
     {
         return capabilities.supportsGpuTimestamps;
-    }
-
-    GLuint RenderApiOpenGl::GetGlShaderProgram(ShaderHandle handle) const
-    {
-        GLuint result = 0;
-        if (handle.IsValid() && handle.id < shaders.size() && shaders[handle.id].isAlive)
-        {
-            result = shaders[handle.id].program;
-        }
-        return result;
-    }
-
-    // ========================
-    // Shader program / uniforms (transitional)
-    // ========================
-
-    void RenderApiOpenGl::BindShaderProgram(ShaderHandle shader)
-    {
-        GLuint program = GetGlShaderProgram(shader);
-        glUseProgram(program);
-    }
-
-    int RenderApiOpenGl::GetUniformLocation(ShaderHandle shader, const char* name)
-    {
-        int result = -1;
-        GLuint program = GetGlShaderProgram(shader);
-        if (program != 0 && name != nullptr)
-        {
-            result = glGetUniformLocation(program, name);
-        }
-        return result;
-    }
-
-    void RenderApiOpenGl::SetUniformMat4(int location, const float* values)
-    {
-        if (location != -1)
-        {
-            glUniformMatrix4fv(location, 1, GL_FALSE, values);
-        }
-    }
-
-    void RenderApiOpenGl::SetUniformVec4(int location, const float* values)
-    {
-        if (location != -1)
-        {
-            glUniform4fv(location, 1, values);
-        }
-    }
-
-    void RenderApiOpenGl::SetUniformVec3(int location, const float* values)
-    {
-        if (location != -1)
-        {
-            glUniform3fv(location, 1, values);
-        }
-    }
-
-    void RenderApiOpenGl::SetUniformVec2(int location, const float* values)
-    {
-        if (location != -1)
-        {
-            glUniform2fv(location, 1, values);
-        }
-    }
-
-    void RenderApiOpenGl::SetUniformFloat(int location, float value)
-    {
-        if (location != -1)
-        {
-            glUniform1f(location, value);
-        }
-    }
-
-    void RenderApiOpenGl::SetUniformInt(int location, int value)
-    {
-        if (location != -1)
-        {
-            glUniform1i(location, value);
-        }
     }
 }

@@ -73,16 +73,6 @@ namespace CC::Gfx
         virtual RenderTargetHandle CreateRenderTarget(const RenderTargetDescription& description) override;
         virtual void               DestroyRenderTarget(RenderTargetHandle handle) override;
 
-        // Shader program / uniforms (transitional)
-        virtual void BindShaderProgram(ShaderHandle shader) override;
-        virtual int  GetUniformLocation(ShaderHandle shader, const char* name) override;
-        virtual void SetUniformMat4(int location, const float* values) override;
-        virtual void SetUniformVec4(int location, const float* values) override;
-        virtual void SetUniformVec3(int location, const float* values) override;
-        virtual void SetUniformVec2(int location, const float* values) override;
-        virtual void SetUniformFloat(int location, float value) override;
-        virtual void SetUniformInt(int location, int value) override;
-
         // Command recording
         virtual void BindPipeline(PipelineHandle pipeline) override;
         virtual void BindVertexBuffer(int slot, BufferHandle buffer, int offsetBytes, int strideBytes) override;
@@ -119,11 +109,6 @@ namespace CC::Gfx
         virtual bool        IsGpuTimerSupported() const override;
 
     private:
-        // Resolves a ShaderHandle to its cached GL program object. Used only
-        // by BindShaderProgram / GetUniformLocation implementations in this
-        // backend; nothing outside the GL backend needs the raw GLuint.
-        GLuint GetGlShaderProgram(ShaderHandle handle) const;
-
         // Lazy-build the FullScreenBlit pipeline + vertex buffer on first
         // EndRenderPass — called only after ShaderManager has compiled
         // the FullScreenBlit shader.
@@ -218,7 +203,7 @@ namespace CC::Gfx
         GfxCapabilities       capabilities;
         BackbufferDescription backbufferDescription;
 
-        // Push-tier UBO. Single GL_DYNAMIC_DRAW buffer reused every draw
+        // Push-constant UBO. Single GL_DYNAMIC_DRAW buffer reused every draw
         // via glBufferSubData; bound once at slot
         // OBJECT_UNIFORMS_BINDING_SLOT on first use.
         GLuint pushConstantsUbo = 0;

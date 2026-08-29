@@ -7,10 +7,15 @@ namespace CC
 {
     // Per-draw uniform buffer contents. Bound at OBJECT_UNIFORMS_BINDING_SLOT.
     //
-    // The "push tier" — values that change with every draw call. Sized at
-    // 128 bytes so future Vulkan / D3D12 backends can map this to native
-    // push constants (the common minimum guarantee) without restructuring
-    // the shader interface.
+    // UpdateFrequency::Draw — values that change with every draw call.
+    // Sized at 128 bytes, the guaranteed minimum maxPushConstantsSize in
+    // Vulkan 1.0-1.3 (1.4 raised it to 256), so a Vulkan backend can map
+    // this to native push constants without restructuring the shader
+    // interface. D3D12's analogue is root constants, drawn from the same
+    // 256-byte root signature budget as everything else in the signature.
+    //
+    // Nothing else belongs here: a third mat4 exceeds the floor this is
+    // sized against and forfeits that mapping.
     //
     // std140 layout. Matches shader-side declaration in
     // Include/objectUniforms.glinc.

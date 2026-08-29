@@ -4,6 +4,7 @@
 #include <string>
 #include <ctime>
 #include "GfxHandles.h"
+#include "CustomParamLayout.h"
 
 namespace CC
 {
@@ -19,6 +20,7 @@ namespace CC
         std::string fragmentShaderText;
         time_t lastWriteTime = 0;
         Gfx::ShaderHandle shaderHandle;
+        CustomParamLayout customParamLayout;
         bool isCompiled = false;
     };
 }

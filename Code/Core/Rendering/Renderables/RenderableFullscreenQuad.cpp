@@ -56,9 +56,12 @@ namespace CC
         // the old one stays resident in the cache for any future user.
         pipelineHandle = CreatePipelineForMaterial(material, MakeFullscreenQuadLayout());
 
-        material->AddUniform("aspectRatio", 1.0f);
-        material->AddUniform("center", Vector2(0, 0));
-        material->AddUniform("scale", 1.0f);
+        // Defaults for the CustomParams members the procedural-art shaders
+        // declare. A shader that declares none of them stores the values and
+        // ignores them.
+        material->SetUniform("aspectRatio", 1.0f);
+        material->SetUniform("center", Vector2(0, 0));
+        material->SetUniform("scale", 1.0f);
     }
 
     void RenderableFullscreenQuad::PreRender()

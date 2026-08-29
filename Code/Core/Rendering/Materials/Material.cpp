@@ -1,4 +1,7 @@
 #include "Material.h"
+
+#include <cstring>
+
 #include "ShaderManager.h"
 #include "TextureManager.h"
 #include "CameraManager.h"
@@ -43,6 +46,10 @@ namespace CC
         if (materialUniformBuffer.IsValid())
         {
             Gfx::RenderApi::Get()->DestroyBuffer(materialUniformBuffer);
+        }
+        if (customParamsBuffer.IsValid())
+        {
+            Gfx::RenderApi::Get()->DestroyBuffer(customParamsBuffer);
         }
     }
 
@@ -118,26 +125,6 @@ namespace CC
         materialUniformBuffer = CreateMaterialUniformBuffer();
     }
 
-    void Material::Bind()
-    {
-        Gfx::ShaderHandle handle;
-        if (ShaderManager::Get()->IsShaderCompiled(shaderName))
-        {
-            handle = ShaderManager::Get()->GetShaderHandle(shaderName);
-        }
-        else
-        {
-            handle = ShaderManager::Get()->GetShaderHandle("DefaultError");
-        }
-        Gfx::RenderApi::Get()->BindShaderProgram(handle);
-    }
-
-    int Material::GetUniformLocation(const std::string& name) const
-    {
-        Gfx::ShaderHandle handle = ShaderManager::Get()->GetShaderHandle(shaderName);
-        return Gfx::RenderApi::Get()->GetUniformLocation(handle, name.c_str());
-    }
-
     void Material::UploadMaterialUniforms()
     {
         MaterialUniforms data = {};
@@ -188,7 +175,18 @@ namespace CC
             }
             gfxApi->BindUniformBuffer(MATERIAL_UNIFORMS_BINDING_SLOT, materialUniformBuffer, 0, static_cast<int>(sizeof(MaterialUniforms)));
 
-            // Push tier: per-draw object uniforms (mvp + model). One UBO
+            // Custom Params: the shader-declared CustomParams block.
+            // Absent for every shader that uses only the standard params.
+            if (customParamsDirty)
+            {
+                PackAndUploadCustomParams();
+            }
+            if (customParamsBuffer.IsValid())
+            {
+                gfxApi->BindUniformBuffer(CUSTOM_PARAMS_BINDING_SLOT, customParamsBuffer, 0, customParamsBufferSizeBytes);
+            }
+
+            // UpdateFrequency::Draw: per-draw object uniforms (mvp + model). One UBO
             // update per draw, bound at OBJECT_UNIFORMS_BINDING_SLOT.
             Mat4x4 viewProj = CameraManager::Get()->GetViewProjectionMatrix();
             Mat4x4 mvp = viewProj * model;
@@ -228,51 +226,151 @@ namespace CC
         }
     }
 
-    void Material::AddUniform(const std::string& name)
+    void Material::SetUniform(const std::string& name, float value)
     {
-        Gfx::ShaderHandle handle = ShaderManager::Get()->GetShaderHandle(shaderName);
-        int location = Gfx::RenderApi::Get()->GetUniformLocation(handle, name.c_str());
-        uniformLocations[name] = location;
+        SetCustomParamValue(name, CustomParamType::Float, &value, static_cast<int>(sizeof(value)));
+    }
+
+    void Material::SetUniform(const std::string& name, int value)
+    {
+        SetCustomParamValue(name, CustomParamType::Int, &value, static_cast<int>(sizeof(value)));
+    }
+
+    void Material::SetUniform(const std::string& name, const Vector2& value)
+    {
+        float components[2] = { value.x, value.y };
+        SetCustomParamValue(name, CustomParamType::Vector2, components, static_cast<int>(sizeof(components)));
+    }
+
+    void Material::SetUniform(const std::string& name, const Vector3& value)
+    {
+        float components[3] = { value.x, value.y, value.z };
+        SetCustomParamValue(name, CustomParamType::Vector3, components, static_cast<int>(sizeof(components)));
+    }
+
+    void Material::SetUniform(const std::string& name, const Vector4& value)
+    {
+        float components[4] = { value.x, value.y, value.z, value.w };
+        SetCustomParamValue(name, CustomParamType::Vector4, components, static_cast<int>(sizeof(components)));
     }
 
     void Material::ReconnectShader()
     {
-        Gfx::ShaderHandle handle = ShaderManager::Get()->GetShaderHandle(shaderName);
-        for (auto i = uniformLocations.begin(); i != uniformLocations.end(); i++)
+        // A recompile can move, add, or drop CustomParams members. The
+        // values are held by name, so re-packing against the new layout is
+        // all that is needed.
+        materialUniformsDirty = true;
+        customParamsDirty   = true;
+    }
+
+    bool Material::CheckUniformExists(const std::string& name) const
+    {
+        const CustomParamLayout* layout = GetCustomParamLayout();
+        return layout != nullptr && layout->FindParam(name) != nullptr;
+    }
+
+    const CustomParamLayout* Material::GetCustomParamLayout() const
+    {
+        return ShaderManager::Get()->GetCustomParamLayout(shaderName);
+    }
+
+    void Material::SetCustomParamValue(const std::string& name, CustomParamType type, const void* data, int sizeBytes)
+    {
+        CC_ASSERT(sizeBytes <= static_cast<int>(sizeof(CustomParamValue::data)), "Material parameter is larger than the value store: " + name);
+
+        unsigned char incoming[sizeof(CustomParamValue::data)] = {};
+        memcpy(incoming, data, static_cast<size_t>(sizeBytes));
+
+        int index = -1;
+        for (int i = 0; i < customParamValueCount && index == -1; i++)
         {
-            i->second = Gfx::RenderApi::Get()->GetUniformLocation(handle, i->first.c_str());
+            if (customParamValues[i].name == name)
+            {
+                index = i;
+            }
+        }
+
+        if (index == -1)
+        {
+            CC_ASSERT(customParamValueCount < MAX_CUSTOM_PARAM_VALUES, "Material holds at most MAX_CUSTOM_PARAM_VALUES parameters: " + name);
+            if (customParamValueCount < MAX_CUSTOM_PARAM_VALUES)
+            {
+                index = customParamValueCount;
+                customParamValues[index].name = name;
+                customParamValues[index].type = type;
+                customParamValueCount++;
+                customParamsDirty = true;
+            }
+        }
+
+        if (index != -1)
+        {
+            if (customParamValues[index].type != type || memcmp(customParamValues[index].data, incoming, sizeof(incoming)) != 0)
+            {
+                memcpy(customParamValues[index].data, incoming, sizeof(incoming));
+                customParamValues[index].type = type;
+                customParamsDirty = true;
+            }
+
+            // Uploaded on the spot rather than deferred to the next
+            // SetStandardUniforms, because RenderManager's fade overlay sets
+            // its colour after the material is bound for this frame's draw.
+            // An unchanged value — the fullscreen quad re-sets its aspect
+            // ratio every frame — costs the compare above and nothing more.
+            if (customParamsDirty)
+            {
+                PackAndUploadCustomParams();
+            }
         }
     }
 
-    bool Material::CheckUniformExists(const std::string& name)
+    void Material::PackAndUploadCustomParams()
     {
-        Gfx::ShaderHandle handle = ShaderManager::Get()->GetShaderHandle(shaderName);
-        int location = Gfx::RenderApi::Get()->GetUniformLocation(handle, name.c_str());
-        return location != -1;
-    }
+        const CustomParamLayout* layout = GetCustomParamLayout();
+        if (layout != nullptr && layout->HasParams())
+        {
+            unsigned char blockData[CustomParamLayout::MAX_BLOCK_SIZE_BYTES] = {};
+            int blockSizeBytes = layout->GetBlockSizeBytes();
 
-    void Material::SetUniformInternal(int location, int value)
-    {
-        Gfx::RenderApi::Get()->SetUniformInt(location, value);
-    }
+            for (int i = 0; i < customParamValueCount; i++)
+            {
+                const CustomParam* param = layout->FindParam(customParamValues[i].name);
+                if (param != nullptr)
+                {
+                    // A value set as one type against a block member of
+                    // another would write the wrong bytes at the right
+                    // offset, which reads as a corrupt value rather than a
+                    // missing one. Leave the member at its default instead.
+                    CC_ASSERT(param->type == customParamValues[i].type, "CustomParams type mismatch for: " + customParamValues[i].name);
+                    if (param->type == customParamValues[i].type)
+                    {
+                        memcpy(blockData + param->offsetBytes, customParamValues[i].data, static_cast<size_t>(param->sizeBytes));
+                    }
+                }
+            }
 
-    void Material::SetUniformInternal(int location, float value)
-    {
-        Gfx::RenderApi::Get()->SetUniformFloat(location, value);
-    }
+            Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
 
-    void Material::SetUniformInternal(int location, const Vector4& value)
-    {
-        Gfx::RenderApi::Get()->SetUniformVec4(location, value);
-    }
+            if (customParamsBuffer.IsValid() && customParamsBufferSizeBytes != blockSizeBytes)
+            {
+                gfxApi->DestroyBuffer(customParamsBuffer);
+                customParamsBuffer = Gfx::BufferHandle();
+            }
 
-    void Material::SetUniformInternal(int location, const Vector3& value)
-    {
-        Gfx::RenderApi::Get()->SetUniformVec3(location, value);
-    }
+            if (!customParamsBuffer.IsValid())
+            {
+                Gfx::BufferDescription description;
+                description.sizeBytes = blockSizeBytes;
+                description.usage     = Gfx::BufferUsage::Uniform;
+                description.memory    = Gfx::BufferMemory::CpuToGpu;
+                description.debugName = "CustomParams";
+                customParamsBuffer          = gfxApi->CreateBuffer(description);
+                customParamsBufferSizeBytes = blockSizeBytes;
+            }
 
-    void Material::SetUniformInternal(int location, const Vector2& value)
-    {
-        Gfx::RenderApi::Get()->SetUniformVec2(location, value);
+            gfxApi->UpdateBuffer(customParamsBuffer, 0, blockSizeBytes, blockData);
+        }
+
+        customParamsDirty = false;
     }
 }

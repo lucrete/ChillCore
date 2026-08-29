@@ -6,7 +6,7 @@ Single index of outstanding engineering work. Per `Guidelines/CodingGuidelines.m
 - **Scope.** Every workstream with unfinished work, plus open design questions, verification debt, and documentation debt.
 - **Detail lives in the plan docs.** Each section links to the plan that carries the design rationale.
 
-Last verified against the source code: 2026-08-28.
+Last verified against the source code: 2026-08-29.
 
 ## Status legend
 
@@ -24,7 +24,7 @@ Nothing is in flight. Every actionable item is **Ready**; the backlog does not t
 
 | Workstream | Plan | State |
 | --- | --- | --- |
-| Rendering | `RenderingPlan.md` | Material-to-pipelines, render targets, dirty-state cache, compute |
+| Rendering | `RenderingPlan.md` | Render targets, dirty-state cache, compute |
 | AudioTracker | `AudioTrackerPlan.md` | Phases 0–5 landed; velocity editing and project handling open |
 | Platform and build | `PlatformAndBuildPlan.md` | Android ships; CMake, WebGL, further backends open |
 | Persistence | `PersistencePlan.md` | Not started |
@@ -32,15 +32,6 @@ Nothing is in flight. Every actionable item is **Ready**; the backlog does not t
 ---
 
 ## Rendering
-
-### Material to pipelines (**Ready**)
-
-Last unfinished piece of the graphics abstraction migration. `UiRenderer` and `TextRenderer` already bind pipelines; `Material` is the only holdout.
-
-- `Material::Bind` calls `Gfx::RenderApi::BindShaderProgram` (`Material.cpp:132`). Replace with `BindPipeline`.
-- Add a `PipelineHandle` member to `Material` for standalone (non-renderable) use.
-- Remove the transitional shims once Material migrates: `BindShaderProgram`, `GetUniformLocation`, `SetUniformMat4` / `Vec4` / `Vec3` / `Vec2` / `Float` / `Int` (`GfxRenderApi.h:102-109`), the matching `Material::SetUniformInternal` overloads, and both backend implementations.
-- **Ship:** no transitional shim methods remain on `Gfx::RenderApi`.
 
 ### Render target creation (**Ready**)
 
@@ -196,7 +187,7 @@ Milestones defined in the plans with no recorded run.
 
 ## Documentation debt
 
-- **Rendering pipeline getting-started doc.** Requested in `DevBlogChillCore.blog`. Covers the frame and material UBO tiers, the pipeline-first opaque sort, and the render-pass brackets. Superseded by AGD-0070 (Rendering Pipeline); track it there rather than as separate work.
+- **Rendering pipeline getting-started doc.** Requested in `DevBlogChillCore.blog`. Covers the frame and material UBO groups, the pipeline-first opaque sort, and the render-pass brackets. Superseded by AGD-0070 (Rendering Pipeline); track it there rather than as separate work.
 - **AGD-0120 (UI Layout and Styling) inherited a provisional design.** Needs a pass to confirm or revise the layout and styling decisions.
 - **`mkdocs.yml` has no `nav`.** Deliberate — navigation is derived from the folder structure. Recorded so it is not "fixed".
 

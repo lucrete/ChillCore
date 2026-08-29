@@ -6,7 +6,7 @@
 
 - Renderables submit themselves each frame. There is no persistent draw list and no retained scene on the rendering side.
 - Submissions split into opaque and transparent lists, drawn as two passes with different rules.
-- Uniform data is tiered by how often it changes: once per frame, once per material, once per draw, or baked into the pipeline and never sent at all.
+- Uniform data is grouped by update frequency: once per frame, once per material, once per draw, or baked into the pipeline and never sent at all.
 - The opaque list is sorted so that draws sharing a pipeline are adjacent, which lets redundant state changes be dropped.
 - Shaders are authored in one file per shader with vertex and fragment sections, support includes, and can be reloaded while the application runs.
 
@@ -15,7 +15,7 @@
 - **Renderable** — a component that submits itself to be drawn. Meshes, primitives, and fullscreen quads are all renderables.
 - **Material** — a shader plus the parameter values and textures that configure it. Materials decide transparency; shaders do not.
 - **Pipeline** — the baked combination of shader, vertex layout, and fixed graphics state for one kind of draw. Created once, bound many times.
-- **Uniform tier** — a grouping of shader inputs by update frequency. Frame, material, and draw tiers each have their own buffer.
+- **Update frequency** — how often a shader input changes, and the axis uniform data is partitioned along. Frame, Material, Custom, and Draw each own a buffer and a binding slot. It is the same partition Vulkan descriptor sets and D3D12 root signatures are organised along.
 - **Pass** — a span of the frame drawing one category of geometry under one set of rules.
 
 ## Architecture
@@ -44,11 +44,12 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 Between these, named timing markers are emitted at each pass boundary, which is what produces the profiler's per-pass breakdown.
 
-**Uniform tiers** carry data according to how often it changes:
+**Update frequency** decides where data lives:
 
-- **Frame tier** — view-projection, camera position, time, lighting. Written once per frame.
-- **Material tier** — base colour, opacity, tiling, physically-based factors, alpha mode and cutoff, texture presence. Written when a material value changes, not per frame.
-- **Draw tier** — the model transform and its combination with the view-projection. Written per draw.
+- **Frame** — view-projection, camera position, time, lighting. Written once per frame.
+- **Material** — base colour, opacity, tiling, physically-based factors, alpha mode and cutoff, texture presence. Written when a material value changes, not per frame.
+- **Custom** — parameters one shader declares for itself: procedural-art controls, the fade colour, the fullscreen aspect ratio. Written when the value changes.
+- **Draw** — the model transform and its combination with the view-projection. Written per draw.
 - **Baked** — cull mode, depth comparison, blend state. Never sent; part of the pipeline.
 
 Texture units are declared by the shader rather than assigned at runtime, so binding a texture does not require an accompanying uniform write.
@@ -57,9 +58,9 @@ Texture units are declared by the shader rather than assigned at runtime, so bin
 
 **Add a renderable type.** Derive from the renderable base, describe the vertex layout, create the geometry buffers, and submit during update. The pipeline is obtained from the cache; nothing needs to create one directly.
 
-**Author a shader.** One file holds vertex and fragment sections. Shared declarations, including the uniform tier blocks, are pulled in by include. All shaders target one language version, which is what allows shader-declared texture units and shared include files to work everywhere.
+**Author a shader.** One file holds vertex and fragment sections. Shared declarations, including the uniform blocks, are pulled in by include. All shaders target one language version, which is what allows shader-declared texture units and shared include files to work everywhere.
 
-**Add a material parameter.** If it belongs to every material, it goes in the material tier block and its shared shader include. If it belongs to one shader, use the named-uniform path — but see the limitation on that below.
+**Add a material parameter.** If it belongs to every material, it goes in the material block and its shared shader include. If it belongs to one shader, declare it in that shader's own parameter block and set it by name on the material; the engine places it in the block by the standard layout rules and uploads the block when a value changes.
 
 **Iterate on a shader without restarting.** Nominate the shader for hot reload; changes to the file are detected and recompiled in place. This works only where the file system reports modification times, so it is unavailable when assets are packaged.
 
@@ -73,13 +74,21 @@ This ties visibility directly to the scene update, which is what makes disabling
 
 The costs are that visibility cannot be decided independently of updating, and that the submission array has a fixed capacity rather than growing.
 
-### Uniforms are tiered by update frequency
+### Uniforms are grouped by update frequency
 
 The alternative, which this replaced, was sending every shader input on every draw — the full lighting, camera, material, and transform set for each object, whether or not the previous object had just sent identical values.
 
 Splitting by frequency means frame-constant data is written once, material data is written only when it changes, and only the transform is genuinely per-draw. It also matches how modern graphics interfaces expect resources to be bound, so the structure carries forward rather than needing to be redone.
 
 The cost is that adding a shared parameter means changing a buffer layout and its shared shader declaration together, and the two must agree exactly. A mismatch produces wrong values rather than an error.
+
+### One shader's own parameters get a block, not individual uniform writes
+
+Procedural-art effects, the fade overlay, and the fullscreen quad each need parameters no standard frequency covers. The obvious route — write each one individually by name to the bound shader — is the one thing a modern graphics interface cannot do, and it was the last reason the frontend bound shaders rather than pipelines.
+
+Instead the shader author declares a parameter block, and the engine reads that declaration to learn each member's position in it. Setting a parameter writes into the block and uploads it; nothing resolves a name against a compiled program, and no backend has to offer a way to set a uniform on its own.
+
+Two costs. The engine computes member positions from the declaration rather than asking the driver, so a member type it cannot place must be rejected outright rather than half-placed. And a value set for a parameter the current shader does not declare is kept but ignored, which is what lets one caller drive several effects that declare different parameters — at the price of a misspelt name failing silently rather than loudly.
 
 ### The opaque list is sorted by pipeline, and redundancy is dropped beneath
 
@@ -122,6 +131,6 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
 - Offscreen render targets are unimplemented, so there are no shadow maps, no reflection probes, and no post-processing beyond the fixed resolve.
-- The named-uniform path used by procedural-art materials and overlays bypasses the tier system, and is the last part of the frontend still binding shaders directly rather than pipelines.
+- A shader's own parameter block is parsed from its fragment source, not queried from the graphics interface. A block declared in a vertex section is not seen. Only scalar, vector, and 4x4 matrix members are placed; anything else drops the whole block rather than risk offsets that disagree with the driver.
 - Hot reload handles one nominated shader and is unavailable where assets are packaged.
 - Visibility cannot be separated from updating; a renderable that must not draw must stop updating.
