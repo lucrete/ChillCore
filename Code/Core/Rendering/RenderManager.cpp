@@ -32,6 +32,7 @@ namespace CC
         , fullscreenQuad(false)
         , fadeOverlay(nullptr)
         , fadeColor(0.0f, 0.0f, 0.0f, 0.0f)
+        , offscreenPostQuad(nullptr)
     {
         CC_ASSERT(instance == nullptr, "RenderManager already created");
         instance = this;
@@ -111,6 +112,11 @@ namespace CC
             gfxApi->DestroyBuffer(frameUniformBuffer);
         }
 
+        if (offscreenSampler.IsValid())
+        {
+            gfxApi->DestroySampler(offscreenSampler);
+        }
+        delete offscreenPostQuad;
         delete fadeOverlay;
         delete renderableFullscreenQuad;
         delete pipelineCache;
@@ -146,11 +152,22 @@ namespace CC
         PlatformWindow::Get()->GetFramebufferSize(width, height);
         TextRenderer::Get()->BeginFrame(width, height);
 
-        // Begin the scene render pass on the offscreen framebuffer. The
-        // backend handles MSAA + the eventual blit in EndRenderPass.
-        gfxApi->BeginRenderPass(gfxApi->GetBackbuffer());
+        // Begin the scene render pass. Normally the backbuffer path (MSAA
+        // scene FB + resolve/blit in EndRenderPass); an active offscreen
+        // scene pass redirects it into the caller's render target instead.
+        gfxApi->BeginRenderPass(SceneTargetForFrame());
 
         shaderManager->Update();
+    }
+
+    Gfx::RenderTargetHandle RenderManager::SceneTargetForFrame() const
+    {
+        Gfx::RenderTargetHandle result = gfxApi->GetBackbuffer();
+        if (offscreenScenePass.isEnabled)
+        {
+            result = offscreenScenePass.target;
+        }
+        return result;
     }
 
 
@@ -221,6 +238,77 @@ namespace CC
         fadeColor = color;
     }
 
+    // ========================
+    // Offscreen scene pass
+    // ========================
+
+    void RenderManager::SetOffscreenScenePass(Gfx::RenderTargetHandle target,
+                                              Gfx::TextureHandle colorTexture,
+                                              Material* postMaterial)
+    {
+        offscreenScenePass.target       = target;
+        offscreenScenePass.colorTexture = colorTexture;
+        offscreenScenePass.postMaterial = postMaterial;
+        offscreenScenePass.isEnabled    = target.IsValid() && colorTexture.IsValid() && postMaterial != nullptr;
+
+        if (offscreenScenePass.isEnabled)
+        {
+            if (offscreenPostQuad == nullptr)
+            {
+                offscreenPostQuad = new RenderableFullscreenQuad(postMaterial);
+            }
+            else
+            {
+                offscreenPostQuad->SetMaterial(postMaterial);
+            }
+
+            if (!offscreenSampler.IsValid())
+            {
+                // Non-mipmapped, edge-clamped, linear. A mipmap-filtering
+                // sampler on the single-level target texture reads as black
+                // on some drivers (the same hazard the EndRenderPass blit
+                // guards against).
+                Gfx::SamplerDescription samplerDesc;
+                samplerDesc.minFilter  = Gfx::FilterMode::Linear;
+                samplerDesc.magFilter  = Gfx::FilterMode::Linear;
+                samplerDesc.mipmapMode = Gfx::MipmapMode::None;
+                samplerDesc.addressU   = Gfx::AddressMode::ClampToEdge;
+                samplerDesc.addressV   = Gfx::AddressMode::ClampToEdge;
+                samplerDesc.addressW   = Gfx::AddressMode::ClampToEdge;
+                samplerDesc.debugName  = "RenderManager::OffscreenSampler";
+                offscreenSampler = gfxApi->CreateSampler(samplerDesc);
+            }
+        }
+    }
+
+    void RenderManager::ClearOffscreenScenePass()
+    {
+        offscreenScenePass = OffscreenScenePass();
+    }
+
+    bool RenderManager::HasOffscreenScenePass() const
+    {
+        return offscreenScenePass.isEnabled;
+    }
+
+    void RenderManager::DrawOffscreenPostPass()
+    {
+        if (offscreenScenePass.isEnabled)
+        {
+            gfxApi->BeginRenderPass(gfxApi->GetBackbuffer());
+            gfxApi->InvalidateCachedState();
+
+            offscreenPostQuad->PreRender();
+            // Override texture unit 0 (PreRender bound the material's own base
+            // texture there) with the offscreen colour target.
+            gfxApi->BindTexture(0, offscreenScenePass.colorTexture, offscreenSampler);
+            offscreenPostQuad->Render(nullptr);
+
+            gfxApi->EndRenderPass();
+            gfxApi->AddGpuTimestamp("GpuAfterOffscreenPost");
+        }
+    }
+
     void RenderManager::AddRenderInfo(Renderable* renderable, void* info, int size)
     {
         if (renderable->GetMaterial()->IsTransparent())
@@ -263,6 +351,7 @@ namespace CC
             gfxApi->AddGpuTimestamp("GpuAfterTransparent");
             gfxApi->EndRenderPass();
             gfxApi->AddGpuTimestamp("GpuAfterPostProcess");
+            DrawOffscreenPostPass();
         }
         else
         {
@@ -296,6 +385,7 @@ namespace CC
 
             gfxApi->EndRenderPass();
             gfxApi->AddGpuTimestamp("GpuAfterPostProcess");
+            DrawOffscreenPostPass();
         }
     }
 

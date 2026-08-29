@@ -40,7 +40,9 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 **Transparent pass.** The list is sorted back to front by distance from the camera. Blending is on and depth writing is off — both baked into the pipelines rather than toggled around the pass.
 
-**End of frame.** UI and text draw, then the developer overlay, then the fade overlay if it is not fully transparent, then the frame is presented.
+**Offscreen scene pass (optional).** A caller may declare that the scene should render into an offscreen target rather than the backbuffer, naming the target, its colour texture, and a material to post-process with. The opaque and transparent passes then draw into that target, and a fullscreen pass with that material draws into the backbuffer sampling the colour texture. Declaring nothing renders directly, as before.
+
+**End of frame.** UI and text draw, then the developer overlay, then the fade overlay if it is not fully transparent, then the frame is presented. These follow the post pass, so UI is never subject to a scene post-process effect.
 
 Between these, named timing markers are emitted at each pass boundary, which is what produces the profiler's per-pass breakdown.
 
@@ -114,6 +116,16 @@ This removes an entire category of bug, where state is left enabled by an early 
 
 The cost is that changing a material's transparency after creation requires recreating its pipeline rather than flipping a flag.
 
+### An offscreen scene pass is declared, not bracketed
+
+A caller states that the scene should go to a target and be post-processed by a material. It does not open and close the passes itself.
+
+The frame's scene pass opens before any application code runs, and passes cannot nest, so a caller has no point at which it could bracket a pass of its own. Declaring the intent lets the frontend redirect the pass it already opens, which needs no change to the frame sequence and keeps pass ordering in one place. This is the frontend half of the access-level split recorded in AGD-0080.
+
+The post pass reuses the ordinary fullscreen-quad renderable and an ordinary material, so a post-process effect is authored as a normal shader with normal parameters.
+
+The cost is expressive range: one offscreen pass feeding one post pass, not an arbitrary chain. A multi-stage chain — bloom, depth of field — needs this extended rather than reused as is.
+
 ### Overlays are ordinary draws
 
 The fullscreen fade is a normal renderable with a normal material, drawn last. It is not a special capability of the renderer or of anything beneath it.
@@ -130,7 +142,9 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
-- Offscreen render targets are unimplemented, so there are no shadow maps, no reflection probes, and no post-processing beyond the fixed resolve.
+- The offscreen scene pass supports one target and one post-process material. A multi-stage post chain is not expressible.
+- An offscreen scene pass loses backbuffer multisampling, because offscreen targets are single-sample (AGD-0080).
+- Shadow maps and reflection probes are not built. Render targets make them possible; nothing in the frontend produces or consumes one yet.
 - A shader's own parameter block is parsed from its fragment source, not queried from the graphics interface. A block declared in a vertex section is not seen. Only scalar, vector, and 4x4 matrix members are placed; anything else drops the whole block rather than risk offsets that disagree with the driver.
 - Hot reload handles one nominated shader and is unavailable where assets are packaged.
 - Visibility cannot be separated from updating; a renderable that must not draw must stop updating.

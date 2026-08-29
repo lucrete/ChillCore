@@ -6,20 +6,19 @@ Sequenced on dependency and cost, not product priority. Where priorities differ,
 
 | # | Work | Workstream | Plan doc | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Offscreen render targets | Rendering | `RenderingPlan.md` | Largest capability gap — blocks shadows, reflections, post-process. Descriptor types and an unused backend pool already exist. |
-| 2 | Dirty-state cache beyond pipelines | Rendering | `RenderingPlan.md` | Cheapest call-count win. After render targets only because it is an optimisation, not a capability. |
-| 3 | Compute shaders | Rendering | `RenderingPlan.md` | Backend surface is built. Gated on shader compilation recognising a `#shader compute` stage — that one change unblocks the rest. Ends with a compute demo state. |
-| 4 | Velocity editing | AudioTracker | `AudioTrackerPlan.md` | Primary editing affordance. The whole workstream is independent of rendering, platform, and build work. |
-| 5 | Missing commands | AudioTracker | `AudioTrackerPlan.md` | Includes command coalescing — without it, drag-paint undo is unusable. |
-| 6 | Project file handling | AudioTracker | `AudioTrackerPlan.md` | New / Open / Save As, in-engine project browser, auto-save on exit. |
-| 7 | Android v1 ship-gate verification | Platform and build | `PlatformAndBuildPlan.md` | Cheapest item in the plan. Closes out a port everything downstream assumes is good; run it before more is built on the assumption. |
-| 8 | Persistence and lifecycle hooks | Persistence | `PersistencePlan.md` | Makes the Android context-loss cold-restart honest. Foundation for settings and save games — build once with both consumers in mind. |
-| 9 | Automated testing | Build pipeline | `BuildPipelinePlan.md` | `RunTests.sh` beside `Build.sh` / `Run.sh`. First tests: engine starts, loads a scene, shuts down clean. |
-| 10 | Packaged distribution | Build pipeline | `BuildPipelinePlan.md` | Archive of the self-contained output directory, labelled builds only. Cheapest once the output dir stands alone. |
+| 1 | Dirty-state cache beyond pipelines | Rendering | `RenderingPlan.md` | Cheapest call-count win. |
+| 2 | Compute shaders | Rendering | `RenderingPlan.md` | Backend surface is built. Gated on shader compilation recognising a `#shader compute` stage — that one change unblocks the rest. Ends with a compute demo state. |
+| 3 | Velocity editing | AudioTracker | `AudioTrackerPlan.md` | Primary editing affordance. The whole workstream is independent of rendering, platform, and build work. |
+| 4 | Missing commands | AudioTracker | `AudioTrackerPlan.md` | Includes command coalescing — without it, drag-paint undo is unusable. |
+| 5 | Project file handling | AudioTracker | `AudioTrackerPlan.md` | New / Open / Save As, in-engine project browser, auto-save on exit. |
+| 6 | Android v1 ship-gate verification | Platform and build | `PlatformAndBuildPlan.md` | Cheapest item in the plan. Closes out a port everything downstream assumes is good; run it before more is built on the assumption. Now also covers the offscreen render-target path on device (AGD-0080), which is written but unverified there. |
+| 7 | Persistence and lifecycle hooks | Persistence | `PersistencePlan.md` | Makes the Android context-loss cold-restart honest. Foundation for settings and save games — build once with both consumers in mind. |
+| 8 | Automated testing | Build pipeline | `BuildPipelinePlan.md` | `RunTests.sh` beside `Build.sh` / `Run.sh`. First tests: engine starts, loads a scene, shuts down clean. |
+| 9 | Packaged distribution | Build pipeline | `BuildPipelinePlan.md` | Archive of the self-contained output directory, labelled builds only. Cheapest once the output dir stands alone. |
 
 ## Sequencing notes
 
-- **Rendering (1–3) is a block, scheduled first by priority, not dependency.** No rendering item blocks the tracker, Android, or build work.
-- **AudioTracker (4–6) is independent** and can run in parallel with any other row, including the rendering block.
-- **The one hard dependency: 8 before any Android context-loss hardening.** The recovery policy is a deliberate cold restart on the premise that persistence restores the user's place.
+- **Rendering (1–2) is a block, scheduled first by priority, not dependency.** No rendering item blocks the tracker, Android, or build work.
+- **AudioTracker (3–5) is independent** and can run in parallel with any other row, including the rendering block.
+- **The one hard dependency: 7 before any Android context-loss hardening.** The recovery policy is a deliberate cold restart on the premise that persistence restores the user's place.
 - **Within a workstream the order is dependency and cost.** Across workstreams it is a preference and can be reordered freely.

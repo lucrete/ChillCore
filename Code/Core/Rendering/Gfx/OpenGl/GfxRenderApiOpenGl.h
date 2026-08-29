@@ -203,6 +203,12 @@ namespace CC::Gfx
         GfxCapabilities       capabilities;
         BackbufferDescription backbufferDescription;
 
+        // Which target the active render pass is bound to. An invalid handle
+        // means the pass targets the scene framebuffer (the backbuffer path);
+        // a valid handle indexes an offscreen entry in renderTargets.
+        RenderTargetHandle    currentRenderTarget;
+        bool                  currentPassIsOffscreen = false;
+
         // Push-constant UBO. Single GL_DYNAMIC_DRAW buffer reused every draw
         // via glBufferSubData; bound once at slot
         // OBJECT_UNIFORMS_BINDING_SLOT on first use.

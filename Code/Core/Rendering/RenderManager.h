@@ -55,6 +55,28 @@ namespace CC
 
         PipelineCache* GetPipelineCache() const { return pipelineCache; }
 
+        // ========================
+        // Offscreen scene pass
+        // ========================
+        //
+        // The frame loop opens the scene render pass in StartFrame, before
+        // any AppState code runs, so a general caller cannot bracket its own
+        // pass ahead of the backbuffer one. This is the affordance for that:
+        // when set, the opaque and transparent passes render into `target`
+        // instead of the backbuffer, then `postMaterial` is drawn as a
+        // fullscreen pass sampling `colorTexture` (bound at texture unit 0)
+        // into the backbuffer. Pass an invalid handle / null material, or
+        // call ClearOffscreenScenePass, to restore the direct path.
+        //
+        // Ownership of `target`, `colorTexture`, and `postMaterial` stays
+        // with the caller. General callers use this rather than the
+        // Gfx::RenderApi pass brackets directly (AGD-0070, AGD-0080).
+        void SetOffscreenScenePass(Gfx::RenderTargetHandle target,
+                                   Gfx::TextureHandle colorTexture,
+                                   Material* postMaterial);
+        void ClearOffscreenScenePass();
+        bool HasOffscreenScenePass() const;
+
     private:
         static RenderManager* instance;
         Gfx::RenderApi* gfxApi;
@@ -71,9 +93,27 @@ namespace CC
         Gfx::BufferHandle     frameUniformBuffer;
         Gfx::BackbufferDescription backbufferDescription;
 
+        struct OffscreenScenePass
+        {
+            Gfx::RenderTargetHandle target;
+            Gfx::TextureHandle      colorTexture;
+            Material*               postMaterial = nullptr;
+            bool                    isEnabled = false;
+        };
+        OffscreenScenePass        offscreenScenePass;
+        RenderableFullscreenQuad* offscreenPostQuad;
+        Gfx::SamplerHandle        offscreenSampler;
+
         void SortTransparentRenderables();
         void SortOpaqueRenderables();
         void UploadFrameUniforms();
+
+        // Second pass of an offscreen scene pass: draw offscreenPostQuad into
+        // the backbuffer, sampling the offscreen colour texture. No-op unless
+        // SetOffscreenScenePass is active. Called from Render after the scene
+        // passes end.
+        void DrawOffscreenPostPass();
+        Gfx::RenderTargetHandle SceneTargetForFrame() const;
 
         static const int MAX_RENDERABLES = 1024;
         Renderable** renderables;

@@ -4,6 +4,7 @@
 #include "AppStateShowcase.h"
 #include "AppStateAudioTest.h"
 #include "AppStateAudioTracker.h"
+#include "AppStateRenderTarget.h"
 #include "AudioManager.h"
 
 AppMain::AppMain()
@@ -25,6 +26,7 @@ void AppMain::Init()
     stateMachine->RegisterState("Showcase", new AppStateShowcase());
     stateMachine->RegisterState("AudioTest", new AppStateAudioTest());
     stateMachine->RegisterState("AudioTracker", new AppStateAudioTracker());
+    stateMachine->RegisterState("RenderTarget", new AppStateRenderTarget());
     stateMachine->GotoState("AudioTracker");
 }
 

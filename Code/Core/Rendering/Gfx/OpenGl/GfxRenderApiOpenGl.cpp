@@ -333,6 +333,14 @@ namespace CC::Gfx
         pipelines.clear();
         freePipelineSlots.clear();
 
+        for (size_t i = 0; i < renderTargets.size(); i++)
+        {
+            if (renderTargets[i].isAlive && renderTargets[i].fbo != 0)
+            {
+                glDeleteFramebuffers(1, &renderTargets[i].fbo);
+            }
+        }
+
         textures.clear();
         samplers.clear();
         renderTargets.clear();
@@ -542,23 +550,57 @@ namespace CC::Gfx
 
     void RenderApiOpenGl::BeginRenderPass(RenderTargetHandle target)
     {
-        // The "backbuffer" target is currently the only supported value.
-        // Future RenderTargetHandle pool entries (offscreen post-FX targets,
-        // shadow maps, etc.) will branch here.
-        (void)target;
-        CC_ASSERT(sceneFrameBuffer != nullptr, "BeginRenderPass: scene FB not configured");
         CC_ASSERT(!renderPassActive, "BeginRenderPass: a render pass is already active");
 
-        int width  = 0;
-        int height = 0;
-        GetBackbufferSize(width, height);
+        if (target.IsValid())
+        {
+            uint32_t slotIndex = target.id;
+            CC_ASSERT(slotIndex < renderTargets.size() && renderTargets[slotIndex].isAlive,
+                      "BeginRenderPass: render target not alive");
+            GlRenderTarget& entry = renderTargets[slotIndex];
+            const RenderTargetDescription& desc = entry.description;
 
-        sceneFrameBuffer->Bind(width, height);
-        glEnable(GL_DEPTH_TEST);
-        // glClear honours the depth write mask. A prior frame's transparent
-        // pipeline may have left it disabled; ensure the depth clear lands.
-        glDepthMask(GL_TRUE);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glBindFramebuffer(GL_FRAMEBUFFER, entry.fbo);
+            glViewport(0, 0, entry.width, entry.height);
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_TRUE);
+
+            for (int i = 0; i < desc.colorAttachmentCount; i++)
+            {
+                if (desc.colorAttachments[i].loadOp == LoadOp::Clear)
+                {
+                    glClearBufferfv(GL_COLOR, i, desc.colorAttachments[i].clearColor);
+                }
+            }
+            if (desc.hasDepthStencil && desc.depthStencilAttachment.loadOp == LoadOp::Clear)
+            {
+                glClear(GL_DEPTH_BUFFER_BIT);
+            }
+
+            currentRenderTarget    = target;
+            currentPassIsOffscreen = true;
+        }
+        else
+        {
+            CC_ASSERT(sceneFrameBuffer != nullptr, "BeginRenderPass: scene FB not configured");
+
+            int width  = 0;
+            int height = 0;
+            GetBackbufferSize(width, height);
+
+            sceneFrameBuffer->Bind(width, height);
+            glEnable(GL_DEPTH_TEST);
+            // glClear honours the depth write mask. A prior frame's transparent
+            // pipeline may have left it disabled; ensure the depth clear lands.
+            glDepthMask(GL_TRUE);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            currentRenderTarget    = RenderTargetHandle();
+            currentPassIsOffscreen = false;
+        }
+
+        // The raw glBindFramebuffer / glClear above bypass the tracked binds.
+        InvalidateCachedState();
 
         renderPassActive = true;
         AddGpuTimestamp("GpuRenderBegin");
@@ -602,31 +644,68 @@ namespace CC::Gfx
     void RenderApiOpenGl::EndRenderPass()
     {
         CC_ASSERT(renderPassActive, "EndRenderPass: no render pass is active");
-        CC_ASSERT(sceneFrameBuffer != nullptr, "EndRenderPass: scene FB not configured");
 
-        // Resolve MSAA into the single-sample colorbuffer.
-        sceneFrameBuffer->Resolve();
-        AddGpuTimestamp("GpuAfterMsaaResolve");
+        if (currentPassIsOffscreen)
+        {
+            // Offscreen targets are single-sample: no MSAA resolve and no
+            // blit to the default framebuffer. Honour StoreOp::DontCare as a
+            // discard hint so tiled GPUs can drop the contents.
+            uint32_t slotIndex = currentRenderTarget.id;
+            const RenderTargetDescription& desc = renderTargets[slotIndex].description;
 
-        // Blit the resolved colorbuffer to the default framebuffer.
-        EnsureBlitPipeline();
+            GLenum discard[MAX_COLOR_ATTACHMENTS + 1];
+            int discardCount = 0;
+            for (int i = 0; i < desc.colorAttachmentCount; i++)
+            {
+                if (desc.colorAttachments[i].storeOp == StoreOp::DontCare)
+                {
+                    discard[discardCount++] = GL_COLOR_ATTACHMENT0 + i;
+                }
+            }
+            if (desc.hasDepthStencil && desc.depthStencilAttachment.storeOp == StoreOp::DontCare)
+            {
+                discard[discardCount++] = GL_DEPTH_ATTACHMENT;
+            }
+            if (discardCount > 0)
+            {
+                glInvalidateFramebuffer(GL_FRAMEBUFFER, discardCount, discard);
+            }
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            currentRenderTarget    = RenderTargetHandle();
+            currentPassIsOffscreen = false;
 
-        BindPipeline(blitPipeline);
-        BindVertexBuffer(0, blitVertexBuffer, 0, CC::QUAD_STRIDE_BYTES);
+            // The raw glBindFramebuffer above bypasses the tracked binds.
+            InvalidateCachedState();
+        }
+        else
+        {
+            CC_ASSERT(sceneFrameBuffer != nullptr, "EndRenderPass: scene FB not configured");
 
-        // Bind the resolved colorbuffer at unit 0. The blit shader declares
-        // layout(binding = 0). The colorbuffer is non-mipmapped — unbind
-        // any sampler at unit 0 so the texture's own GL_LINEAR parameters
-        // govern, otherwise a stale mipmap-needing sampler from an earlier
-        // material draw silently produces black output.
-        glActiveTexture(GL_TEXTURE0);
-        sceneFrameBuffer->BindColorBuffer();
-        glBindSampler(0, 0);
+            // Resolve MSAA into the single-sample colorbuffer.
+            sceneFrameBuffer->Resolve();
+            AddGpuTimestamp("GpuAfterMsaaResolve");
 
-        Draw(CC::QUAD_VERTEX_COUNT, 1, 0);
+            // Blit the resolved colorbuffer to the default framebuffer.
+            EnsureBlitPipeline();
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            BindPipeline(blitPipeline);
+            BindVertexBuffer(0, blitVertexBuffer, 0, CC::QUAD_STRIDE_BYTES);
+
+            // Bind the resolved colorbuffer at unit 0. The blit shader declares
+            // layout(binding = 0). The colorbuffer is non-mipmapped — unbind
+            // any sampler at unit 0 so the texture's own GL_LINEAR parameters
+            // govern, otherwise a stale mipmap-needing sampler from an earlier
+            // material draw silently produces black output.
+            glActiveTexture(GL_TEXTURE0);
+            sceneFrameBuffer->BindColorBuffer();
+            glBindSampler(0, 0);
+
+            Draw(CC::QUAD_VERTEX_COUNT, 1, 0);
+        }
 
         renderPassActive = false;
     }
@@ -1094,20 +1173,122 @@ namespace CC::Gfx
     }
 
     // ========================
-    // Render targets (stubbed)
+    // Render targets
     // ========================
 
     RenderTargetHandle RenderApiOpenGl::CreateRenderTarget(const RenderTargetDescription& description)
     {
-        (void)description;
-        CC_ASSERT(false, "CreateRenderTarget not yet implemented in Phase 1a");
-        return RenderTargetHandle();
+        CC_ASSERT(description.colorAttachmentCount >= 0 && description.colorAttachmentCount <= MAX_COLOR_ATTACHMENTS,
+                  "CreateRenderTarget: colorAttachmentCount out of range");
+
+        GlRenderTarget entry;
+        entry.description = description;
+        entry.width       = description.width;
+        entry.height      = description.height;
+        entry.isAlive     = true;
+
+        glGenFramebuffers(1, &entry.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, entry.fbo);
+
+        GLenum drawBuffers[MAX_COLOR_ATTACHMENTS];
+        for (int i = 0; i < description.colorAttachmentCount; i++)
+        {
+            const RenderTargetAttachment& attachment = description.colorAttachments[i];
+            CC_ASSERT(attachment.arrayLayer == 0, "CreateRenderTarget: array-layer attachments not supported yet");
+            CC_ASSERT(attachment.texture.IsValid(), "CreateRenderTarget: colour attachment texture is invalid");
+            uint32_t texSlot = attachment.texture.id;
+            CC_ASSERT(texSlot < textures.size() && textures[texSlot].isAlive,
+                      "CreateRenderTarget: colour attachment texture not alive");
+            GlTexture& tex = textures[texSlot];
+
+            // TODO(webgl): a WebGL backend needs a WEBGL_draw_buffers /
+            // colour-renderable format check at this point.
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, tex.target,
+                                   tex.glHandle, attachment.mipLevel);
+            drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
+
+            if (entry.width == 0 || entry.height == 0)
+            {
+                entry.width  = tex.width;
+                entry.height = tex.height;
+            }
+        }
+
+        if (description.colorAttachmentCount > 0)
+        {
+            glDrawBuffers(description.colorAttachmentCount, drawBuffers);
+        }
+        else
+        {
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
+        }
+
+        if (description.hasDepthStencil)
+        {
+            const RenderTargetAttachment& depthAttachment = description.depthStencilAttachment;
+            CC_ASSERT(depthAttachment.texture.IsValid(), "CreateRenderTarget: depth attachment texture is invalid");
+            uint32_t depthSlot = depthAttachment.texture.id;
+            CC_ASSERT(depthSlot < textures.size() && textures[depthSlot].isAlive,
+                      "CreateRenderTarget: depth attachment texture not alive");
+            GlTexture& depthTex = textures[depthSlot];
+            GlTextureFormatInfo depthInfo = ToGlTextureFormat(depthTex.format);
+            GLenum attachPoint = (depthInfo.pixelFormat == GL_DEPTH_STENCIL)
+                ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, depthTex.target,
+                                   depthTex.glHandle, depthAttachment.mipLevel);
+
+            if (entry.width == 0 || entry.height == 0)
+            {
+                entry.width  = depthTex.width;
+                entry.height = depthTex.height;
+            }
+        }
+
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        CC_ASSERT(status == GL_FRAMEBUFFER_COMPLETE, "CreateRenderTarget: framebuffer incomplete");
+
+        // The raw binds above bypassed the tracked state; restore a known one.
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        InvalidateCachedState();
+
+        uint32_t slotIndex = GlCommon::AcquireSlot(freeRenderTargetSlots, static_cast<uint32_t>(renderTargets.size()));
+        if (slotIndex == renderTargets.size())
+        {
+            renderTargets.push_back(entry);
+        }
+        else
+        {
+            renderTargets[slotIndex] = entry;
+        }
+
+        RenderTargetHandle handle;
+        handle.id = slotIndex;
+        return handle;
     }
 
     void RenderApiOpenGl::DestroyRenderTarget(RenderTargetHandle handle)
     {
-        (void)handle;
-        CC_ASSERT(false, "DestroyRenderTarget not yet implemented in Phase 1a");
+        if (handle.IsValid())
+        {
+            uint32_t slotIndex = handle.id;
+            CC_ASSERT(slotIndex < renderTargets.size(), "RenderTargetHandle out of range");
+            GlRenderTarget& entry = renderTargets[slotIndex];
+            if (entry.isAlive)
+            {
+                if (currentRenderTarget.id == slotIndex)
+                {
+                    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                    currentRenderTarget    = RenderTargetHandle();
+                    currentPassIsOffscreen = false;
+                    InvalidateCachedState();
+                }
+                // Attachment textures are owned by the caller and left intact.
+                glDeleteFramebuffers(1, &entry.fbo);
+                entry = GlRenderTarget();
+                freeRenderTargetSlots.push_back(slotIndex);
+            }
+        }
     }
 
     // ========================

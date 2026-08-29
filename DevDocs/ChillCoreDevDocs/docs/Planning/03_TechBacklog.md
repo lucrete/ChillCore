@@ -8,6 +8,15 @@ Last reviewed against the source: 2026-08-29.
 
 ## Rendering
 
+### Render target follow-ups
+
+Gaps left open by the offscreen render-target work (AGD-0080 Limitations). None blocking:
+
+- Multisampled offscreen targets. Offscreen output is single-sample, so an offscreen scene pass loses the backbuffer's MSAA.
+- Array-layer and cubemap-face attachments. Needed before a cascaded shadow map or a cubemap reflection probe.
+- The backbuffer as a pool handle rather than an invalid one, which would remove the special case in the pass brackets.
+- A multi-stage post-process chain. The frontend supports one offscreen pass feeding one post pass.
+
 ### Camera registration by name
 
 `CameraManager` keys its map by `std::string` and asserts rather than storing a null. `GetViewProjectionMatrix` and `GetCameraPosition` dereference `activeCamera` unguarded. No state registers a second camera beyond the manager's own default, so the F9 free-camera toggle is a no-op outside it. No longer crashes; not urgent.
@@ -59,10 +68,6 @@ Decisions nobody has needed to make yet, recorded so they are not rediscovered f
 ### Material versus material instance
 
 Materials are shared objects with no per-renderable override. Setting a colour on one object sets it on every object using that material, and a per-object override would break material-based batching and sorting. The usual answer is a material instance holding per-object overrides over a shared base. Nothing has needed it yet. Adjacent to the batching and sort code — worth resolving whenever that is next open.
-
-### RenderManager versus Gfx::RenderApi access levels
-
-`RenderManager` owns the frame and pass brackets; renderables and materials call `Gfx::RenderApi` directly. Nothing prevents a general caller from beginning a render pass or reconfiguring the backbuffer. Whether to formalise the split — a restricted interface for general callers, a fuller one for `RenderManager` — is undecided. Relevant to AGD-0070 and AGD-0080. The render-target frontend work (roadmap 1) is the first caller that forces the question.
 
 ---
 

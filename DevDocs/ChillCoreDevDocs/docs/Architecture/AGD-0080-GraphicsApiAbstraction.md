@@ -37,7 +37,14 @@ The boundary is checkable: no graphics API type or header may appear outside thi
 
 **Per frame**, a frame begins, a render pass is entered against a target, pipelines and resources are bound and draws are issued, the pass ends, and the frame ends with presentation.
 
-Entering a pass establishes its target and clears it. Ending a pass resolves multisampled output and presents it into the default target as an ordinary draw, using a pipeline like any other.
+A pass targets either the backbuffer or an offscreen render target, selected by the handle passed when entering it. An invalid handle means the backbuffer.
+
+- **Backbuffer pass.** Entering binds the multisampled scene framebuffer and clears it. Ending resolves the multisampled output and presents it into the default target as an ordinary draw, using a pipeline like any other.
+- **Offscreen pass.** Entering binds the target's framebuffer, sets the viewport to its dimensions, and applies each attachment's load behaviour — clear, or preserve what is there. Ending applies each attachment's store behaviour, discarding what is not needed, and does no resolve or present. Offscreen targets are single-sample.
+
+Passes do not nest. Both pass boundaries bind framebuffers outside the tracked binds, so both invalidate the cached bind state.
+
+A target's colour attachment is an ordinary texture. A later pass samples it through the normal texture binding path; no separate mechanism exists for reading rendered output.
 
 **Binding a pipeline** compares against the last one bound and returns immediately if unchanged. Because pipelines carry all fixed state, this single check subsumes what would otherwise be many individual state comparisons.
 
@@ -48,6 +55,8 @@ Entering a pass establishes its target and clears it. Ending a pass resolves mul
 **Create a resource.** Fill a descriptor and call the corresponding create method. Destroy it through the matching destroy method; nothing is collected automatically.
 
 **Add a draw.** Obtain a pipeline for the shader and vertex layout, bind it, bind vertex and index buffers, textures, and uniform buffers, then issue the draw.
+
+**Render to an offscreen target.** Create the attachment textures, marking them as render targets. Create the render target from a descriptor naming those attachments and their load and store behaviour. Destroy the target when done; attachment textures are owned by the caller and are not destroyed with it. Do not enter the pass directly — declare it on the rendering frontend, which owns pass ordering (AGD-0070).
 
 **Support a feature that not every platform has.** Query the capability at runtime and provide a path for its absence. Do not use conditional compilation — that defeats the point of the abstraction and hides the gap from every other platform.
 
@@ -105,6 +114,18 @@ Sample count, format, and vertical sync are set together in one call rather than
 
 Backends that must recreate their presentation chain when any of these change need them as one atomic change. Individual setters would force either a recreation per property or a deferred-application mechanism.
 
+### Pass brackets belong to the frontend, not to general callers
+
+Resource creation and destruction, binding, and drawing are open to any caller. Entering and ending a render pass is not: general callers declare the pass they want and the rendering frontend brackets it.
+
+This settles a question left open since the abstraction was built — whether to formalise the split between what `RenderManager` may call and what anything else may. Offscreen targets forced it, because they are the first feature with a caller outside the frontend that wants a pass of its own.
+
+The frontend opens the scene pass before any application code runs, and passes do not nest. A caller bracketing its own pass from inside the update would therefore be opening a pass inside an open one. The options were to move the frame's pass structure into application code, or to keep the frontend the only thing that brackets passes. The second keeps the frame sequence in one place and leaves the ordering invariant checkable.
+
+The split is by convention rather than by a separate restricted interface. Nothing in the type system stops a caller reaching for the brackets directly; the runtime assert on a nested pass is what catches it. A narrower interface for general callers remains available if this proves insufficient.
+
+The cost is that a caller cannot express an arbitrary pass graph. What it can express is one offscreen pass feeding one post pass, which is what the current features need and is not the general case.
+
 ### Windowing is not a rendering concern
 
 Window size, fullscreen state, and cursor locking were once part of this interface and are not. They belong to the platform layer.
@@ -113,7 +134,9 @@ They differ by operating system rather than by graphics API, and a backend has n
 
 ## Limitations
 
-- Offscreen render targets are declared but unimplemented in both backends. Only the implicit backbuffer exists, which blocks shadow maps, reflection probes, and post-processing chains.
+- Offscreen render targets are single-sample. Multisampling exists on the backbuffer only, so offscreen output has aliased edges the direct path does not.
+- Render target attachments are single-layer. Array layers and cubemap faces are rejected, which is what a cubemap reflection probe or a cascaded shadow map would need.
+- The backbuffer is not itself addressable as a render target. It is reached by an invalid handle rather than by a handle from the pool.
 - Redundancy elimination covers pipeline binds only. Vertex buffer, texture, and uniform buffer binds are not compared against current state.
 - GPU spans are a flat ordered sequence per frame, with no nesting.
 - Any code path bypassing this interface to call the graphics API directly must invalidate the cached bind state, or stale state becomes visible as incorrect rendering.
