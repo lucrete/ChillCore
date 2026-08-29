@@ -8,6 +8,7 @@
 #include "StateMachine.h"
 #include "MainMenuController.h"
 #include "OptionsController.h"
+#include "AboutController.h"
 #include "ShowcaseController.h"
 
 AppStateBoot::AppStateBoot()
@@ -37,6 +38,7 @@ void AppStateBoot::Init()
     screens->RegisterScreen("MainMenu", "Data/Ui/MainMenu.html", "Data/Ui/MainMenu.css",
         new MainMenuController([]() { CC::StateMachine::Get()->GotoState("Showcase"); }));
     screens->RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css", new OptionsController());
+    screens->RegisterScreen("About", "Data/Ui/About.html", "Data/Ui/About.css", new AboutController());
     screens->RegisterScreen("Showcase", "Data/Ui/Showcase.html", "Data/Ui/Showcase.css", new ShowcaseController());
     screens->SetScreen("MainMenu");
     CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);

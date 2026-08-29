@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ChillCore24 is a C++ realtime 3D rendering and interaction engine for Windows using Visual Studio 2022 and OpenGL.
+ChillCore24 is a C++ realtime 3D rendering and interaction engine for Windows using Visual Studio 2026 and OpenGL.
 
 ## Context Startup
 Always start by reading:
@@ -19,7 +19,7 @@ Follow the coding standard defined in `DevDocs/ChillCoreDevDocs/docs/Guidelines/
 
 ### Naming
 * camelCase: variables, function parameters
-* PascalCase: files, folders, classes, structs, functions, properties, enum members
+* PascalCase: all file and folder names (checked in or created at runtime), classes, structs, functions, properties, enum members
 * SCREAMING_SNAKE_CASE: macros, defines, header guards, const variables
 * Descriptive names, no abbreviated words. Single-letter variables only for tight loop iterators.
 * Prefix bools with a verb: `isActive`, `doNotify`
@@ -62,7 +62,7 @@ Follow the coding standard defined in `DevDocs/ChillCoreDevDocs/docs/Guidelines/
 
 ## Build Commands
 
-Open solution: `Code/Targets/Desktop/ChillCore.sln`
+Open solution: `Code/Targets/Desktop/ChillCore.sln` (hand-maintained, being retired), or the CMake-generated `Build/CMake/Desktop/ChillCore.slnx` once the pipeline has run once. Both build the same sources; the generated one is the future.
 
 Android builds from `Code/Targets/Android/` via Gradle -> CMake -> NDK. Claude does not build either target.
 
@@ -72,7 +72,7 @@ Android builds from `Code/Targets/Android/` via Gradle -> CMake -> NDK. Claude d
 
 Output goes to `Build/x64/{Debug|Release}/`
 
-**Claude does not build.** Builds and runs are driven by the user in Visual Studio 2022. Do not invoke MSBuild, devenv, cl.exe, or any other build tooling. Implement and edit; the user will compile and report any errors back. Static analysis (re-reading the code, checking includes and APIs) is the substitute for compile-time validation on Claude's side.
+**Claude builds through the pipeline.** Run `bash Tools/Build/Build.sh --no-pause` (add `--release` or `--clean` as needed) and read `Build/Logs/Unlabelled/Diagnostics.json` for structured errors. Do not invoke MSBuild, devenv, or cl.exe directly — the pipeline is the only supported entry point. Runs are still driven by the user in Visual Studio 2026.
 
 ### Project Configuration Requirements
 

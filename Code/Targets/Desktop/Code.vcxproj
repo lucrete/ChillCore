@@ -155,6 +155,7 @@
     <ClCompile Include="..\..\App\UiScreens\ShowcaseController.cpp" />
     <ClCompile Include="..\..\App\UiScreens\MainMenuController.cpp" />
     <ClCompile Include="..\..\App\UiScreens\OptionsController.cpp" />
+    <ClCompile Include="..\..\App\UiScreens\AboutController.cpp" />
     <ClCompile Include="..\..\App\UiScreens\ShowcaseHudController.cpp" />
     <ClCompile Include="..\..\App\UiScreens\PauseMenuController.cpp" />
     <ClCompile Include="..\..\App\UiScreens\AudioTestController.cpp" />
@@ -270,6 +271,8 @@
     </ClCompile>
     <ClCompile Include="..\..\Core\Ui\DevUi\CommandConsole.cpp" />
     <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewCommandConsole.cpp" />
+    <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewAbout.cpp" />
+    <ClCompile Include="..\..\Core\BuildInfo.cpp" />
     <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewFrameProfile.cpp" />
     <ClCompile Include="..\..\Core\Ui\DevUi\DevUiViewSceneHierarchy.cpp" />
     <ClCompile Include="..\..\Core\Ui\Font\Font.cpp" />
@@ -339,6 +342,7 @@
     <ClInclude Include="..\..\App\UiScreens\ShowcaseController.h" />
     <ClInclude Include="..\..\App\UiScreens\MainMenuController.h" />
     <ClInclude Include="..\..\App\UiScreens\OptionsController.h" />
+    <ClInclude Include="..\..\App\UiScreens\AboutController.h" />
     <ClInclude Include="..\..\App\UiScreens\ShowcaseHudController.h" />
     <ClInclude Include="..\..\App\UiScreens\PauseMenuController.h" />
     <ClInclude Include="..\..\App\UiScreens\AudioTestController.h" />
@@ -489,6 +493,8 @@
     <ClInclude Include="..\..\Core\Ui\DevUi\CommandConsole.h" />
     <ClInclude Include="..\..\Core\Ui\DevUi\DevUiView.h" />
     <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewCommandConsole.h" />
+    <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewAbout.h" />
+    <ClInclude Include="..\..\Core\BuildInfo.h" />
     <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewFrameProfile.h" />
     <ClInclude Include="..\..\Core\Ui\DevUi\DevUiViewSceneHierarchy.h" />
     <ClInclude Include="..\..\Core\Ui\Font\Font.h" />

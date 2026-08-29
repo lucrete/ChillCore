@@ -14,7 +14,7 @@ Four hard dependencies exist. Everything else is preference.
 | This | Cannot start until | Because |
 | --- | --- | --- |
 | WebGL backend | CMake unification | The web toolchain integrates through CMake; there is no path through the hand-maintained desktop project. |
-| Scripted build system | CMake unification | The presets are the script-facing contract. |
+| The build pipeline's remaining phases | CMake unification | The presets are the script-facing contract, so unification is the pipeline's own first phase. |
 | Further graphics backends | CMake unification | Each new target needs a build description, and adding them one at a time to two systems compounds the problem unification solves. |
 | Honest recovery from graphics-context loss | Persistence | The policy is a deliberate cold restart on the premise that persistence restores the user's place. Without it, the restart lands on the boot screen. |
 
@@ -54,21 +54,21 @@ The verification is the cheapest item in the entire backlog and it closes out a 
 
 Persistence follows because it is what makes the context-loss policy honest. It is also the foundation the settings and save systems will need, so building it once with both consumers in mind costs the same as building it for either alone.
 
-## Stage 4 — Unify the build
+## Stage 4 — Unify the build and script it
 
-**CMake unification.**
+**The build pipeline**, whose Phase 0 is **CMake unification**. Design in `BuildPipelinePlan.md`.
 
 This is the pivot of the roadmap. Nothing above it needs it; everything below it does. It is placed here rather than earlier for a specific reason: doing it before the Android port would have meant refactoring the build twice, once to reach parity for Windows alone and again to make it genuinely cross-platform. Now the cross-platform requirement is concrete, and verification is cheap because one target is known-good and the other reduces to a parity test.
 
 Its secondary benefit is removing the divergence hazard where a new source file is added to one build and silently missed by the other.
 
+The pipeline's remaining phases follow immediately rather than waiting for Stage 5. Unification leaves the presets in place and unexercised; the script is what exercises them, and it is what gives the parity test and every later target a repeatable build to run. Building it here also means the WebGL work below arrives into a scripted build rather than adding a third target to a hand-driven one.
+
 ## Stage 5 — Further targets
 
-**WebGL**, then **the scripted build**, then **further graphics backends**.
+**WebGL**, then **further graphics backends**.
 
 WebGL first because it is the strongest test of the abstraction after Android: it lacks compute, storage buffers, and indirect draw, so it forces the capability-gating paths to be genuinely exercised rather than merely present. Stage 1 having landed compute makes this test meaningful — there is now a real consumer to gate off.
-
-The scripted build follows because by then there are three targets, and building them by hand stops being reasonable.
 
 Further graphics backends come last, and their order is open. Vulkan is the likely first, being cross-platform and applicable to Android as well. They inherit a shim-free `Gfx::RenderApi` from Stage 1.
 

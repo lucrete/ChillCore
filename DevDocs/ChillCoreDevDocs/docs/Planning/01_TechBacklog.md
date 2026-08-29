@@ -10,7 +10,7 @@ Last verified against the source code: 2026-08-29.
 
 ## Status legend
 
-Nothing is in flight. Every actionable item is **Ready**; the backlog does not track assignment, and priority is expressed in *Suggested ordering* rather than per item.
+Nothing is in flight. The backlog does not track assignment, and priority is expressed in the roadmap rather than per item. **Blocked** appears only within the build pipeline, whose phases are strictly ordered.
 
 | Marker | Meaning |
 | --- | --- |
@@ -26,7 +26,8 @@ Nothing is in flight. Every actionable item is **Ready**; the backlog does not t
 | --- | --- | --- |
 | Rendering | `RenderingPlan.md` | Render targets, dirty-state cache, compute |
 | AudioTracker | `AudioTrackerPlan.md` | Phases 0–5 landed; velocity editing and project handling open |
-| Platform and build | `PlatformAndBuildPlan.md` | Android ships; CMake, WebGL, further backends open |
+| Platform and build | `PlatformAndBuildPlan.md` | Android ships; WebGL and further backends open |
+| Build pipeline | `BuildPipelinePlan.md` | Phases 0–3 building; behavioural parity and vcxproj retirement open |
 | Persistence | `PersistencePlan.md` | Not started |
 
 ---
@@ -117,31 +118,47 @@ Wave B's context-loss policy is a cold restart on the premise that persistence r
 - `PlatformFileSystemAndroid::CopyFile` and `ListDirectoryEntries` return `false` (`PlatformFileSystemAndroid.cpp:158-172`). Deliberate — the only consumer is desktop-only AudioTracker — but they block any Android feature needing directory enumeration.
 - `PlatformFileSystemAndroid::WriteFileTextAtomic` forwards to `WriteFileText` and is not atomic. Needs scoped-storage work before anything on Android relies on the guarantee.
 
-### CMake unification (**Ready**)
+### CMake unification (written, unverified)
 
-`Code/Targets/Desktop/Code.vcxproj` is still the Windows source of truth. Only the Android `app/src/main/cpp/CMakeLists.txt` exists.
-
-- Root `Code/CMakeLists.txt` describing `chillcore_engine`.
-- `CMakePresets.json` with desktop-debug / desktop-release / android-arm64-debug / android-arm64-release.
-- Per-target `CMakeLists.txt` under `Targets/Desktop/` and `Targets/Android/`.
-- `source_group(TREE …)` replaces the hand-maintained `Code.vcxproj.filters`.
-- `.gitignore` gains `Build-CMake/`, `CMakeCache.txt`, `CMakeFiles/`, `cmake_install.cmake`, `CMakeUserPresets.json`.
-- Windows binary parity test, then retire the vcxproj and sln.
-- Gates the WebGL backend, further backends, and the scripted build system.
+Landed as Phase 0 of the build pipeline. Verification and the retirement of the Visual Studio project are tracked in the Build pipeline section below.
 
 ### WebGL backend (**Deferred**)
 
 - `Gfx::RenderApiWebGl` under emscripten. Capability gating for compute, storage buffers, indirect draw.
 - Platform backends over the emscripten runtime.
 
-### Scripted build system (**Deferred**)
-
-- `scripts/build.py` plus per-target wrappers. Drives CMake presets and Gradle, asset preprocessing, signing, artifact collection into `Artifacts/<platform>/<config>/`.
-
 ### Shader cross-compilation (**Deferred**)
 
 - AGD-0080 defers cross-compilation until a second shader target ships. GLES currently uses `ShaderManager` preamble injection instead.
 - Revisit when WebGL or Vulkan lands: glslang to SPIR-V, SPIRV-Cross to targets.
+
+---
+
+## Build pipeline
+
+Phases 0 to 3 build cleanly. Design in `BuildPipelinePlan.md`.
+
+Confirmed by running the pipeline: Debug and Release, clean and incremental, labelled and unlabelled, zero errors; a deliberately broken source yields exit code 1 with the diagnostic parsed and located; the executable lands in `Build/x64/<Configuration>/` as before; an incremental labelled build recompiles only `BuildInfo.cpp`.
+
+### Behavioural parity (**Ready**)
+
+The gate on everything else in this workstream. The binary compiles and links; nothing has run it.
+
+- Run both configurations and confirm the application behaves as the retired project's binary did.
+- F5 from `Build/CMake/Desktop/ChillCore.slnx` starts in `Code/App` and loads assets.
+- Confirm both About panels — developer Help → About, and the main menu's About screen — show the identifier from a labelled build.
+
+### Android package parity test (**Blocked** — behavioural parity)
+
+`Code/Targets/Android/app/src/main/cpp/CMakeLists.txt` now consumes the shared engine description rather than globbing its own sources. The package produced through Gradle must match the current one.
+
+### Retire the Visual Studio project (**Blocked** — both parity checks)
+
+Delete `Code.vcxproj`, `Code.vcxproj.filters`, and `ChillCore.sln`. Until this lands, every new source file must still be added to the project by hand as well as to disk.
+
+### Reserved (**Deferred**)
+
+Named so the shape is known, not scheduled: `RunTests.sh`, asset preprocessing, documentation and runtime data bundling into an installer, an Android target option.
 
 ---
 

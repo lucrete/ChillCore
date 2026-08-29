@@ -11,6 +11,7 @@
 #include "DevUiViewFrameProfile.h"
 #include "DevUiViewSceneHierarchy.h"
 #include "DevUiViewCommandConsole.h"
+#include "DevUiViewAbout.h"
 
 namespace CC
 {
@@ -24,6 +25,7 @@ namespace CC
         frameProfileView = new DevUiViewFrameProfile();
         sceneHierarchyView = new DevUiViewSceneHierarchy();
         commandConsoleView = new DevUiViewCommandConsole();
+        aboutView = new DevUiViewAbout();
 
         commandConsole->RegisterCommand("profile",
             "Frame profiling. 'profile' for snapshot, 'profile long' for 3s CSV capture",
@@ -52,6 +54,7 @@ namespace CC
 
     DevUi::~DevUi()
     {
+        delete aboutView;
         delete commandConsoleView;
         delete sceneHierarchyView;
         delete frameProfileView;
@@ -99,6 +102,7 @@ namespace CC
             ImGui::ShowDemoWindow(&showDemoWindow);
         }
 
+        DrawMainMenuBar();
         DrawDevOverlay();
 
         FrameTimer::Get()->RecordProfileData();
@@ -124,6 +128,11 @@ namespace CC
         if (commandConsoleView->IsVisible())
         {
             commandConsoleView->Draw();
+        }
+
+        if (aboutView->IsVisible())
+        {
+            aboutView->Draw();
         }
     }
 
@@ -189,6 +198,25 @@ namespace CC
         contextText = text;
     }
 
+    void DevUi::DrawMainMenuBar()
+    {
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("Help"))
+            {
+                if (ImGui::MenuItem("About"))
+                {
+                    aboutView->SetVisible(true);
+                }
+                ImGui::EndMenu();
+            }
+
+            // The overlay below sits under the bar rather than behind it.
+            mainMenuBarHeight = ImGui::GetWindowSize().y;
+            ImGui::EndMainMenuBar();
+        }
+    }
+
     void DevUi::DrawDevOverlay()
     {
         const float xyPosition = 10.0f;
@@ -200,7 +228,7 @@ namespace CC
             ImGuiWindowFlags_NoNav |
             ImGuiWindowFlags_NoMove;
 
-        ImGui::SetNextWindowPos(ImVec2(xyPosition, xyPosition), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(xyPosition, xyPosition + mainMenuBarHeight), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.35f);
 
         if (ImGui::Begin("FPS", nullptr, flags))
@@ -277,6 +305,12 @@ namespace CC
             if (ImGui::Checkbox("Command Console", &isCommandConsoleVisible))
             {
                 commandConsoleView->SetVisible(isCommandConsoleVisible);
+            }
+
+            bool isAboutVisible = aboutView->IsVisible();
+            if (ImGui::Checkbox("About", &isAboutVisible))
+            {
+                aboutView->SetVisible(isAboutVisible);
             }
             ImGui::TreePop();
         }

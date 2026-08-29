@@ -34,9 +34,8 @@ These are guidelines, not rules, where if followed will result in an easier to u
 ~~~
 
 ## Casing terminology
-* camelCase: no spaces, capitalize first letter only of each word except the first word. Including acronyms. Variables, function parameters, Application file names ie files created by the app.
-	* Note: the use of camelCase for application file names is due to legacy naming convention.
-* PascalCase: capitalize first letter of all words including the first. Codebase file and folder names, classes, structs, functions, properties, enum members, Application folder names ie folders created by the app.
+* camelCase: no spaces, capitalize first letter only of each word except the first word. Including acronyms. Variables, function parameters.
+* PascalCase: capitalize first letter of all words including the first. All file and folder names, whether checked in or created by the application at runtime. Classes, structs, functions, properties, enum members.
 * SCREAMING_SNAKE_CASE: for macros, pre-processor defines, header guards, and const variables.
 * Do not use kebab-case.
 

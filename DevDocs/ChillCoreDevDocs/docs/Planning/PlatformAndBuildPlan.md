@@ -27,23 +27,14 @@ Three file-system operations are unimplemented on Android.
 
 ## CMake unification
 
-The desktop target is described by a hand-maintained Visual Studio project; only Android has a CMake description. Unifying them replaces both with one description of the source tree.
+**Moved.** Design, shape, and phasing live in `BuildPipelinePlan.md`, as Phase 0 of the build pipeline. The presets are the script-facing contract, so unification belongs to the plan that consumes them.
 
-**Why it matters.** Every new source file must currently be added to the desktop project by hand, while the Android build discovers it automatically — so the two can silently diverge. Unification also gates everything below it in this document: further targets, and any scripted or automated build.
+Retained here because it is a platform concern as much as a build one:
 
-**Shape.** A root description of the engine as a library, knowing nothing about entry points or platform shells. A presets file carrying the canonical configurations for both platforms and both build types. Per-target descriptions under each target directory, each adding only its entry point and its platform links.
-
-**Consequences worth knowing in advance.**
-
-- The hand-maintained Solution Explorer filter tree becomes a derived artifact, generated from the on-disk hierarchy. Any filter organisation done by hand between now and then is throwaway.
-- Visual Studio users either open the generated solution, with build and debug unchanged, or open the folder directly using the presets.
-- Build artifacts and CMake's own generated files need ignoring.
-
-**Why after Android rather than before.** Doing it first would have meant refactoring the build twice: once to reach parity for Windows alone, again to make it genuinely cross-platform. Doing it now means the cross-platform requirement is concrete rather than speculative, and verification is cheap because the Android build is known-good and the Windows side reduces to a focused parity test.
-
-**A constraint to honour from the start.** Every per-platform configuration must be expressible as a checked-in preset. No platform may require an interactive step to produce a release artifact — otherwise the scripted build below is impossible.
-
-**Done when:** the Windows binary produced through CMake behaves identically to the one the retired project produced, and the Android package produced through Gradle matches the current one. Both build trees run side by side during verification; the old project is retired only after parity is confirmed.
+- **Why it matters.** Every new source file must currently be added to the desktop project by hand, while the Android build discovers it automatically — so the two can silently diverge. Unification also gates the further targets below.
+- **Why after Android rather than before.** Doing it first would have meant refactoring the build twice: once to reach parity for Windows alone, again to make it genuinely cross-platform. Doing it now means the cross-platform requirement is concrete, and verification is cheap because the Android build is known-good and the Windows side reduces to a focused parity test.
+- **A constraint to honour from the start.** Every per-platform configuration must be expressible as a checked-in preset. No platform may require an interactive step to produce a release artifact.
+- **Android's half of the parity test.** The package produced through Gradle after unification must match the current one.
 
 ---
 
@@ -79,9 +70,9 @@ Order is open. Vulkan first is the likely choice, being cross-platform and appli
 
 ## Scripted build system
 
-**Not started.** Gated on CMake unification.
+**Moved.** Design lives in `BuildPipelinePlan.md`.
 
-A build script plus per-target wrappers, driving the CMake presets and the Android packaging tool, running asset preprocessing before the build and signing after it, and collecting artifacts into a per-platform, per-configuration location. Continuous integration invokes the same script rather than reimplementing the steps.
+A command-line build system with two entry paths into one implementation: interactive when double-clicked from Explorer, unattended when given arguments. It drives the CMake presets, produces a log and a machine-readable diagnostic report per build, and compiles a build identifier into the binary. Asset preprocessing, signing, testing, and installer generation attach to the same script later.
 
 ---
 
