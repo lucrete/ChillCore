@@ -1,6 +1,6 @@
 # AGD-0070: Rendering Pipeline
 
-- **Scope:** How a frame is drawn — submission, sorting, passes, materials, shaders, textures, cameras, and lights. Covers the rendering frontend, which speaks only in engine graphics types. Does not cover the graphics abstraction beneath it, which is AGD-0080.
+- **Scope:** How a frame is drawn — submission, sorting, passes, materials, shaders, textures, cameras, and lights. Covers the rendering frontend, which speaks only in engine graphics types. Does not cover the graphics abstraction beneath it.
 
 ## Overview
 
@@ -120,7 +120,7 @@ The cost is that changing a material's transparency after creation requires recr
 
 A caller states that the scene should go to a target and be post-processed by a material. It does not open and close the passes itself.
 
-The frame's scene pass opens before any application code runs, and passes cannot nest, so a caller has no point at which it could bracket a pass of its own. Declaring the intent lets the frontend redirect the pass it already opens, which needs no change to the frame sequence and keeps pass ordering in one place. This is the frontend half of the access-level split recorded in AGD-0080.
+The frame's scene pass opens before any application code runs, and passes cannot nest, so a caller has no point at which it could bracket a pass of its own. Declaring the intent lets the frontend redirect the pass it already opens, which needs no change to the frame sequence and keeps pass ordering in one place. This is the frontend half of a split that also constrains the graphics abstraction: entering and ending a pass is the frontend's alone, while resource creation, binding, and drawing stay open to any caller.
 
 The post pass reuses the ordinary fullscreen-quad renderable and an ordinary material, so a post-process effect is authored as a normal shader with normal parameters.
 
@@ -143,7 +143,7 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
 - The offscreen scene pass supports one target and one post-process material. A multi-stage post chain is not expressible.
-- An offscreen scene pass loses backbuffer multisampling, because offscreen targets are single-sample (AGD-0080).
+- An offscreen scene pass loses backbuffer multisampling, because offscreen targets are single-sample.
 - Shadow maps and reflection probes are not built. Render targets make them possible; nothing in the frontend produces or consumes one yet.
 - A shader's own parameter block is parsed from its fragment source, not queried from the graphics interface. A block declared in a vertex section is not seen. Only scalar, vector, and 4x4 matrix members are placed; anything else drops the whole block rather than risk offsets that disagree with the driver.
 - Hot reload handles one nominated shader and is unavailable where assets are packaged.

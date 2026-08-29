@@ -1,6 +1,6 @@
 # AGD-0160: Android Support
 
-- **Scope:** What running on Android requires beyond the shared engine — the activity shell, the drawing-surface and graphics-context lifecycle, packaged assets, touch input, and what is deliberately absent. Does not cover the platform abstraction itself, which is AGD-0030, nor the build, which is AGD-0040.
+- **Scope:** What running on Android requires beyond the shared engine — the activity shell, the drawing-surface and graphics-context lifecycle, packaged assets, touch input, and what is deliberately absent. Does not cover the platform abstraction itself, nor the build.
 
 ## Overview
 

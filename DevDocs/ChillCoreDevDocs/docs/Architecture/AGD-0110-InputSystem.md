@@ -1,6 +1,6 @@
 # AGD-0110: Input System
 
-- **Scope:** How physical input becomes application-meaningful actions. Covers the layered model, contexts, the gamepad-first design, interaction modes, and developer-only bindings. Does not cover how any individual platform captures input, which is AGD-0030.
+- **Scope:** How physical input becomes application-meaningful actions. Covers the layered model, contexts, the gamepad-first design, interaction modes, and developer-only bindings. Does not cover how any individual platform captures input.
 
 ## Overview
 

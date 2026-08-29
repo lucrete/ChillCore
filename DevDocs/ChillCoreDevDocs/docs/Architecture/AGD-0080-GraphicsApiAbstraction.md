@@ -1,6 +1,6 @@
 # AGD-0080: Graphics API Abstraction
 
-- **Scope:** The boundary between the rendering frontend and a graphics API. Covers opaque handles, descriptors, pipeline objects, render passes, capability querying, and GPU timing, plus how backends implement them. Does not cover how a frame is composed, which is AGD-0070.
+- **Scope:** The boundary between the rendering frontend and a graphics API. Covers opaque handles, descriptors, pipeline objects, render passes, capability querying, and GPU timing, plus how backends implement them. Does not cover how a frame is composed.
 
 ## Overview
 
@@ -56,7 +56,7 @@ A target's colour attachment is an ordinary texture. A later pass samples it thr
 
 **Add a draw.** Obtain a pipeline for the shader and vertex layout, bind it, bind vertex and index buffers, textures, and uniform buffers, then issue the draw.
 
-**Render to an offscreen target.** Create the attachment textures, marking them as render targets. Create the render target from a descriptor naming those attachments and their load and store behaviour. Destroy the target when done; attachment textures are owned by the caller and are not destroyed with it. Do not enter the pass directly — declare it on the rendering frontend, which owns pass ordering (AGD-0070).
+**Render to an offscreen target.** Create the attachment textures, marking them as render targets. Create the render target from a descriptor naming those attachments and their load and store behaviour. Destroy the target when done; attachment textures are owned by the caller and are not destroyed with it. Do not enter the pass directly — declare it on the rendering frontend, which owns pass ordering.
 
 **Support a feature that not every platform has.** Query the capability at runtime and provide a path for its absence. Do not use conditional compilation — that defeats the point of the abstraction and hides the gap from every other platform.
 
