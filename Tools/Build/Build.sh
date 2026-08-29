@@ -13,7 +13,7 @@ set -u
 EXIT_INVALID_USAGE=2
 EXIT_MISSING_TOOLCHAIN=3
 
-scriptDirectory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+scriptDirectory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
 useBuildId=false
 configuration="Debug"
@@ -156,6 +156,24 @@ ResolvePython()
     return 1
 }
 
+# Convert a shell path to a Windows path for the Windows interpreter. Git Bash
+# usually converts arguments on the way out, but not reliably for every
+# invocation form, and WSL does not convert at all.
+ToWindowsPath()
+{
+    local path="$1"
+
+    if command -v cygpath >/dev/null 2>&1
+    then
+        cygpath -w "$path"
+    elif command -v wslpath >/dev/null 2>&1
+    then
+        wslpath -w "$path"
+    else
+        echo "$path"
+    fi
+}
+
 # ============================================================================
 # Main
 # ============================================================================
@@ -211,18 +229,40 @@ then
     buildArguments+=(--clean)
 fi
 
+# ============================================================================
+# Virtual environment
+#
+# Build.py imports only the standard library today, so the environment buys
+# isolation for what comes later — a report template engine, a test runner —
+# rather than solving a problem that exists now. Creating it costs a few
+# seconds once; using it costs nothing measurable per build, because the
+# interpreter and its import search are the same either way.
+# ============================================================================
+
+virtualEnvironment="$scriptDirectory/.venv"
+
+if [ ! -f "$virtualEnvironment/Scripts/python.exe" ] && [ ! -f "$virtualEnvironment/bin/python" ]
+then
+    echo "Creating the build virtual environment (first run only)."
+
+    if ! "$pythonCommand" -m venv "$(ToWindowsPath "$virtualEnvironment")"
+    then
+        echo "Failed to create the virtual environment at $virtualEnvironment." >&2
+        Finish $EXIT_MISSING_TOOLCHAIN
+    fi
+fi
+
+if [ -f "$virtualEnvironment/Scripts/python.exe" ]
+then
+    pythonCommand="$virtualEnvironment/Scripts/python.exe"
+elif [ -f "$virtualEnvironment/bin/python" ]
+then
+    pythonCommand="$virtualEnvironment/bin/python"
+fi
+
 buildScript="$scriptDirectory/Build.py"
 
-# The Windows interpreter needs a Windows path. Git Bash usually converts
-# arguments on the way out, but not reliably for every invocation form, and
-# WSL does not convert at all.
-if command -v cygpath >/dev/null 2>&1
-then
-    buildScript="$(cygpath -w "$buildScript")"
-elif command -v wslpath >/dev/null 2>&1
-then
-    buildScript="$(wslpath -w "$buildScript")"
-fi
+buildScript="$(ToWindowsPath "$buildScript")"
 
 "$pythonCommand" "$buildScript" "${buildArguments[@]}"
 Finish $?

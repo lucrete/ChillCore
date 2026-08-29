@@ -220,3 +220,6 @@ CMakeUserPresets.json
 Build/Logs/
 Build/BuildCounter.json
 Code/Core/BuildInfoGenerated.h
+Tools/Build/.venv/
+__pycache__/
+*.pyc

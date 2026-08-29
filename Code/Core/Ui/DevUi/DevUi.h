@@ -38,12 +38,10 @@ namespace CC
         DevUiViewCommandConsole* commandConsoleView = nullptr;
         DevUiViewAbout* aboutView = nullptr;
 
-        void DrawMainMenuBar();
         void DrawDevOverlay();
         void DrawViewToggles();
 
         std::string contextText;
-        float mainMenuBarHeight = 0.0f;
         bool showDemoWindow = false;
         bool wasConsoleVisible = false;
         bool savedMouseLockState = false;

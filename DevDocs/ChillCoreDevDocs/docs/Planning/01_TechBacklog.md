@@ -27,7 +27,7 @@ Nothing is in flight. The backlog does not track assignment, and priority is exp
 | Rendering | `RenderingPlan.md` | Render targets, dirty-state cache, compute |
 | AudioTracker | `AudioTrackerPlan.md` | Phases 0–5 landed; velocity editing and project handling open |
 | Platform and build | `PlatformAndBuildPlan.md` | Android ships; WebGL and further backends open |
-| Build pipeline | `BuildPipelinePlan.md` | Phases 0–3 building; behavioural parity and vcxproj retirement open |
+| Build pipeline | `BuildPipelinePlan.md` | Builds and runs desktop; packaging and automated testing open |
 | Persistence | `PersistencePlan.md` | Not started |
 
 ---
@@ -118,10 +118,6 @@ Wave B's context-loss policy is a cold restart on the premise that persistence r
 - `PlatformFileSystemAndroid::CopyFile` and `ListDirectoryEntries` return `false` (`PlatformFileSystemAndroid.cpp:158-172`). Deliberate — the only consumer is desktop-only AudioTracker — but they block any Android feature needing directory enumeration.
 - `PlatformFileSystemAndroid::WriteFileTextAtomic` forwards to `WriteFileText` and is not atomic. Needs scoped-storage work before anything on Android relies on the guarantee.
 
-### CMake unification (written, unverified)
-
-Landed as Phase 0 of the build pipeline. Verification and the retirement of the Visual Studio project are tracked in the Build pipeline section below.
-
 ### WebGL backend (**Deferred**)
 
 - `Gfx::RenderApiWebGl` under emscripten. Capability gating for compute, storage buffers, indirect draw.
@@ -136,34 +132,30 @@ Landed as Phase 0 of the build pipeline. Verification and the retirement of the 
 
 ## Build pipeline
 
-Phases 0 to 3 build cleanly. Design in `BuildPipelinePlan.md`.
+The pipeline builds and runs the desktop target; AGD-0040 describes it. Design for what remains is in `BuildPipelinePlan.md`.
 
-Confirmed by running the pipeline: Debug and Release, clean and incremental, labelled and unlabelled, zero errors; a deliberately broken source yields exit code 1 with the diagnostic parsed and located; the executable lands in `Build/x64/<Configuration>/` as before; an incremental labelled build recompiles only `BuildInfo.cpp`.
+### Runtime data in the build output (**Ready**)
 
-### Behavioural parity (**Ready**)
+A built executable does not run in place — it resolves `Data/...` against the working directory, and only the application source directory satisfies that. Copy the runtime data tree into the output directory beside the executable, incrementally, removing files deleted from source.
 
-The Debug binary boots to the AudioTracker state and, with the initial state temporarily pointed at Showcase, loads `ExampleScene` — both without faulting and with no warnings or errors in the log. What remains needs a person at the keyboard.
+- Blocks packaged distribution.
+- Open: whether the copy belongs in the CMake build or in the pipeline around it.
 
-- Confirm both About panels — developer Help → About, and the main menu's About screen — show the identifier from a labelled build.
-- Exercise the states the automated run cannot: menu navigation, the showcase scene, F9 free-camera toggle.
-- F5 from `Build/CMake/Desktop/ChillCore.slnx` and confirm the debugger starts in `Code/App`.
-- Run the Release configuration.
+### Packaged distribution (**Blocked** — runtime data)
 
-### Android package parity test (**Blocked** — behavioural parity)
+An archive of the output directory named by build identifier, produced as a pipeline step. Labelled builds only. Installer, signing, and documentation bundling are separate and later.
 
-`Code/Targets/Android/app/src/main/cpp/CMakeLists.txt` now consumes the shared engine description rather than globbing its own sources. The package produced through Gradle must match the current one.
+### Automated testing (**Ready**)
 
-### Retire the Visual Studio project (**Blocked** — both parity checks)
+`RunTests.sh` alongside `Build.sh` and `Run.sh`, same entry-point shape and exit-code contract, reporting into the same per-build folder. First tests: the engine starts, loads a scene, and shuts down without faulting.
 
-Delete `Code.vcxproj`, `Code.vcxproj.filters`, and `ChillCore.sln`. Until this lands, every new source file must still be added to the project by hand as well as to disk.
+### Android through the pipeline (**Ready**)
 
-### Reserved (**Deferred**)
-
-Named so the shape is known, not scheduled: `RunTests.sh`, asset preprocessing, documentation and runtime data bundling into an installer, an Android target option.
+A target selection option and a Gradle invocation, reporting into the same folder structure. Unblocked, low value until something other than a developer's machine builds the package.
 
 ### Camera registration by name (**Ready**)
 
-`CameraManager` now keys its map by `std::string`, and `SetActiveCamera` asserts rather than silently storing a null. Two related weaknesses remain and are not urgent.
+`CameraManager` keys its map by `std::string` and asserts rather than storing a null. Two related weaknesses remain and are not urgent.
 
 - No state registers `CameraFree` beyond the one the manager constructs, so the F9 toggle is a no-op in states that never set a second camera. It no longer crashes.
 - `GetViewProjectionMatrix` and `GetCameraPosition` still dereference `activeCamera` unguarded.

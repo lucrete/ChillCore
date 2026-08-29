@@ -13,8 +13,8 @@ set -u
 
 EXIT_MISSING_TOOLCHAIN=3
 
-scriptDirectory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repositoryRoot="$(cd "$scriptDirectory/../.." && pwd)"
+scriptDirectory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repositoryRoot="$(cd "$scriptDirectory/../.." && pwd -P)"
 
 configuration="Debug"
 runSeconds=10

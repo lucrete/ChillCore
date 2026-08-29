@@ -6,9 +6,9 @@
 
 - Engine and application source is shared across every target. Only the entry point and the build description differ.
 - Each target owns a directory containing its entry point and its build files. This layout is the design, not an accident of history.
-- Desktop builds from a hand-maintained Visual Studio project. Android builds through Gradle, which drives CMake, which drives the native toolchain.
+- One CMake description covers every target. Desktop configures it directly through a preset; Android reaches the same description through Gradle, which drives CMake, which drives the native toolchain.
 - The graphics backend is selected by a preprocessor definition set by the build, not by swapping source directories.
-- Two build systems currently describe the same source. That duplication is known and temporary.
+- A command-line pipeline drives the build, produces a per-build log and report, and compiles a build identifier into the binary.
 
 ## Concepts
 
@@ -28,7 +28,7 @@ Code/Targets/<Platform>/
 
 Everything platform-specific about *building* lives under a target directory; everything platform-specific about *running* lives in the platform layer. A target directory holds an entry point and build files, and nothing else. This is the one place where a directory path is part of the design rather than an implementation detail, which is why it appears here.
 
-**Desktop** builds from a Visual Studio solution and project. Source files are enumerated explicitly, so a new file must be added to the project as well as to disk.
+**Desktop** configures the shared description through a checked-in preset and builds with the Visual Studio generator, which produces a solution for interactive work. Source files are discovered from the source tree, so adding a file to disk is enough.
 
 **Android** builds through three layers. Gradle configures the application and packaging, invokes CMake for the native build, and CMake drives the toolchain. Native sources are gathered by recursive glob with dependency tracking, so new files are picked up without editing the build description. The result is a shared library loaded by the platform's activity host, linked against the graphics and activity libraries the platform provides.
 
@@ -66,11 +66,19 @@ Copying would create a second copy to keep synchronised and a build step that ca
 
 The consequence is that asset paths must be interpreted consistently across platforms, which is handled at the platform file-system boundary rather than by the callers.
 
-### Two build descriptions, deliberately temporary
+### One description, entered from two places
 
-The desktop project and the Android CMake description currently describe the same source in two places. Every new source file must be added to the desktop project by hand; the Android build discovers it automatically.
+A single description defines the engine; each target adds only its entry point and its platform links. Desktop enters through a preset, Android through Gradle, and both compile the same discovered source closure.
 
-This is accepted only because the intended end state is a single CMake description generating both. Until then, the desktop project remains authoritative for desktop, and the divergence is a known maintenance cost rather than a design position.
+The alternative — a hand-maintained project per platform — was what existed, and its failure mode was drift: a new file added to one build and silently missed by the other. Discovery removes the second place to remember.
+
+The cost is that the build description changes only when a new file appears, so it is rarely exercised, and configuration must be re-run when the file set changes. The build tooling handles that; a developer adding a file does not have to think about it.
+
+### The engine is an object library
+
+Components register themselves through file-scope static objects. Nothing else references symbols in those translation units, so packaging the engine as a static archive lets the linker discard those objects and the registration never runs — the scene loads, the component is reported as an unknown type, and it is simply absent.
+
+An object library has no archive to select from, so every translation unit reaches the link. This is a constraint on how the engine may be packaged, not an implementation detail: any future change here must preserve it.
 
 ### Dependencies are vendored and statically linked
 
@@ -80,10 +88,25 @@ Vendoring makes a checkout buildable without network access or toolchain-specifi
 
 The cost is strict: every dependency must be built with matching runtime settings, and mismatches surface as link errors rather than clear diagnostics. Adding a dependency means confirming that before anything else.
 
+## The build pipeline
+
+A command-line entry point serves two callers from one implementation: it prompts for parameters when launched interactively, and runs unattended when given arguments, which is how automation and continuous integration invoke it.
+
+- Three parameters: whether to label the build, the configuration, and whether to rebuild from scratch.
+- Each build writes a folder holding the raw log, a machine-readable diagnostic list, and a report for a person. Unlabelled builds overwrite one fixed location so a consumer never has to discover an identifier.
+- Exit codes distinguish a failed compilation from a broken pipeline or a missing toolchain.
+- A companion script launches what was built, from the directory its asset paths are relative to, and captures the log — under a debugger when one is available, so a fault yields a stack rather than an exit code.
+
+### Build identity
+
+Builds produced by the pipeline can carry an identifier composed of the date, a counter for that day, and the source revision, marked when the working tree was unclean. It is compiled in through a generated header that the checked-in header falls back for, so a build made outside the pipeline still compiles and reports itself as unlabelled — which is honest, because such a build cannot be reproduced from a record.
+
+The identifier is displayed in both the developer overlay and the application's own interface.
+
 ## Limitations
 
-- Two build systems describe the same source. Desktop requires manual project maintenance for every new file.
 - Android builds one processor architecture only. There is no support for older or alternative architectures.
-- Desktop asset loading depends on the debugger's working directory being set correctly; assets are addressed relative to the application directory rather than to the executable.
-- There is no scripted or continuous-integration build path. Both targets are built interactively.
+- Asset loading depends on the working directory being the application directory; assets are addressed relative to it rather than to the executable, so a built executable does not run in place.
 - No offline shader processing step exists. Shader variants are produced at load time.
+- The pipeline builds the desktop target only. Android is still built through Gradle directly.
+- Toolchain resolution prefers the CMake bundled with the installed Visual Studio, because a CMake on PATH is routinely older than the installed toolset and does not know its generator.

@@ -102,7 +102,6 @@ namespace CC
             ImGui::ShowDemoWindow(&showDemoWindow);
         }
 
-        DrawMainMenuBar();
         DrawDevOverlay();
 
         FrameTimer::Get()->RecordProfileData();
@@ -198,25 +197,6 @@ namespace CC
         contextText = text;
     }
 
-    void DevUi::DrawMainMenuBar()
-    {
-        if (ImGui::BeginMainMenuBar())
-        {
-            if (ImGui::BeginMenu("Help"))
-            {
-                if (ImGui::MenuItem("About"))
-                {
-                    aboutView->SetVisible(true);
-                }
-                ImGui::EndMenu();
-            }
-
-            // The overlay below sits under the bar rather than behind it.
-            mainMenuBarHeight = ImGui::GetWindowSize().y;
-            ImGui::EndMainMenuBar();
-        }
-    }
-
     void DevUi::DrawDevOverlay()
     {
         const float xyPosition = 10.0f;
@@ -228,7 +208,7 @@ namespace CC
             ImGuiWindowFlags_NoNav |
             ImGuiWindowFlags_NoMove;
 
-        ImGui::SetNextWindowPos(ImVec2(xyPosition, xyPosition + mainMenuBarHeight), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(xyPosition, xyPosition), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.35f);
 
         if (ImGui::Begin("FPS", nullptr, flags))

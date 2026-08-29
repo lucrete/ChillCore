@@ -9,13 +9,11 @@ Implementation order for the work inventoried in `01_TechBacklog.md`. The backlo
 
 ## What actually gates what
 
-Four hard dependencies exist. Everything else is preference.
+Two hard dependencies remain. Everything else is preference.
 
 | This | Cannot start until | Because |
 | --- | --- | --- |
-| WebGL backend | CMake unification | The web toolchain integrates through CMake; there is no path through the hand-maintained desktop project. |
-| The build pipeline's remaining phases | CMake unification | The presets are the script-facing contract, so unification is the pipeline's own first phase. |
-| Further graphics backends | CMake unification | Each new target needs a build description, and adding them one at a time to two systems compounds the problem unification solves. |
+| Packaged distribution | Runtime data in the build output | An archive of an output directory that does not contain its data is an archive of something that does not run. |
 | Honest recovery from graphics-context loss | Persistence | The policy is a deliberate cold restart on the premise that persistence restores the user's place. Without it, the restart lands on the boot screen. |
 
 One soft dependency remains:
@@ -54,15 +52,17 @@ The verification is the cheapest item in the entire backlog and it closes out a 
 
 Persistence follows because it is what makes the context-loss policy honest. It is also the foundation the settings and save systems will need, so building it once with both consumers in mind costs the same as building it for either alone.
 
-## Stage 4 — Unify the build and script it
+## Stage 4 — Finish the build pipeline
 
-**The build pipeline**, whose Phase 0 is **CMake unification**. Design in `BuildPipelinePlan.md`.
+**Runtime data in the build output**, then **automated testing**, then **packaged distribution**.
 
-This is the pivot of the roadmap. Nothing above it needs it; everything below it does. It is placed here rather than earlier for a specific reason: doing it before the Android port would have meant refactoring the build twice, once to reach parity for Windows alone and again to make it genuinely cross-platform. Now the cross-platform requirement is concrete, and verification is cheap because one target is known-good and the other reduces to a parity test.
+The build system now compiles, runs, and reports. What it cannot do is hand anyone a working copy of the result.
 
-Its secondary benefit is removing the divergence hazard where a new source file is added to one build and silently missed by the other.
+Data first, because it is the smallest change with the largest effect: it turns the output directory into something that runs, which is the precondition for both of the others. Without it, an archive contains an executable that fails on first launch, and a test run has to reproduce the same working-directory dance the developer does by hand.
 
-The pipeline's remaining phases follow immediately rather than waiting for Stage 5. Unification leaves the presets in place and unexercised; the script is what exercises them, and it is what gives the parity test and every later target a repeatable build to run. Building it here also means the WebGL work below arrives into a scripted build rather than adding a third target to a hand-driven one.
+Automated testing next rather than last. The run-and-capture machinery already exists, so the first tests — the engine starts, loads a scene, shuts down clean — cost little and immediately protect everything below them. Each further target added in Stage 5 is a chance to break the shared engine quietly; a test that runs on every build is what catches that on the day it happens rather than at the next manual check.
+
+Packaged distribution closes the stage. It is the cheapest of the three once the output directory is self-contained, and it is the point at which the build stops being something only this machine can produce.
 
 ## Stage 5 — Further targets
 
