@@ -14,16 +14,21 @@ namespace CC
         static CameraManager* Get();
 
         void Update();
-        void SetActiveCamera(const char* cameraName);
-        void RegisterCamera(const char* cameraName, CameraBase* camera);
+        void SetActiveCamera(const std::string& cameraName);
+        void RegisterCamera(const std::string& cameraName, CameraBase* camera);
         Mat4x4& GetViewProjectionMatrix();
         Vector3 GetCameraPosition();
 
     private:
+        static constexpr const char* FREE_CAMERA_NAME = "CameraFree";
+
         static CameraManager* instance;
-        std::map<const char*, CameraBase*> cameraMap;
+
+        CameraBase* FindCamera(const std::string& cameraName) const;
+
+        std::map<std::string, CameraBase*> cameraMap;
         CameraBase* activeCamera;
-        const char* activeCameraName;
+        std::string activeCameraName;
         bool isFreeCameraActive;
 
     };

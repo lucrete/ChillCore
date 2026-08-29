@@ -42,6 +42,11 @@ void MainMenuController::Init()
         ui->RegisterButtonAction("enterWorld", onEnterShowcaseCallback);
     }
 
+    ui->RegisterButtonAction("gotoAbout", []()
+    {
+        CC::UiScreenSystem::Get()->TransitionForward("About");
+    });
+
     ui->RegisterButtonAction("quit", []()
     {
         CC::CoreMain::Get()->RequestQuit();

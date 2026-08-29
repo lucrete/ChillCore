@@ -1,0 +1,36 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 22,
+        "patch": 1
+    },
+    "configurePresets": [
+        {
+            "name": "Desktop",
+            "displayName": "Desktop (Windows x64)",
+            "description": "Windows target, GLFW and desktop GL 4.3. Multi-config: pick Debug or Release at build time.",
+            "generator": "Visual Studio 18 2026",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/../Build/CMake/Desktop",
+            "cacheVariables": {
+                "CC_GFX_BACKEND_GLES": "OFF",
+                "CC_DISABLE_DEVUI": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "DesktopDebug",
+            "displayName": "Desktop Debug",
+            "configurePreset": "Desktop",
+            "configuration": "Debug"
+        },
+        {
+            "name": "DesktopRelease",
+            "displayName": "Desktop Release",
+            "configurePreset": "Desktop",
+            "configuration": "Release"
+        }
+    ]
+}

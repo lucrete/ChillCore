@@ -10,9 +10,13 @@ ChillCore is a realtime 3D rendering and interaction engine. It provides susbsys
 > git submodule update --init --recursive
 
 ## Desktop
-* Open the solution in Visual Studio 2026 Community:
+* Build once from the command line, which also generates the solution:
 ```
-ChillCore24\Code\Targets\Desktop\ChillCore.sln
+bash Tools/Build/Build.sh
+```
+* Open the generated solution in Visual Studio 2026 Community:
+```
+ChillCore24\Build\CMake\Desktop\ChillCore.slnx
 ```
 * Build solution: **ctrl-shift-b**
 * Run: **ctrl-F5**
@@ -78,10 +82,9 @@ See [AGD-0040: Build and Targets](Architecture/AGD-0040-BuildAndTargets.md) for 
 * Set Find-all file types to cpp
 
 ## Project Setup
-* Add preprocessor define CC_PRINT_ENABLED to Debug configuration.
-* Configure build output directories.
-* Set Configuration Properties->Debugging Working Directory to `$(ProjectDir)..\..\App`. Asset paths in code are `Data/...`-relative from there.
-* Generate the Solution Explorer filters. `Code.vcxproj.filters` is machine-local and not committed, so a fresh clone shows every file in one flat list. Ask Claude: *"Add Visual Studio filters so that the solution explorer is presented in the exact on-disk hierarchy"*. It reads the item list out of `Code.vcxproj` and writes a filter tree that mirrors the folders under `Code`. Repeat it after adding files to the project.
+Nothing to configure by hand. The build description sets the preprocessor defines, the output directories, the debugger's working directory, and the Solution Explorer tree, which is derived from the folders on disk. Adding a source file to disk is enough; re-run the build to pick it up.
+
+See `KnowledgeBase/BuildPipeline.md` for the build and run scripts and how to read their output.
 
 ## Procedural Art
 * Set the shader being worked in the ProcArt material created in MaterialManager.

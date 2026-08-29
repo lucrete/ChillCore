@@ -1,6 +1,6 @@
 # Platform and Build Plan
 
-**Status:** Windows and Android both ship. What remains is one verification pass, unifying the two build systems, and the further targets that unification unlocks.
+**Status:** Windows and Android both ship, from one build description. What remains is one verification pass and the further targets.
 **Current state:** AGD-0040 (Build and Targets) and AGD-0160 (Android Support) describe what exists. This plan covers only what does not.
 **Index:** the Platform and build section of `01_TechBacklog.md`.
 
@@ -25,28 +25,6 @@ Three file-system operations are unimplemented on Android.
 
 ---
 
-## CMake unification
-
-The desktop target is described by a hand-maintained Visual Studio project; only Android has a CMake description. Unifying them replaces both with one description of the source tree.
-
-**Why it matters.** Every new source file must currently be added to the desktop project by hand, while the Android build discovers it automatically — so the two can silently diverge. Unification also gates everything below it in this document: further targets, and any scripted or automated build.
-
-**Shape.** A root description of the engine as a library, knowing nothing about entry points or platform shells. A presets file carrying the canonical configurations for both platforms and both build types. Per-target descriptions under each target directory, each adding only its entry point and its platform links.
-
-**Consequences worth knowing in advance.**
-
-- The hand-maintained Solution Explorer filter tree becomes a derived artifact, generated from the on-disk hierarchy. Any filter organisation done by hand between now and then is throwaway.
-- Visual Studio users either open the generated solution, with build and debug unchanged, or open the folder directly using the presets.
-- Build artifacts and CMake's own generated files need ignoring.
-
-**Why after Android rather than before.** Doing it first would have meant refactoring the build twice: once to reach parity for Windows alone, again to make it genuinely cross-platform. Doing it now means the cross-platform requirement is concrete rather than speculative, and verification is cheap because the Android build is known-good and the Windows side reduces to a focused parity test.
-
-**A constraint to honour from the start.** Every per-platform configuration must be expressible as a checked-in preset. No platform may require an interactive step to produce a release artifact — otherwise the scripted build below is impossible.
-
-**Done when:** the Windows binary produced through CMake behaves identically to the one the retired project produced, and the Android package produced through Gradle matches the current one. Both build trees run side by side during verification; the old project is retired only after parity is confirmed.
-
----
-
 ## Persistence and lifecycle hooks
 
 Not started, and blocking the Android graphics-context-loss story. Design in `PersistencePlan.md`.
@@ -57,7 +35,7 @@ The context-loss policy is a deliberate cold restart, on the premise that persis
 
 ## WebGL backend
 
-**Not started.** Gated on CMake unification, which is what makes the web toolchain's build integration tractable.
+**Not started.** The build description now accommodates a third target; the web toolchain integrates through it.
 
 - A third graphics backend, alongside the two current ones.
 - Capability gating for what the platform lacks: compute, storage buffers, indirect draw. Any state depending on those needs a fallback path or must report itself unsupported.
@@ -74,14 +52,6 @@ The context-loss policy is a deliberate cold restart, on the premise that persis
 Largely mechanical, because the abstraction was designed for them: handles map directly onto native objects, pipeline descriptors translate closely, and command recording is already explicit. This is where the abstraction's cost is finally repaid.
 
 Order is open. Vulkan first is the likely choice, being cross-platform and applicable to Android as well.
-
----
-
-## Scripted build system
-
-**Not started.** Gated on CMake unification.
-
-A build script plus per-target wrappers, driving the CMake presets and the Android packaging tool, running asset preprocessing before the build and signing after it, and collecting artifacts into a per-platform, per-configuration location. Continuous integration invokes the same script rather than reimplementing the steps.
 
 ---
 

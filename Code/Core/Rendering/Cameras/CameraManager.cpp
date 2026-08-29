@@ -1,5 +1,6 @@
 #include "CameraManager.h"
 #include "CameraFree.h"
+#include "CCAssert.h"
 #include "InputManager.h"
 
 namespace CC
@@ -7,11 +8,12 @@ namespace CC
     CameraManager* CameraManager::instance = NULL;
 
     CameraManager::CameraManager()
-        : isFreeCameraActive(false)
+        : activeCamera(nullptr)
+        , isFreeCameraActive(false)
     {
         instance = this;
         CameraBase* camera = new CameraFree();
-        RegisterCamera("CameraFree", camera);
+        RegisterCamera(FREE_CAMERA_NAME, camera);
     }
 
     CameraManager::~CameraManager() 
@@ -24,15 +26,35 @@ namespace CC
         return instance;
     }
 
-    void CameraManager::RegisterCamera(const char* cameraName, CameraBase* camera)
+    void CameraManager::RegisterCamera(const std::string& cameraName, CameraBase* camera)
     {
         cameraMap[cameraName] = camera;
     }
 
-    void CameraManager::SetActiveCamera(const char* cameraName)
+    void CameraManager::SetActiveCamera(const std::string& cameraName)
     {
-        activeCamera = cameraMap[cameraName];
-        activeCameraName = cameraName;
+        CameraBase* camera = FindCamera(cameraName);
+
+        CC_ASSERT(camera != nullptr, "SetActiveCamera called with an unregistered camera name");
+
+        if (camera != nullptr)
+        {
+            activeCamera = camera;
+            activeCameraName = cameraName;
+        }
+    }
+
+    CameraBase* CameraManager::FindCamera(const std::string& cameraName) const
+    {
+        CameraBase* camera = nullptr;
+        std::map<std::string, CameraBase*>::const_iterator entry = cameraMap.find(cameraName);
+
+        if (entry != cameraMap.end())
+        {
+            camera = entry->second;
+        }
+
+        return camera;
     }
 
     Mat4x4& CameraManager::GetViewProjectionMatrix()
@@ -50,12 +72,22 @@ namespace CC
         if (InputManager::Get()->IsWorldInteractable()
             && InputManager::Get()->EdgePositive(InputAction::DevToggleFreeCam))
         {
-            activeCamera = cameraMap[isFreeCameraActive ? activeCameraName : "CameraFree"];
-            isFreeCameraActive = !isFreeCameraActive;
-            InputManager::Get()->LockMouseCursor(isFreeCameraActive);
+            CameraBase* toggled = FindCamera(isFreeCameraActive ? activeCameraName : FREE_CAMERA_NAME);
+
+            if (toggled != nullptr)
+            {
+                activeCamera = toggled;
+                isFreeCameraActive = !isFreeCameraActive;
+                InputManager::Get()->LockMouseCursor(isFreeCameraActive);
+            }
         }
 
-        activeCamera->Update();
-        activeCamera->UpdateViewProjectionMatrix();
+        CC_ASSERT(activeCamera != nullptr, "No active camera; the AppState must call SetActiveCamera in Init");
+
+        if (activeCamera != nullptr)
+        {
+            activeCamera->Update();
+            activeCamera->UpdateViewProjectionMatrix();
+        }
     }
 }

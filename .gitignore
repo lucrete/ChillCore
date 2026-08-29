@@ -208,3 +208,18 @@ Scratch/
 # MkDocs documentation site
 DevDocs/ChillCoreDevDocs/.venv/
 DevDocs/ChillCoreDevDocs/site/
+
+# CMake build tree and generated files
+Build/CMake/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CMakeUserPresets.json
+
+# Build pipeline output
+Build/Logs/
+Build/BuildCounter.json
+Code/Core/BuildInfoGenerated.h
+Tools/Build/.venv/
+__pycache__/
+*.pyc

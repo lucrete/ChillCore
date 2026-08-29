@@ -10,7 +10,7 @@ Last verified against the source code: 2026-08-29.
 
 ## Status legend
 
-Nothing is in flight. Every actionable item is **Ready**; the backlog does not track assignment, and priority is expressed in *Suggested ordering* rather than per item.
+Nothing is in flight. The backlog does not track assignment, and priority is expressed in the roadmap rather than per item. **Blocked** appears only within the build pipeline, whose phases are strictly ordered.
 
 | Marker | Meaning |
 | --- | --- |
@@ -26,7 +26,8 @@ Nothing is in flight. Every actionable item is **Ready**; the backlog does not t
 | --- | --- | --- |
 | Rendering | `RenderingPlan.md` | Render targets, dirty-state cache, compute |
 | AudioTracker | `AudioTrackerPlan.md` | Phases 0–5 landed; velocity editing and project handling open |
-| Platform and build | `PlatformAndBuildPlan.md` | Android ships; CMake, WebGL, further backends open |
+| Platform and build | `PlatformAndBuildPlan.md` | Android ships; WebGL and further backends open |
+| Build pipeline | `BuildPipelinePlan.md` | Builds and runs desktop; packaging and automated testing open |
 | Persistence | `PersistencePlan.md` | Not started |
 
 ---
@@ -117,31 +118,40 @@ Wave B's context-loss policy is a cold restart on the premise that persistence r
 - `PlatformFileSystemAndroid::CopyFile` and `ListDirectoryEntries` return `false` (`PlatformFileSystemAndroid.cpp:158-172`). Deliberate — the only consumer is desktop-only AudioTracker — but they block any Android feature needing directory enumeration.
 - `PlatformFileSystemAndroid::WriteFileTextAtomic` forwards to `WriteFileText` and is not atomic. Needs scoped-storage work before anything on Android relies on the guarantee.
 
-### CMake unification (**Ready**)
-
-`Code/Targets/Desktop/Code.vcxproj` is still the Windows source of truth. Only the Android `app/src/main/cpp/CMakeLists.txt` exists.
-
-- Root `Code/CMakeLists.txt` describing `chillcore_engine`.
-- `CMakePresets.json` with desktop-debug / desktop-release / android-arm64-debug / android-arm64-release.
-- Per-target `CMakeLists.txt` under `Targets/Desktop/` and `Targets/Android/`.
-- `source_group(TREE …)` replaces the hand-maintained `Code.vcxproj.filters`.
-- `.gitignore` gains `Build-CMake/`, `CMakeCache.txt`, `CMakeFiles/`, `cmake_install.cmake`, `CMakeUserPresets.json`.
-- Windows binary parity test, then retire the vcxproj and sln.
-- Gates the WebGL backend, further backends, and the scripted build system.
-
 ### WebGL backend (**Deferred**)
 
 - `Gfx::RenderApiWebGl` under emscripten. Capability gating for compute, storage buffers, indirect draw.
 - Platform backends over the emscripten runtime.
 
-### Scripted build system (**Deferred**)
-
-- `scripts/build.py` plus per-target wrappers. Drives CMake presets and Gradle, asset preprocessing, signing, artifact collection into `Artifacts/<platform>/<config>/`.
-
 ### Shader cross-compilation (**Deferred**)
 
 - AGD-0080 defers cross-compilation until a second shader target ships. GLES currently uses `ShaderManager` preamble injection instead.
 - Revisit when WebGL or Vulkan lands: glslang to SPIR-V, SPIRV-Cross to targets.
+
+---
+
+## Build pipeline
+
+The pipeline builds a self-contained desktop output directory and runs it; AGD-0040 describes it. Design for what remains is in `BuildPipelinePlan.md`.
+
+### Packaged distribution (**Ready**)
+
+An archive of the output directory named by build identifier, produced as a pipeline step. Labelled builds only. Installer, signing, and documentation bundling are separate and later.
+
+### Automated testing (**Ready**)
+
+`RunTests.sh` alongside `Build.sh` and `Run.sh`, same entry-point shape and exit-code contract, reporting into the same per-build folder. First tests: the engine starts, loads a scene, and shuts down without faulting.
+
+### Android through the pipeline (**Ready**)
+
+A target selection option and a Gradle invocation, reporting into the same folder structure. Unblocked, low value until something other than a developer's machine builds the package.
+
+### Camera registration by name (**Ready**)
+
+`CameraManager` keys its map by `std::string` and asserts rather than storing a null. Two related weaknesses remain and are not urgent.
+
+- No state registers `CameraFree` beyond the one the manager constructs, so the F9 toggle is a no-op in states that never set a second camera. It no longer crashes.
+- `GetViewProjectionMatrix` and `GetCameraPosition` still dereference `activeCamera` unguarded.
 
 ---
 
