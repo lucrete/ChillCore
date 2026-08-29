@@ -1266,7 +1266,7 @@ namespace CC::Gfx
         CC_ASSERT(sizeBytes > 0 && sizeBytes <= OBJECT_UNIFORMS_SIZE_BYTES,
             "SetPushConstants: size out of range");
 
-        // Lazy create the single push-tier UBO. Bind it once at the push
+        // Lazy create the single push-constant UBO. Bind it once at the push
         // slot; subsequent draws only need glBufferSubData.
         if (pushConstantsUbo == 0)
         {

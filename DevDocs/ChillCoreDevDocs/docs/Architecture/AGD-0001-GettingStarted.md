@@ -71,7 +71,7 @@ A scene object is a node with a list of components rather than a base class to s
 
 ### Frequently-changing and rarely-changing data are separated
 
-The recurring pattern in the rendering path: group data by how often it changes, upload each group at its own rate, and bake what never changes into an object created once. It is why pipelines exist, why uniforms are tiered, and why the draw loop sorts.
+The recurring pattern in the rendering path: group data by how often it changes, upload each group at its own rate, and bake what never changes into an object created once. It is why pipelines exist, why uniforms are grouped by update frequency, and why the draw loop sorts.
 
 ### Any app state can be the first one
 

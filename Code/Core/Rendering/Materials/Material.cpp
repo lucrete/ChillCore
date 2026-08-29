@@ -47,9 +47,9 @@ namespace CC
         {
             Gfx::RenderApi::Get()->DestroyBuffer(materialUniformBuffer);
         }
-        if (materialParamsBuffer.IsValid())
+        if (customParamsBuffer.IsValid())
         {
-            Gfx::RenderApi::Get()->DestroyBuffer(materialParamsBuffer);
+            Gfx::RenderApi::Get()->DestroyBuffer(customParamsBuffer);
         }
     }
 
@@ -175,18 +175,18 @@ namespace CC
             }
             gfxApi->BindUniformBuffer(MATERIAL_UNIFORMS_BINDING_SLOT, materialUniformBuffer, 0, static_cast<int>(sizeof(MaterialUniforms)));
 
-            // Custom Params: the shader-declared MaterialParams block.
+            // Custom Params: the shader-declared CustomParams block.
             // Absent for every shader that uses only the standard params.
-            if (materialParamsDirty)
+            if (customParamsDirty)
             {
-                PackAndUploadParams();
+                PackAndUploadCustomParams();
             }
-            if (materialParamsBuffer.IsValid())
+            if (customParamsBuffer.IsValid())
             {
-                gfxApi->BindUniformBuffer(MATERIAL_PARAMS_BINDING_SLOT, materialParamsBuffer, 0, materialParamsBufferSizeBytes);
+                gfxApi->BindUniformBuffer(CUSTOM_PARAMS_BINDING_SLOT, customParamsBuffer, 0, customParamsBufferSizeBytes);
             }
 
-            // Push tier: per-draw object uniforms (mvp + model). One UBO
+            // UpdateFrequency::Draw: per-draw object uniforms (mvp + model). One UBO
             // update per draw, bound at OBJECT_UNIFORMS_BINDING_SLOT.
             Mat4x4 viewProj = CameraManager::Get()->GetViewProjectionMatrix();
             Mat4x4 mvp = viewProj * model;
@@ -228,63 +228,63 @@ namespace CC
 
     void Material::SetUniform(const std::string& name, float value)
     {
-        SetParamValue(name, ShaderParamType::Float, &value, static_cast<int>(sizeof(value)));
+        SetCustomParamValue(name, CustomParamType::Float, &value, static_cast<int>(sizeof(value)));
     }
 
     void Material::SetUniform(const std::string& name, int value)
     {
-        SetParamValue(name, ShaderParamType::Int, &value, static_cast<int>(sizeof(value)));
+        SetCustomParamValue(name, CustomParamType::Int, &value, static_cast<int>(sizeof(value)));
     }
 
     void Material::SetUniform(const std::string& name, const Vector2& value)
     {
         float components[2] = { value.x, value.y };
-        SetParamValue(name, ShaderParamType::Vector2, components, static_cast<int>(sizeof(components)));
+        SetCustomParamValue(name, CustomParamType::Vector2, components, static_cast<int>(sizeof(components)));
     }
 
     void Material::SetUniform(const std::string& name, const Vector3& value)
     {
         float components[3] = { value.x, value.y, value.z };
-        SetParamValue(name, ShaderParamType::Vector3, components, static_cast<int>(sizeof(components)));
+        SetCustomParamValue(name, CustomParamType::Vector3, components, static_cast<int>(sizeof(components)));
     }
 
     void Material::SetUniform(const std::string& name, const Vector4& value)
     {
         float components[4] = { value.x, value.y, value.z, value.w };
-        SetParamValue(name, ShaderParamType::Vector4, components, static_cast<int>(sizeof(components)));
+        SetCustomParamValue(name, CustomParamType::Vector4, components, static_cast<int>(sizeof(components)));
     }
 
     void Material::ReconnectShader()
     {
-        // A recompile can move, add, or drop MaterialParams members. The
+        // A recompile can move, add, or drop CustomParams members. The
         // values are held by name, so re-packing against the new layout is
         // all that is needed.
         materialUniformsDirty = true;
-        materialParamsDirty   = true;
+        customParamsDirty   = true;
     }
 
     bool Material::CheckUniformExists(const std::string& name) const
     {
-        const ShaderParamLayout* layout = GetParamLayout();
+        const CustomParamLayout* layout = GetCustomParamLayout();
         return layout != nullptr && layout->FindParam(name) != nullptr;
     }
 
-    const ShaderParamLayout* Material::GetParamLayout() const
+    const CustomParamLayout* Material::GetCustomParamLayout() const
     {
-        return ShaderManager::Get()->GetParamLayout(shaderName);
+        return ShaderManager::Get()->GetCustomParamLayout(shaderName);
     }
 
-    void Material::SetParamValue(const std::string& name, ShaderParamType type, const void* data, int sizeBytes)
+    void Material::SetCustomParamValue(const std::string& name, CustomParamType type, const void* data, int sizeBytes)
     {
-        CC_ASSERT(sizeBytes <= static_cast<int>(sizeof(ParamValue::data)), "Material parameter is larger than the value store: " + name);
+        CC_ASSERT(sizeBytes <= static_cast<int>(sizeof(CustomParamValue::data)), "Material parameter is larger than the value store: " + name);
 
-        unsigned char incoming[sizeof(ParamValue::data)] = {};
+        unsigned char incoming[sizeof(CustomParamValue::data)] = {};
         memcpy(incoming, data, static_cast<size_t>(sizeBytes));
 
         int index = -1;
-        for (int i = 0; i < paramValueCount && index == -1; i++)
+        for (int i = 0; i < customParamValueCount && index == -1; i++)
         {
-            if (paramValues[i].name == name)
+            if (customParamValues[i].name == name)
             {
                 index = i;
             }
@@ -292,24 +292,24 @@ namespace CC
 
         if (index == -1)
         {
-            CC_ASSERT(paramValueCount < MAX_PARAM_VALUES, "Material holds at most MAX_PARAM_VALUES parameters: " + name);
-            if (paramValueCount < MAX_PARAM_VALUES)
+            CC_ASSERT(customParamValueCount < MAX_CUSTOM_PARAM_VALUES, "Material holds at most MAX_CUSTOM_PARAM_VALUES parameters: " + name);
+            if (customParamValueCount < MAX_CUSTOM_PARAM_VALUES)
             {
-                index = paramValueCount;
-                paramValues[index].name = name;
-                paramValues[index].type = type;
-                paramValueCount++;
-                materialParamsDirty = true;
+                index = customParamValueCount;
+                customParamValues[index].name = name;
+                customParamValues[index].type = type;
+                customParamValueCount++;
+                customParamsDirty = true;
             }
         }
 
         if (index != -1)
         {
-            if (paramValues[index].type != type || memcmp(paramValues[index].data, incoming, sizeof(incoming)) != 0)
+            if (customParamValues[index].type != type || memcmp(customParamValues[index].data, incoming, sizeof(incoming)) != 0)
             {
-                memcpy(paramValues[index].data, incoming, sizeof(incoming));
-                paramValues[index].type = type;
-                materialParamsDirty = true;
+                memcpy(customParamValues[index].data, incoming, sizeof(incoming));
+                customParamValues[index].type = type;
+                customParamsDirty = true;
             }
 
             // Uploaded on the spot rather than deferred to the next
@@ -317,60 +317,60 @@ namespace CC
             // its colour after the material is bound for this frame's draw.
             // An unchanged value — the fullscreen quad re-sets its aspect
             // ratio every frame — costs the compare above and nothing more.
-            if (materialParamsDirty)
+            if (customParamsDirty)
             {
-                PackAndUploadParams();
+                PackAndUploadCustomParams();
             }
         }
     }
 
-    void Material::PackAndUploadParams()
+    void Material::PackAndUploadCustomParams()
     {
-        const ShaderParamLayout* layout = GetParamLayout();
+        const CustomParamLayout* layout = GetCustomParamLayout();
         if (layout != nullptr && layout->HasParams())
         {
-            unsigned char blockData[ShaderParamLayout::MAX_BLOCK_SIZE_BYTES] = {};
+            unsigned char blockData[CustomParamLayout::MAX_BLOCK_SIZE_BYTES] = {};
             int blockSizeBytes = layout->GetBlockSizeBytes();
 
-            for (int i = 0; i < paramValueCount; i++)
+            for (int i = 0; i < customParamValueCount; i++)
             {
-                const ShaderParam* param = layout->FindParam(paramValues[i].name);
+                const CustomParam* param = layout->FindParam(customParamValues[i].name);
                 if (param != nullptr)
                 {
                     // A value set as one type against a block member of
                     // another would write the wrong bytes at the right
                     // offset, which reads as a corrupt value rather than a
                     // missing one. Leave the member at its default instead.
-                    CC_ASSERT(param->type == paramValues[i].type, "MaterialParams type mismatch for: " + paramValues[i].name);
-                    if (param->type == paramValues[i].type)
+                    CC_ASSERT(param->type == customParamValues[i].type, "CustomParams type mismatch for: " + customParamValues[i].name);
+                    if (param->type == customParamValues[i].type)
                     {
-                        memcpy(blockData + param->offsetBytes, paramValues[i].data, static_cast<size_t>(param->sizeBytes));
+                        memcpy(blockData + param->offsetBytes, customParamValues[i].data, static_cast<size_t>(param->sizeBytes));
                     }
                 }
             }
 
             Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
 
-            if (materialParamsBuffer.IsValid() && materialParamsBufferSizeBytes != blockSizeBytes)
+            if (customParamsBuffer.IsValid() && customParamsBufferSizeBytes != blockSizeBytes)
             {
-                gfxApi->DestroyBuffer(materialParamsBuffer);
-                materialParamsBuffer = Gfx::BufferHandle();
+                gfxApi->DestroyBuffer(customParamsBuffer);
+                customParamsBuffer = Gfx::BufferHandle();
             }
 
-            if (!materialParamsBuffer.IsValid())
+            if (!customParamsBuffer.IsValid())
             {
                 Gfx::BufferDescription description;
                 description.sizeBytes = blockSizeBytes;
                 description.usage     = Gfx::BufferUsage::Uniform;
                 description.memory    = Gfx::BufferMemory::CpuToGpu;
-                description.debugName = "MaterialParams";
-                materialParamsBuffer          = gfxApi->CreateBuffer(description);
-                materialParamsBufferSizeBytes = blockSizeBytes;
+                description.debugName = "CustomParams";
+                customParamsBuffer          = gfxApi->CreateBuffer(description);
+                customParamsBufferSizeBytes = blockSizeBytes;
             }
 
-            gfxApi->UpdateBuffer(materialParamsBuffer, 0, blockSizeBytes, blockData);
+            gfxApi->UpdateBuffer(customParamsBuffer, 0, blockSizeBytes, blockData);
         }
 
-        materialParamsDirty = false;
+        customParamsDirty = false;
     }
 }

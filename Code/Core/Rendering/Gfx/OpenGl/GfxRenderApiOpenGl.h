@@ -203,7 +203,7 @@ namespace CC::Gfx
         GfxCapabilities       capabilities;
         BackbufferDescription backbufferDescription;
 
-        // Push-tier UBO. Single GL_DYNAMIC_DRAW buffer reused every draw
+        // Push-constant UBO. Single GL_DYNAMIC_DRAW buffer reused every draw
         // via glBufferSubData; bound once at slot
         // OBJECT_UNIFORMS_BINDING_SLOT on first use.
         GLuint pushConstantsUbo = 0;

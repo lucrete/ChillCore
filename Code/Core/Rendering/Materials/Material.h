@@ -10,7 +10,7 @@
 #include "CCVector2.h"
 #include "CCVector4.h"
 #include "GfxHandles.h"
-#include "ShaderParamLayout.h"
+#include "CustomParamLayout.h"
 
 namespace CC
 {
@@ -47,7 +47,7 @@ namespace CC
         void SetStandardUniforms(const Mat4x4& value);
 
         // Custom per-material parameters, written into the shader-declared
-        // MaterialParams block by std140 offset. Names the active shader does
+        // CustomParams block by std140 offset. Names the active shader does
         // not declare are stored and ignored, so one caller can drive several
         // shaders that declare different parameter sets.
         void SetUniform(const std::string& name, float value);
@@ -91,29 +91,29 @@ namespace CC
         int GetDebugMode() const { return debugMode; }
 
     private:
-        static constexpr int MAX_PARAM_VALUES      = 16;
-        static constexpr int MAX_PARAM_VALUE_BYTES = 16;  // vec4, the widest type a caller can set
+        static constexpr int MAX_CUSTOM_PARAM_VALUES      = 16;
+        static constexpr int MAX_CUSTOM_PARAM_VALUE_BYTES = 16;  // vec4, the widest type a caller can set
 
         // A parameter value as the caller set it. Held by name rather than by
         // offset, so a shader hot-reload that moves block members re-packs
         // from the values the material already holds.
-        struct ParamValue
+        struct CustomParamValue
         {
             std::string     name;
-            ShaderParamType type = ShaderParamType::Float;
-            unsigned char   data[MAX_PARAM_VALUE_BYTES] = {};
+            CustomParamType type = CustomParamType::Float;
+            unsigned char   data[MAX_CUSTOM_PARAM_VALUE_BYTES] = {};
         };
 
         void UploadMaterialUniforms();
 
-        const ShaderParamLayout* GetParamLayout() const;
-        void SetParamValue(const std::string& name, ShaderParamType type, const void* data, int sizeBytes);
-        void PackAndUploadParams();
+        const CustomParamLayout* GetCustomParamLayout() const;
+        void SetCustomParamValue(const std::string& name, CustomParamType type, const void* data, int sizeBytes);
+        void PackAndUploadCustomParams();
 
         std::string shaderName;
 
-        ParamValue paramValues[MAX_PARAM_VALUES];
-        int        paramValueCount = 0;
+        CustomParamValue customParamValues[MAX_CUSTOM_PARAM_VALUES];
+        int              customParamValueCount = 0;
 
         // Base texture (mainTex / baseColor)
         Texture* texture = nullptr;
@@ -146,11 +146,11 @@ namespace CC
         Gfx::BufferHandle materialUniformBuffer;
         bool materialUniformsDirty = true;
 
-        // Shader-declared MaterialParams block. Created on first upload, once
+        // Shader-declared CustomParams block. Created on first upload, once
         // the block size is known, and re-created if a hot-reload resizes it.
-        Gfx::BufferHandle materialParamsBuffer;
-        int  materialParamsBufferSizeBytes = 0;
-        bool materialParamsDirty = true;
+        Gfx::BufferHandle customParamsBuffer;
+        int  customParamsBufferSizeBytes = 0;
+        bool customParamsDirty = true;
     };
 }
 

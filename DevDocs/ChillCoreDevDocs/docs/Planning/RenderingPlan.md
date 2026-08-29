@@ -38,7 +38,7 @@ The abstraction work defined quantitative gates. No run is recorded against any 
 - Visual parity across the showcase, boot, procedural art, and physically-based scenes.
 - Multisampling still taking effect when the sample count is changed through the backbuffer descriptor.
 
-**Why it matters.** Draw-call reduction was half the justification for the whole abstraction, and it is currently an assumption. If the numbers do not show the expected drop, something in the uniform tiering or the sort is not doing its job, and that is worth knowing before more work is built on top. The measurement is also the only remaining check on whether the migration regressed rendering behaviour anywhere.
+**Why it matters.** Draw-call reduction was half the justification for the whole abstraction, and it is currently an assumption. If the numbers do not show the expected drop, something in the update-frequency grouping or the sort is not doing its job, and that is worth knowing before more work is built on top. The measurement is also the only remaining check on whether the migration regressed rendering behaviour anywhere.
 
 ---
 

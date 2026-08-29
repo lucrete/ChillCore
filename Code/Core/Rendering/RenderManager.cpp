@@ -198,7 +198,7 @@ namespace CC
     void RenderManager::EndFrame()
     {
         // Fade overlay: last draw before the swap so it covers both scene
-        // and UI. Alpha 0 skips the draw. fadeColor is a MaterialParams
+        // and UI. Alpha 0 skips the draw. fadeColor is a CustomParams
         // member, so the write lands in the material's parameter block and
         // is uploaded on the spot. Order against PreRender does not matter.
         if (fadeColor.w > 0.0f)

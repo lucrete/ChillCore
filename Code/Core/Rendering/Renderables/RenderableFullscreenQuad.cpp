@@ -56,7 +56,7 @@ namespace CC
         // the old one stays resident in the cache for any future user.
         pipelineHandle = CreatePipelineForMaterial(material, MakeFullscreenQuadLayout());
 
-        // Defaults for the MaterialParams members the procedural-art shaders
+        // Defaults for the CustomParams members the procedural-art shaders
         // declare. A shader that declares none of them stores the values and
         // ignores them.
         material->SetUniform("aspectRatio", 1.0f);

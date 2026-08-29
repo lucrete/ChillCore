@@ -187,7 +187,7 @@ Milestones defined in the plans with no recorded run.
 
 ## Documentation debt
 
-- **Rendering pipeline getting-started doc.** Requested in `DevBlogChillCore.blog`. Covers the frame and material UBO tiers, the pipeline-first opaque sort, and the render-pass brackets. Superseded by AGD-0070 (Rendering Pipeline); track it there rather than as separate work.
+- **Rendering pipeline getting-started doc.** Requested in `DevBlogChillCore.blog`. Covers the frame and material UBO groups, the pipeline-first opaque sort, and the render-pass brackets. Superseded by AGD-0070 (Rendering Pipeline); track it there rather than as separate work.
 - **AGD-0120 (UI Layout and Styling) inherited a provisional design.** Needs a pass to confirm or revise the layout and styling decisions.
 - **`mkdocs.yml` has no `nav`.** Deliberate — navigation is derived from the folder structure. Recorded so it is not "fixed".
 

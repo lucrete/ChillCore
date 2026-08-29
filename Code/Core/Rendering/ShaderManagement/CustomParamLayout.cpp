@@ -1,4 +1,4 @@
-#include "ShaderParamLayout.h"
+#include "CustomParamLayout.h"
 
 #include <sstream>
 
@@ -6,20 +6,20 @@
 
 namespace CC
 {
-    static const char* MATERIAL_PARAMS_DECLARATION = "uniform MaterialParams";
+    static const char* CUSTOM_PARAMS_DECLARATION = "uniform CustomParams";
     static const int   STD140_BLOCK_ALIGNMENT_BYTES = 16;
 
-    void ShaderParamLayout::Clear()
+    void CustomParamLayout::Clear()
     {
         for (int i = 0; i < MAX_PARAMS; i++)
         {
-            params[i] = ShaderParam();
+            params[i] = CustomParam();
         }
         paramCount     = 0;
         blockSizeBytes = 0;
     }
 
-    void ShaderParamLayout::ParseFromFragmentSource(const std::string& fragmentSource)
+    void CustomParamLayout::ParseFromFragmentSource(const std::string& fragmentSource)
     {
         Clear();
 
@@ -54,7 +54,7 @@ namespace CC
                     else if (!trailingToken.empty())
                     {
                         CCPrint(PrintManager::CHANNEL_WARN,
-                                "MaterialParams member is not a simple 'type name;' declaration: %s",
+                                "CustomParams member is not a simple 'type name;' declaration: %s",
                                 statement.c_str());
                         isLayoutValid = false;
                     }
@@ -73,7 +73,7 @@ namespace CC
             if (blockSizeBytes > MAX_BLOCK_SIZE_BYTES)
             {
                 CCPrint(PrintManager::CHANNEL_WARN,
-                        "MaterialParams block is %d bytes, over the %d byte limit. Block ignored.",
+                        "CustomParams block is %d bytes, over the %d byte limit. Block ignored.",
                         blockSizeBytes, MAX_BLOCK_SIZE_BYTES);
                 isLayoutValid = false;
             }
@@ -89,9 +89,9 @@ namespace CC
         }
     }
 
-    const ShaderParam* ShaderParamLayout::FindParam(const std::string& name) const
+    const CustomParam* CustomParamLayout::FindParam(const std::string& name) const
     {
-        const ShaderParam* result = nullptr;
+        const CustomParam* result = nullptr;
         for (int i = 0; i < paramCount && result == nullptr; i++)
         {
             if (params[i].name == name)
@@ -102,11 +102,11 @@ namespace CC
         return result;
     }
 
-    bool ShaderParamLayout::ExtractBlockBody(const std::string& source, std::string& outBlockBody) const
+    bool CustomParamLayout::ExtractBlockBody(const std::string& source, std::string& outBlockBody) const
     {
         bool result = false;
 
-        size_t declarationPos = source.find(MATERIAL_PARAMS_DECLARATION);
+        size_t declarationPos = source.find(CUSTOM_PARAMS_DECLARATION);
         if (declarationPos != std::string::npos)
         {
             size_t openBrace = source.find('{', declarationPos);
@@ -120,36 +120,36 @@ namespace CC
                 }
                 else
                 {
-                    CCPrint(PrintManager::CHANNEL_WARN, "MaterialParams block has no closing brace.");
+                    CCPrint(PrintManager::CHANNEL_WARN, "CustomParams block has no closing brace.");
                 }
             }
             else
             {
-                CCPrint(PrintManager::CHANNEL_WARN, "MaterialParams block has no opening brace.");
+                CCPrint(PrintManager::CHANNEL_WARN, "CustomParams block has no opening brace.");
             }
         }
 
         return result;
     }
 
-    bool ShaderParamLayout::AddParam(const std::string& typeName, const std::string& paramName)
+    bool CustomParamLayout::AddParam(const std::string& typeName, const std::string& paramName)
     {
         bool            result    = true;
-        ShaderParamType type      = ShaderParamType::Float;
+        CustomParamType type      = CustomParamType::Float;
         int             alignment = 0;
         int             size      = 0;
 
         if (paramCount >= MAX_PARAMS)
         {
             CCPrint(PrintManager::CHANNEL_WARN,
-                    "MaterialParams holds at most %d members. Dropped: %s",
+                    "CustomParams holds at most %d members. Dropped: %s",
                     MAX_PARAMS, paramName.c_str());
             result = false;
         }
         else if (!GetTypeInfo(typeName, type, alignment, size))
         {
             CCPrint(PrintManager::CHANNEL_WARN,
-                    "MaterialParams member type is not supported: %s %s",
+                    "CustomParams member type is not supported: %s %s",
                     typeName.c_str(), paramName.c_str());
             result = false;
         }
@@ -169,44 +169,44 @@ namespace CC
         return result;
     }
 
-    bool ShaderParamLayout::GetTypeInfo(const std::string& typeName, ShaderParamType& outType,
+    bool CustomParamLayout::GetTypeInfo(const std::string& typeName, CustomParamType& outType,
                                         int& outAlignmentBytes, int& outSizeBytes)
     {
         bool result = true;
 
         if (typeName == "float")
         {
-            outType = ShaderParamType::Float;
+            outType = CustomParamType::Float;
             outAlignmentBytes = 4;
             outSizeBytes      = 4;
         }
         else if (typeName == "int")
         {
-            outType = ShaderParamType::Int;
+            outType = CustomParamType::Int;
             outAlignmentBytes = 4;
             outSizeBytes      = 4;
         }
         else if (typeName == "vec2")
         {
-            outType = ShaderParamType::Vector2;
+            outType = CustomParamType::Vector2;
             outAlignmentBytes = 8;
             outSizeBytes      = 8;
         }
         else if (typeName == "vec3")
         {
-            outType = ShaderParamType::Vector3;
+            outType = CustomParamType::Vector3;
             outAlignmentBytes = 16;
             outSizeBytes      = 12;
         }
         else if (typeName == "vec4")
         {
-            outType = ShaderParamType::Vector4;
+            outType = CustomParamType::Vector4;
             outAlignmentBytes = 16;
             outSizeBytes      = 16;
         }
         else if (typeName == "mat4")
         {
-            outType = ShaderParamType::Mat4;
+            outType = CustomParamType::Mat4;
             outAlignmentBytes = 16;
             outSizeBytes      = 64;
         }
@@ -218,7 +218,7 @@ namespace CC
         return result;
     }
 
-    std::string ShaderParamLayout::StripLineComments(const std::string& text)
+    std::string CustomParamLayout::StripLineComments(const std::string& text)
     {
         std::stringstream result;
         std::stringstream lines(text);
