@@ -20,6 +20,7 @@ namespace CC
     static constexpr int OBJECT_UNIFORMS_BINDING_SLOT   = 2;  // Per-draw     — mvp, model (push tier)
     static constexpr int UI_UNIFORMS_BINDING_SLOT       = 3;  // UI quads     — orthographic projection
     static constexpr int TEXT_UNIFORMS_BINDING_SLOT     = 4;  // MSDF text    — projection + per-batch text colour / pixel range
+    static constexpr int MATERIAL_PARAMS_BINDING_SLOT   = 5;  // Per-material — shader-declared custom parameters (see ShaderParamLayout)
 }
 
 #endif // UNIFORMBINDINGS_H

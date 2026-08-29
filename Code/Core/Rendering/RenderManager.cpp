@@ -87,7 +87,7 @@ namespace CC
         // scene shows through until fadeColor.w drives a cover. Color and
         // alpha are set via SetScreenFadeColor / SetScreenFadeAlpha.
         Material* fadeMaterial = materialManager->GetMaterial("FullScreenFade");
-        fadeMaterial->AddUniform("fadeColor", fadeColor);
+        fadeMaterial->SetUniform("fadeColor", fadeColor);
         fadeOverlay = new RenderableFullscreenQuad(fadeMaterial);
 
         Gfx::BufferDescription frameUboDesc;
@@ -198,10 +198,9 @@ namespace CC
     void RenderManager::EndFrame()
     {
         // Fade overlay: last draw before the swap so it covers both scene
-        // and UI. Alpha 0 skips the draw. The fadeColor uniform is uploaded
-        // here — after PreRender's Bind — because glUniform* targets the
-        // currently bound program; the SetScreenFade* setters are called
-        // from the Update phase where the fade shader is not bound.
+        // and UI. Alpha 0 skips the draw. fadeColor is a MaterialParams
+        // member, so the write lands in the material's parameter block and
+        // is uploaded on the spot. Order against PreRender does not matter.
         if (fadeColor.w > 0.0f)
         {
             fadeOverlay->PreRender();

@@ -1,28 +1,8 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is one migration, two unimplemented capabilities, an unrun acceptance pass, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two unimplemented capabilities, an unrun acceptance pass, and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
 **Index:** the Rendering section of `01_TechBacklog.md`.
-
----
-
-## Material to pipelines
-
-`UiRenderer` and `TextRenderer` bind baked pipelines. `Material` does not — it still binds a shader program directly and writes individual uniforms by location. It is the sole remaining caller of the transitional shim methods on `Gfx::RenderApi`: binding a shader program, resolving a uniform location, and the six typed uniform setters.
-
-**Why it matters.** The shims are the graphics API's own calls wearing an abstraction's clothes. No backend for a modern graphics interface can implement them honestly — there is no notion of setting a uniform by location on a bound program — so every backend after the current two pays for them. The pipeline-first sort also cannot short-circuit a material bind while `Material` rebinds a raw program.
-
-**The open design question.** Migrating `Material` to bind a pipeline is mechanical; it already holds a pipeline handle for renderables and needs one for standalone use. The escape hatch is not. Four call sites set bespoke per-material uniforms by name: the fade overlay's colour, the fullscreen quad's aspect ratio, and two procedural-art parameters. Procedural-art shaders are the hard case, because each declares its own uniforms and no fixed uniform block covers them.
-
-Options, in rough order of preference:
-
-1. A per-material dynamic uniform block that authors declare in the shader and `Material` uploads opaquely by offset. Keeps arbitrary parameters and removes location-based writes.
-2. A generic scratch region in the existing material block. Cheap, but caps parameter count and makes every new parameter a shared-header edit.
-3. Keep the named-uniform path as an explicitly single-backend debug affordance, capability-gated and asserted off elsewhere. Honest, but leaves procedural art unportable.
-
-Choose before starting. The choice decides whether the shims are deleted or merely narrowed.
-
-**Done when:** UI, text, and scene materials all bind pipelines, and no shim method remains on `Gfx::RenderApi`.
 
 ---
 

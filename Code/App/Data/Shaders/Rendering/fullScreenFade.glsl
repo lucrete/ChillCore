@@ -12,7 +12,14 @@ void main()
 #version 430 core
 out vec4 FragColor;
 
-uniform vec4 fadeColor;
+// Custom per-material parameters. Written by Material::SetUniform,
+// packed by std140 offset from this declaration.
+// Slot must match MATERIAL_PARAMS_BINDING_SLOT in Code/Core/Rendering/Uniforms/UniformBindings.h.
+// Unnamed block: members stay in global scope and read as plain uniforms.
+layout(std140, binding = 5) uniform MaterialParams
+{
+    vec4 fadeColor;
+};
 
 void main()
 {

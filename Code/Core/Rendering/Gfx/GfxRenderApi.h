@@ -90,25 +90,6 @@ namespace CC::Gfx
         virtual void                             DestroyRenderTarget(RenderTargetHandle handle)                  = 0;
 
         // ========================
-        // Shader program binding and uniforms (transitional)
-        // ========================
-        //
-        // These methods exist to let Material / UiRenderer stop making raw GL
-        // calls before the full pipeline-object migration is complete. They
-        // correspond directly to glUseProgram / glGetUniformLocation /
-        // glUniform* on the GL backend. Once callers adopt PipelineHandle +
-        // uniform buffers, this section can be removed.
-
-        virtual void BindShaderProgram(ShaderHandle shader)                                = 0;
-        virtual int  GetUniformLocation(ShaderHandle shader, const char* name)             = 0;
-        virtual void SetUniformMat4(int location, const float* values)                     = 0;
-        virtual void SetUniformVec4(int location, const float* values)                     = 0;
-        virtual void SetUniformVec3(int location, const float* values)                     = 0;
-        virtual void SetUniformVec2(int location, const float* values)                     = 0;
-        virtual void SetUniformFloat(int location, float value)                            = 0;
-        virtual void SetUniformInt(int location, int value)                                = 0;
-
-        // ========================
         // Command recording
         // ========================
 

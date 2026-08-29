@@ -15,8 +15,15 @@ void main() {
 out vec4 FragColor;
 
 in vec2 uv;
-uniform float iTime;
-uniform float aspectRatio;
+// Custom per-material parameters. Written by Material::SetUniform,
+// packed by std140 offset from this declaration.
+// Slot must match MATERIAL_PARAMS_BINDING_SLOT in Code/Core/Rendering/Uniforms/UniformBindings.h.
+// Unnamed block: members stay in global scope and read as plain uniforms.
+layout(std140, binding = 5) uniform MaterialParams
+{
+    float iTime;
+    float aspectRatio;
+};
 
 vec3 palette (float t) {
 

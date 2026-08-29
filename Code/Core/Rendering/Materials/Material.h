@@ -1,7 +1,6 @@
 #ifndef MATERIAL_H
 #define MATERIAL_H
 
-#include <unordered_map>
 #include <string>
 #include "ShaderManager.h"
 #include "CCAssert.h"
@@ -11,6 +10,7 @@
 #include "CCVector2.h"
 #include "CCVector4.h"
 #include "GfxHandles.h"
+#include "ShaderParamLayout.h"
 
 namespace CC
 {
@@ -46,41 +46,20 @@ namespace CC
 
         void SetStandardUniforms(const Mat4x4& value);
 
-        void AddUniform(const std::string& name);
+        // Custom per-material parameters, written into the shader-declared
+        // MaterialParams block by std140 offset. Names the active shader does
+        // not declare are stored and ignored, so one caller can drive several
+        // shaders that declare different parameter sets.
+        void SetUniform(const std::string& name, float value);
+        void SetUniform(const std::string& name, int value);
+        void SetUniform(const std::string& name, const Vector2& value);
+        void SetUniform(const std::string& name, const Vector3& value);
+        void SetUniform(const std::string& name, const Vector4& value);
 
-        template<typename T>
-        void AddUniform(const std::string& name, const T& defaultValue)
-        {
-            Bind();
-            AddUniform(name);
-            auto it = uniformLocations.find(name);
-            if (it != uniformLocations.end() && it->second != -1)
-            {
-                SetUniformInternal(it->second, defaultValue);
-            }
-        }
-
-        template<typename T>
-        void SetUniform(const std::string& name, T value)
-        {
-            if (ShaderManager::Get()->IsShaderCompiled(shaderName))
-            {
-                auto it = uniformLocations.find(name);
-                CC_ASSERT(it != uniformLocations.end(), "Uniform not found: " + name);
-                if (it != uniformLocations.end())
-                {
-                    if (it->second != -1)
-                    {
-                        SetUniformInternal(it->second, value);
-                    }
-                }
-            }
-        }
-
-        bool UsesShader(const std::string& shaderName) const { return shaderName == shaderName; }
+        bool UsesShader(const std::string& _shaderName) const { return shaderName == _shaderName; }
         void ReconnectShader();
 
-        bool CheckUniformExists(const std::string& name);
+        bool CheckUniformExists(const std::string& name) const;
 
         Texture* GetTexture() const { return texture; }
         bool HasTexture() const { return texture != nullptr; }
@@ -112,18 +91,29 @@ namespace CC
         int GetDebugMode() const { return debugMode; }
 
     private:
-        void Bind();
-        int GetUniformLocation(const std::string& name) const;
+        static constexpr int MAX_PARAM_VALUES      = 16;
+        static constexpr int MAX_PARAM_VALUE_BYTES = 16;  // vec4, the widest type a caller can set
+
+        // A parameter value as the caller set it. Held by name rather than by
+        // offset, so a shader hot-reload that moves block members re-packs
+        // from the values the material already holds.
+        struct ParamValue
+        {
+            std::string     name;
+            ShaderParamType type = ShaderParamType::Float;
+            unsigned char   data[MAX_PARAM_VALUE_BYTES] = {};
+        };
+
         void UploadMaterialUniforms();
 
-        void SetUniformInternal(int location, int value);
-        void SetUniformInternal(int location, float value);
-        void SetUniformInternal(int location, const Vector4& value);
-        void SetUniformInternal(int location, const Vector3& value);
-        void SetUniformInternal(int location, const Vector2& value);
+        const ShaderParamLayout* GetParamLayout() const;
+        void SetParamValue(const std::string& name, ShaderParamType type, const void* data, int sizeBytes);
+        void PackAndUploadParams();
 
         std::string shaderName;
-        std::unordered_map<std::string, int> uniformLocations;
+
+        ParamValue paramValues[MAX_PARAM_VALUES];
+        int        paramValueCount = 0;
 
         // Base texture (mainTex / baseColor)
         Texture* texture = nullptr;
@@ -155,6 +145,12 @@ namespace CC
 
         Gfx::BufferHandle materialUniformBuffer;
         bool materialUniformsDirty = true;
+
+        // Shader-declared MaterialParams block. Created on first upload, once
+        // the block size is known, and re-created if a hot-reload resizes it.
+        Gfx::BufferHandle materialParamsBuffer;
+        int  materialParamsBufferSizeBytes = 0;
+        bool materialParamsDirty = true;
     };
 }
 

@@ -139,6 +139,17 @@ namespace CC
         return result;
     }
 
+    const ShaderParamLayout* ShaderManager::GetParamLayout(const std::string& shaderName) const
+    {
+        const ShaderParamLayout* result = nullptr;
+        auto it = shaderMap.find(shaderName);
+        if (it != shaderMap.end())
+        {
+            result = &it->second->paramLayout;
+        }
+        return result;
+    }
+
     bool ShaderManager::ExtractIncludePath(const std::string& line, std::string& outIncludePath)
     {
         const std::string includeKeyword = "#include";
@@ -333,6 +344,10 @@ namespace CC
 
         shaderDef->shaderHandle = Gfx::RenderApi::Get()->CreateShader(description);
         shaderDef->isCompiled   = shaderDef->shaderHandle.IsValid();
+
+        // Material writes custom parameters into the shader-declared
+        // MaterialParams block by std140 offset.
+        shaderDef->paramLayout.ParseFromFragmentSource(shaderDef->fragmentShaderText);
     }
 
     bool ShaderManager::HasFileChanged(const std::string& shaderName)

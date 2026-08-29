@@ -116,7 +116,6 @@ They differ by operating system rather than by graphics API, and a backend has n
 - Offscreen render targets are declared but unimplemented in both backends. Only the implicit backbuffer exists, which blocks shadow maps, reflection probes, and post-processing chains.
 - Redundancy elimination covers pipeline binds only. Vertex buffer, texture, and uniform buffer binds are not compared against current state.
 - GPU spans are a flat ordered sequence per frame, with no nesting.
-- A set of transitional methods for binding a shader and writing individual uniforms still exists, used by one remaining caller. They cannot be implemented honestly by a backend for a modern graphics interface and are intended for removal.
 - Any code path bypassing this interface to call the graphics API directly must invalidate the cached bind state, or stale state becomes visible as incorrect rendering.
 - The compute surface is implemented but unreachable. Shader compilation does not recognise a compute stage, so no compute shader can be authored, and the dispatch, storage-buffer, image-binding, and barrier methods have no callers.
 - Resource lifetime is manual. Nothing is reference-counted or collected.
