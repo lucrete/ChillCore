@@ -46,6 +46,10 @@ Shape, unchanged from `PlatformAndBuildPlan.md`:
 - Per-target `CMakeLists.txt` under `Targets/Desktop/` and `Targets/Android/`, each adding only its entry point and its platform links.
 - `source_group(TREE …)` replaces the hand-maintained filter file.
 
+**The engine is an object library, not a static one.** Components self-register through file-scope static objects — a `ComponentRegistrar` in `RenderableQuad.cpp` and four siblings. Nothing else references symbols in those translation units, so a static archive lets the linker discard the object and the registration never runs. The failure is quiet and misleading: the scene loads, the component is reported as an unknown type, and the object is simply absent from the world. An object library has no archive to select from, so every translation unit reaches the link — which is what the hand-maintained project did by compiling everything into the executable directly.
+
+This is the one place where unification could silently change behaviour rather than fail loudly, and it is worth remembering before any future change to how the engine is packaged.
+
 **Generator: Visual Studio 2026.** The toolset then matches what interactive builds use today, so parity testing compares like with like, and a solution still exists for the interactive workflow below. Ninja is a later option for build speed; it changes nothing above the preset name.
 
 **CMake is resolved through Visual Studio, not PATH.** A CMake on PATH is routinely older than the installed Visual Studio and does not know its generator — the machine this was written on had 4.0.2 on PATH, which knows nothing past Visual Studio 2022, alongside 4.3.1 inside the Visual Studio installation. The pipeline locates the installation with `vswhere`, prefers its bundled CMake, falls back to PATH, and rejects any CMake that does not advertise the required generator.
@@ -125,6 +129,20 @@ Build/Logs/Unlabelled/     when --no-id, overwritten every run
 
 ---
 
+## Running and log capture
+
+The pipeline builds; `Tools/Build/Run.sh` runs what it built and collects the log. Same entry-point shape as `Build.sh` — double-clickable, argument-driven, pause only when prompted.
+
+Three things make an unattended run possible at all, and each was found the hard way:
+
+- **The application must start in `Code/App`.** Asset paths are `Data/...`-relative to it. Started anywhere else, shader loading fails and pipeline creation asserts — a failure that looks nothing like a working-directory problem.
+- **Standard output is unbuffered.** `printf` is block-buffered whenever stdout is not a console, so a fault discarded the entire log that would have explained it. Set in `PrintManager`'s constructor. The Windows CRT treats line buffering as full buffering, so unbuffered is the only mode that survives.
+- **The run happens under the Windows debugger when one is present.** `cdb` from the Windows Kits turns a bare exit code into a symbolised stack. Without it the script still runs the application, and a fault is only an exit code. The debugger has no run-for-n-seconds command, so a clean run ends at the script's own timeout — timing out is success here.
+
+Output goes to `Build/Logs/Run.log`, echoed as it is written.
+
+---
+
 ## Build identifier
 
 Format `2026_08_29_4_g1a2b3c4`, with `_dirty` appended when the working tree is unclean.
@@ -183,11 +201,15 @@ Diagnostics parsed from the captured output into `Diagnostics.json`, and `Report
 
 Identifier generation and daily counter, `BuildInfo.h` with its generated half, `CC::BuildInfo`, a Help → About menu and view in `DevUi`, and an About screen in the application interface reached from the main menu.
 
+### Phase 3.5 — Running and log capture (verified)
+
+`Tools/Build/Run.sh`, unbuffered application output, and debugger-backed crash capture. Not in the original plan; added because verifying anything above it requires being able to run the result and read what it said.
+
 ### Phase 4 — Reserved
 
 Named here so the shape is known, not scheduled:
 
-- `RunTests.sh` alongside `Build.sh`, reporting into the same per-build folder.
+- `RunTests.sh` alongside `Build.sh` and `Run.sh`, reporting into the same per-build folder.
 - Asset preprocessing before the build.
 - Documentation and runtime data bundling into an installer.
 - An Android target option.

@@ -142,11 +142,12 @@ Confirmed by running the pipeline: Debug and Release, clean and incremental, lab
 
 ### Behavioural parity (**Ready**)
 
-The gate on everything else in this workstream. The binary compiles and links; nothing has run it.
+The Debug binary boots to the AudioTracker state and, with the initial state temporarily pointed at Showcase, loads `ExampleScene` — both without faulting and with no warnings or errors in the log. What remains needs a person at the keyboard.
 
-- Run both configurations and confirm the application behaves as the retired project's binary did.
-- F5 from `Build/CMake/Desktop/ChillCore.slnx` starts in `Code/App` and loads assets.
 - Confirm both About panels — developer Help → About, and the main menu's About screen — show the identifier from a labelled build.
+- Exercise the states the automated run cannot: menu navigation, the showcase scene, F9 free-camera toggle.
+- F5 from `Build/CMake/Desktop/ChillCore.slnx` and confirm the debugger starts in `Code/App`.
+- Run the Release configuration.
 
 ### Android package parity test (**Blocked** — behavioural parity)
 
@@ -159,6 +160,13 @@ Delete `Code.vcxproj`, `Code.vcxproj.filters`, and `ChillCore.sln`. Until this l
 ### Reserved (**Deferred**)
 
 Named so the shape is known, not scheduled: `RunTests.sh`, asset preprocessing, documentation and runtime data bundling into an installer, an Android target option.
+
+### Camera registration by name (**Ready**)
+
+`CameraManager` now keys its map by `std::string`, and `SetActiveCamera` asserts rather than silently storing a null. Two related weaknesses remain and are not urgent.
+
+- No state registers `CameraFree` beyond the one the manager constructs, so the F9 toggle is a no-op in states that never set a second camera. It no longer crashes.
+- `GetViewProjectionMatrix` and `GetCameraPosition` still dereference `activeCamera` unguarded.
 
 ---
 

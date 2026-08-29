@@ -93,7 +93,16 @@ endif()
 # Engine library
 # ============================================================================
 
-add_library(ChillCoreEngine STATIC
+# An OBJECT library, not STATIC, and the distinction matters. Components
+# self-register through file-scope static objects — a ComponentRegistrar in
+# RenderableQuad.cpp and four siblings. Nothing else references symbols in
+# those translation units, so a static archive lets the linker discard the
+# object entirely and the registration silently never happens: the scene loads
+# and the component is reported as an unknown type. Object libraries have no
+# archive to select from, so every translation unit reaches the link, which is
+# what the hand-maintained project did by compiling everything into the
+# executable directly.
+add_library(ChillCoreEngine OBJECT
     ${CC_ENGINE_SOURCES}
     ${CC_ENGINE_HEADERS}
     ${CC_THIRD_PARTY_SOURCES}

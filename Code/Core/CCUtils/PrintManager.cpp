@@ -22,6 +22,13 @@ namespace CC
         CC_ASSERT(NULL == instance, "PrintManager already created");
         instance = this;
 
+        // stdout is block-buffered whenever it is not a console — under a
+        // debugger, redirected to a file, or read by a build runner. A crash
+        // then discards the log that would explain it. Unbuffered rather than
+        // line-buffered because the Windows CRT treats _IOLBF as full
+        // buffering; at this volume the cost does not matter.
+        setvbuf(stdout, NULL, _IONBF, 0);
+
         memset(channels, 0, sizeof(channels[0] * CHANNEL_MAX));
 
         // Set these to true to enable a channel

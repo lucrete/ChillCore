@@ -72,6 +72,8 @@ Android builds from `Code/Targets/Android/` via Gradle -> CMake -> NDK. Claude d
 
 Output goes to `Build/x64/{Debug|Release}/`
 
+**Claude runs the app through the pipeline.** `bash Tools/Build/Run.sh --seconds 10 --no-pause` launches the Debug build from `Code/App`, captures the log to `Build/Logs/Run.log`, and dumps a symbolised stack if it faults.
+
 **Claude builds through the pipeline.** Run `bash Tools/Build/Build.sh --no-pause` (add `--release` or `--clean` as needed) and read `Build/Logs/Unlabelled/Diagnostics.json` for structured errors. Do not invoke MSBuild, devenv, or cl.exe directly — the pipeline is the only supported entry point. Runs are still driven by the user in Visual Studio 2026.
 
 ### Project Configuration Requirements
