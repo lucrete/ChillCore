@@ -10,7 +10,7 @@ namespace CC
     class SceneObject;
 }
 
-// Demo / manual regression state for offscreen render targets (AGD-0080).
+// Demo / manual regression state for offscreen render targets.
 // Renders the scene into an offscreen colour target, then draws a fullscreen
 // pass that samples it with a colour-invert effect into the backbuffer.
 // Toggling the effect off must reproduce the direct render path (MSAA on

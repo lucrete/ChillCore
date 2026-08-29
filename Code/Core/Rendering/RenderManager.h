@@ -70,7 +70,7 @@ namespace CC
         //
         // Ownership of `target`, `colorTexture`, and `postMaterial` stays
         // with the caller. General callers use this rather than the
-        // Gfx::RenderApi pass brackets directly (AGD-0070, AGD-0080).
+        // Gfx::RenderApi pass brackets directly, which RenderManager owns.
         void SetOffscreenScenePass(Gfx::RenderTargetHandle target,
                                    Gfx::TextureHandle colorTexture,
                                    Material* postMaterial);

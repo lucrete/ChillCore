@@ -46,6 +46,7 @@ Follow the coding standard defined in `DevDocs/ChillCoreDevDocs/docs/Guidelines/
 
 ### Comments
 * Only where extra explanation is needed. Prefer self-commenting code.
+* Never cite docs from code comments — no AGD numbers, no planning-doc names, no `DevDocs` paths. State the reason directly; the comment must stand alone.
 * Use comment header blocks for sections:
 ```
 // ========================
