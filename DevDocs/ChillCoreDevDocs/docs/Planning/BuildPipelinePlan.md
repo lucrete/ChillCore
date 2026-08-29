@@ -1,8 +1,8 @@
 # Build Pipeline Plan
 
-**Status:** The pipeline builds a self-contained output directory and runs it. What remains is distribution, automated testing, and Android.
+**Status:** The pipeline builds a self-contained output directory and runs it. What remains in plan is automated testing and packaged distribution.
 **Current state:** AGD-0040 (Build and Targets) describes the pipeline as it exists. This plan covers only what does not.
-**Index:** the Build pipeline section of `01_TechBacklog.md`.
+**Sequence:** rows 9–10 of `02_Roadmap.md`. Android through the pipeline is not yet scheduled — see `03_TechBacklog.md`.
 
 ---
 
@@ -30,11 +30,3 @@ An archive of the output directory — executable, runtime data, and the build r
 - Results land in the same per-build folder as the build that produced them, in both a machine-readable and a human-readable form, so a build and its test results are one record.
 - The first tests are the cheapest useful ones: the engine starts, loads a scene, and shuts down without faulting. The run-and-capture machinery for that already exists.
 - What a test failure means for the build's exit code is a decision to make when the first test exists, not before.
-
----
-
-## Android through the pipeline
-
-**Not started.** The pipeline builds the desktop target only; Android is still built by invoking Gradle directly.
-
-Adding it is a target selection option and a Gradle invocation, reporting into the same folder structure. It is unblocked but low value until something other than a developer's machine builds the Android package.

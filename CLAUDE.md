@@ -55,10 +55,11 @@ Follow the coding standard defined in `DevDocs/ChillCoreDevDocs/docs/Guidelines/
 
 ## Planning Docs
 - Planning docs live in `DevDocs\ChillCoreDevDocs\docs\Planning`. They describe outstanding work only; completed work moves into an Architectural Guide Doc under `docs\Architecture` and is removed from the plan.
-- `01_TechBacklog.md` is the index of outstanding work across every workstream. Read it to find what is open; update it when work lands or new work is identified.
-- `02_Roadmap.md` gives the recommended implementation order and the dependencies behind it.
-- The per-workstream plans are `RenderingPlan.md`, `AudioTrackerPlan.md`, `PlatformAndBuildPlan.md`, and `PersistencePlan.md`.
-- When asked to save the current plan, add it to the relevant workstream plan, or create a new one alongside them if it does not fit.
+- `01_DevProcess.md` defines how the planning docs relate and the lifecycle of a work item. Read it first.
+- `02_Roadmap.md` is the single ordered table of work that is in plan.
+- `03_TechBacklog.md` holds summaries of work not yet in plan. The roadmap and the backlog are mutually exclusive.
+- The per-workstream plans — `RenderingPlan.md`, `AudioTrackerPlan.md`, `PlatformAndBuildPlan.md`, `BuildPipelinePlan.md`, `PersistencePlan.md` — carry implementation detail for planned work.
+- When asked to save the current plan, follow `01_DevProcess.md`: a backlog summary if the work is unscheduled, otherwise a roadmap row plus a section in the relevant workstream plan.
 
 ## Build Commands
 

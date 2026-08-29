@@ -1,18 +1,50 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two unimplemented capabilities, an unrun acceptance pass, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two unimplemented capabilities and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
-**Index:** the Rendering section of `01_TechBacklog.md`.
+**Sequence:** rows 1–3 of `02_Roadmap.md`. Rendering work not yet scheduled (camera registration, the open design questions) is in `03_TechBacklog.md`.
 
 ---
 
 ## Offscreen render targets
 
-Render target creation and destruction assert and fail in both backends. The descriptor and handle types exist; the implementation does not. Only the implicit backbuffer works.
+`CreateRenderTarget` / `DestroyRenderTarget` assert-and-fail in both backends (`GfxRenderApiOpenGl.cpp:1100`, `GfxRenderApiGles.cpp:927`). Only the implicit backbuffer works.
 
-**Why it matters.** This is the largest capability gap in the abstraction, and it blocks a class of features rather than one feature: shadow maps, reflection probes, and any post-process chain beyond the fixed resolve. The render-pass bracket was designed for it and already accepts a render target handle, so the frontend needs no change — the work is confined to the two backends.
+**Why it matters.** The largest capability gap in the abstraction. It blocks a class of features rather than one: shadow maps, reflection probes, and any post-process chain beyond the fixed resolve.
 
-**Done when:** a demo state renders to an offscreen target and samples it in a later pass, on both desktop and Android.
+### What already exists
+
+- `RenderTargetDescription` / `RenderTargetAttachment` with `LoadOp` / `StoreOp` / clear colour, up to `MAX_COLOR_ATTACHMENTS` colour attachments plus optional depth-stencil (`GfxDescriptions.h:164`).
+- `TextureDescription::isRenderTarget` — the attachment texture path.
+- `RenderTargetHandle`, and a `GlRenderTarget` pool (`fbo`, `width`, `height`, `description`, `isAlive`) with `renderTargets` / `freeRenderTargetSlots` members in both backend headers. Nothing writes to the pool.
+- `BeginRenderPass(RenderTargetHandle)` / `EndRenderPass()` brackets. `BeginRenderPass` currently ignores the handle and always binds the scene framebuffer; `EndRenderPass` always resolves MSAA and blits to the default framebuffer.
+- `GetBackbuffer()` returns a null handle as a placeholder for "the backbuffer as a render target".
+
+### Frontend
+
+- `RenderManager::StartFrame` calls `BeginRenderPass(GetBackbuffer())` (`RenderManager.cpp:151`); `EndRenderPass` is paired in `RenderManager.cpp`. A consumer that wants an offscreen pass needs a way to bracket one **inside** the frame, before the backbuffer pass.
+- Add a minimal frontend affordance: `RenderManager::BeginOffscreenPass(RenderTargetHandle)` / `EndOffscreenPass()`, or expose the `Gfx` brackets directly for demo-state use. This is the first real caller that wants pass control, so it forces the *RenderManager versus Gfx::RenderApi access levels* open question — resolve that into AGD-0080 rather than deferring again.
+- Texture handle for the colour attachment is sampled in a later pass through the existing `BindTexture` path; no new sampling API.
+
+### Backend work (OpenGl, then Gles)
+
+- `CreateRenderTarget`: allocate an FBO, attach each colour attachment's texture (`glFramebufferTexture2D` at `mipLevel` / `arrayLayer`), attach depth-stencil if `hasDepthStencil`, set `glDrawBuffers` for the colour count, check completeness, store in the pool, return a handle. No MSAA on offscreen targets in this pass — single-sample only.
+- `DestroyRenderTarget`: delete the FBO, free the slot, clear it if currently bound.
+- `BeginRenderPass`: branch on the handle. Null / backbuffer handle keeps the current scene-framebuffer path. A pool handle binds that FBO, sets the viewport to its dimensions, and applies each attachment's `LoadOp` (clear vs. load) and clear colour.
+- `EndRenderPass`: for an offscreen target, apply `StoreOp` and skip the MSAA-resolve-and-blit — that is backbuffer-only. Invalidate the dirty-state cache on pass boundaries (the raw `glBindFramebuffer` / `glClear` bypass the tracked binds).
+- Gles mirrors the above. No MSAA scene FB there, so the offscreen path is closer to a straight FBO bind. Watch GLES 3.1 attachment-format and `glDrawBuffers` constraints.
+
+### Capability notes
+
+- Depth-texture sampling and multiple render targets are core in GL 4.3 and GLES 3.1; no capability gate needed for the desktop and Android backends.
+- A future WebGL backend will need `WEBGL_draw_buffers` / format checks — leave a `TODO` marker at the `glDrawBuffers` call rather than building the gate now.
+
+### Demo state
+
+- New `AppState` that renders the scene to an offscreen colour target, then draws a fullscreen pass sampling it with a trivial effect (invert or blur) into the backbuffer.
+- Doubles as the manual regression check: disabling the effect must produce output identical to the direct path.
+
+**Done when:** the demo state renders to an offscreen target and samples it in a later pass, on both desktop and Android, and `DestroyRenderTarget` leaks no GL objects across a state re-enter.
 
 ---
 
@@ -28,37 +60,23 @@ Binding a pipeline compares against the last one bound and returns early. Bindin
 
 ---
 
-## Acceptance measurements
-
-The abstraction work defined quantitative gates. No run is recorded against any of them.
-
-- Per-frame graphics call count before and after, on a multi-object scene. The target was roughly 280 uniform and bind calls down to under 40 for ten physically-based spheres.
-- Frame duration stable or improved — the rework must not have regressed frame time.
-- A capture showing the labelled scope hierarchy on a debug build.
-- Visual parity across the showcase, boot, procedural art, and physically-based scenes.
-- Multisampling still taking effect when the sample count is changed through the backbuffer descriptor.
-
-**Why it matters.** Draw-call reduction was half the justification for the whole abstraction, and it is currently an assumption. If the numbers do not show the expected drop, something in the update-frequency grouping or the sort is not doing its job, and that is worth knowing before more work is built on top. The measurement is also the only remaining check on whether the migration regressed rendering behaviour anywhere.
-
----
-
 ## Compute shaders
 
-The backend surface is built. `Gfx::RenderApi` provides compute dispatch, indirect dispatch, storage-buffer and image binding, and memory barriers; shader creation accepts a compute stage; both backends implement all of it and report compute and storage buffers as available. Nothing above the backend can reach it.
+The backend surface is built and implemented for both backends: `DispatchCompute`, `DispatchComputeIndirect`, `BindStorageBuffer`, `BindImage`, `MemoryBarrier`, and `CreateShader` accepting `description.computeSource`. `supportsComputeShaders` / `supportsStorageBuffers` report true on both, GLES 3.1 included. Nothing above the backend can reach any of it.
 
 ### What is missing
 
-**Shader authoring.** Shader compilation does not recognise a compute stage. This is the single blocking change — until it lands, no compute shader can exist.
+**Shader authoring.** `ShaderManager` does not parse a `#shader compute` section. This is the single blocking change — until it lands, no compute shader can exist.
 
-- A compute shader definition type, parallel to the existing one but with a single source stream and no vertex or fragment split.
+- `CC::ComputeShaderDefinition` — a compute shader definition type, parallel to the existing one but with a single source stream and no vertex or fragment split.
 - A compute entry in the shader manager, with its own lookup and compile path routing through the existing backend shader creation.
 - Include resolution is unchanged and reuses the existing mechanism.
 - Shader parsing gains a third stream. A file declaring only a compute stage registers as compute; a file declaring vertex and fragment stages registers as raster. No file mixes all three.
 - Hot reload extends to compute shader files, and anything caching a compiled handle re-fetches on reload.
 
-**Storage buffer wrapper.** A typed wrapper over a buffer used for compute input and output, covering allocation, upload, and readback. The underlying buffer usage and binding already exist in the abstraction.
+**Storage buffer wrapper (`CC::ComputeBuffer`).** A typed wrapper over an SSBO used for compute input and output, covering allocation, upload, and readback. The underlying buffer usage and binding already exist in the abstraction.
 
-**Dispatch unit.** The compute-side analogue of a renderable: it holds a compute shader reference, its bound buffers and images, and dispatches. It should offer dispatch by total thread count as well as by workgroup count, rounding up internally, so callers think in the terms the problem is stated in rather than in workgroup arithmetic.
+**Dispatch unit (`CC::ComputePass`).** The compute-side analogue of a renderable: it holds a compute shader reference, its bound buffers and images, and dispatches. It should offer dispatch by total thread count as well as by workgroup count, rounding up internally, so callers think in the terms the problem is stated in rather than in workgroup arithmetic.
 
 ### Capability gating
 

@@ -2,7 +2,7 @@
 
 **Status:** Phases 0 to 5 have landed. What remains is the primary editing affordance, project file handling, several editor first-cuts, and the deferred polish phase.
 **Current state:** AGD-0150 (AudioTracker) describes what exists. This plan covers only what does not.
-**Index:** the AudioTracker section of `01_TechBacklog.md`.
+**Sequence:** rows 4–6 of `02_Roadmap.md`. Editor first-cuts and the polish phase are not yet scheduled — see `03_TechBacklog.md`.
 
 ---
 
@@ -32,8 +32,8 @@ Without it, every hit is identical and the loop sounds machine-flat. Velocity is
 
 ### What is missing
 
-- A command for setting step velocity. The existing toggle command names it as pending.
-- Visual encoding of velocity on the pattern grid. Cells currently render as a binary state; brightness or fill height would carry the value.
+- `SetStepVelocityCommand` does not exist. `ToggleStepCommand.h:17` names it as pending.
+- Visual encoding of velocity on the pattern grid. Cells render binary on/off at `AudioTrackerController.cpp:713`; brightness or fill height would carry the value.
 - Vertical drag on a cell to adjust it. This may need drag support adding to the interface input layer.
 - Secondary affordances — scroll wheel, keyboard nudge — belong with the polish work below.
 
@@ -41,15 +41,15 @@ Without it, every hit is identical and the loop sounds machine-flat. Velocity is
 
 ## Missing commands
 
-Every project edit routes through a command so it is undoable. Several from the intended catalogue do not exist yet: setting a pattern track's gain, renaming a pattern, clearing a song cell, removing a song track, and setting a song track's gain.
+Every project edit routes through a command so it is undoable. Several from the intended catalogue do not exist yet: `SetPatternTrackGainCommand`, `RenamePatternCommand`, `ClearSongCellCommand`, `RemoveSongTrackCommand`, `SetSongTrackGainCommand`.
 
-Separately, no command implements coalescing. Drag-painting across cells and dragging a slider therefore push one history entry per event rather than one per gesture, which makes undo unusable for those interactions.
+Separately, no concrete command overrides `TryCoalesceWith`. Drag-painting across cells and dragging a slider therefore push one history entry per event rather than one per gesture, which makes undo unusable for those interactions.
 
 ---
 
 ## Project file handling
 
-Saving and loading work, but against a single fixed path.
+Saving and loading work, but against one fixed `GetDefaultProjectPath()` (`AudioTrackerController.cpp:238,253`).
 
 - **New, Open, and Save As** do not exist.
 - **An in-engine project browser**, scoped to the projects folder, showing tempo, song length, and last-edited time inline.
@@ -62,15 +62,15 @@ The right answer differs by what is being picked, and the split is worth recordi
 
 **Project files use an in-engine browser.** The tracker owns the projects folder, and users have no reason to keep project files elsewhere — arbitrary disk browsing mostly lets someone put work where the application cannot find it again. An in-engine list is also the only place project metadata can be shown inline, which a generic file dialog cannot do. It is one cross-platform code path rather than one native dialog per desktop platform, and it avoids the modal-dialog hazards that come with the platform's own picker.
 
-**Sample import uses the platform's native dialog.** Samples come from anywhere on disk, which is exactly what a native picker is for, and users already know how it works. Drag-and-drop is implemented and works as a complementary affordance; the native dialog is not, so import is currently drag-and-drop only.
+**Sample import uses the platform's native dialog** — `IFileOpenDialog` on Windows, confirmed as a Phase 2 decision. Samples come from anywhere on disk, which is exactly what a native picker is for, and users already know how it works. Only `glfwSetDropCallback` drag-and-drop is implemented; the native dialog is not, so import is currently drag-and-drop only.
 
 ---
 
 ## Editor first-cuts to replace
 
-- **Track source assignment is a cycle button.** The intended control is a dropdown, which is blocked on the interface's dropdown supporting dynamically populated options.
-- **Neither grid shows a playhead.** The transport publishes its position for exactly this purpose and nothing reads it for display.
-- **The non-Windows storage path is a placeholder**, pending a second desktop target.
+- **Track source assignment is a "Cycle Source" button** (`AudioTrackerController.cpp:583`). The intended dropdown is blocked on `UiDropdown` supporting dynamically populated options.
+- **Neither grid shows a playhead.** `TrackerClock` publishes its position for exactly this purpose and nothing reads it for display.
+- **The non-Windows storage path is a placeholder** (`TrackerPaths.h:14`), pending a second desktop target.
 
 ---
 
