@@ -39,6 +39,8 @@ namespace CC
 
         virtual void LockMouseCursor(bool isLocked) override;
 
+        virtual bool IsFocused() const override;
+
         virtual void SetFileDropCallback(std::function<void(const std::vector<std::string>&)> callback) override;
 
         virtual void OnSurfaceLost()      override;

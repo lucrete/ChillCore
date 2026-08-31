@@ -267,6 +267,13 @@ namespace CC
         // No mouse cursor on Android in v1.
     }
 
+    bool PlatformWindowAndroid::IsFocused() const
+    {
+        // The activity only runs its frame loop while it is foregrounded,
+        // so anything asking this is already focused.
+        return true;
+    }
+
     void PlatformWindowAndroid::SetFileDropCallback(std::function<void(const std::vector<std::string>&)> callback)
     {
         (void)callback;

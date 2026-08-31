@@ -93,6 +93,7 @@ namespace CC
         float analogStickRightX;
         float analogStickRightY;
         bool useMouseAsRightStick;
+        bool wasWindowFocused;
 
         float joystickOverrideX[STICK_MAX];
         float joystickOverrideY[STICK_MAX];

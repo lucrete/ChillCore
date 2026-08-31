@@ -27,7 +27,7 @@ void AppMain::Init()
     stateMachine->RegisterState("AudioTest", new AppStateAudioTest());
     stateMachine->RegisterState("AudioTracker", new AppStateAudioTracker());
     stateMachine->RegisterState("RenderTarget", new AppStateRenderTarget());
-    stateMachine->GotoState("AudioTracker");
+    stateMachine->GotoState("RenderTarget");
 }
 
 // Global UI SFX must load before any AppState runs so any state can be the
