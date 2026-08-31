@@ -56,26 +56,23 @@ namespace CC
         PipelineCache* GetPipelineCache() const { return pipelineCache; }
 
         // ========================
-        // Offscreen scene pass
+        // Post-processing
         // ========================
         //
-        // The frame loop opens the scene render pass in StartFrame, before
-        // any AppState code runs, so a general caller cannot bracket its own
-        // pass ahead of the backbuffer one. This is the affordance for that:
-        // when set, the opaque and transparent passes render into `target`
-        // instead of the backbuffer, then `postMaterial` is drawn as a
-        // fullscreen pass sampling `colorTexture` (bound at texture unit 0)
-        // into the backbuffer. Pass an invalid handle / null material, or
-        // call ClearOffscreenScenePass, to restore the direct path.
+        // Setting a material redirects the opaque and transparent passes
+        // into an offscreen colour target, then draws that material as a
+        // fullscreen pass into the backbuffer with the target's colour
+        // texture bound at unit 0. The target belongs to RenderManager: it
+        // is created on demand at framebuffer resolution and rebuilt when
+        // that resolution changes, so callers only choose the effect.
+        // Passing nullptr restores the direct-to-backbuffer path and
+        // releases the target.
         //
-        // Ownership of `target`, `colorTexture`, and `postMaterial` stays
-        // with the caller. General callers use this rather than the
-        // Gfx::RenderApi pass brackets directly, which RenderManager owns.
-        void SetOffscreenScenePass(Gfx::RenderTargetHandle target,
-                                   Gfx::TextureHandle colorTexture,
-                                   Material* postMaterial);
-        void ClearOffscreenScenePass();
-        bool HasOffscreenScenePass() const;
+        // The material stays owned by the caller. Offscreen targets are
+        // single-sample, so an active effect costs backbuffer multisampling.
+        void SetPostProcessMaterial(Material* material);
+        Material* GetPostProcessMaterial() const;
+        bool IsPostProcessEnabled() const;
 
     private:
         static RenderManager* instance;
@@ -93,26 +90,28 @@ namespace CC
         Gfx::BufferHandle     frameUniformBuffer;
         Gfx::BackbufferDescription backbufferDescription;
 
-        struct OffscreenScenePass
-        {
-            Gfx::RenderTargetHandle target;
-            Gfx::TextureHandle      colorTexture;
-            Material*               postMaterial = nullptr;
-            bool                    isEnabled = false;
-        };
-        OffscreenScenePass        offscreenScenePass;
-        RenderableFullscreenQuad* offscreenPostQuad;
-        Gfx::SamplerHandle        offscreenSampler;
+        Material*                 postProcessMaterial;
+        RenderableFullscreenQuad* postProcessQuad;
+        Gfx::SamplerHandle        postProcessSampler;
+        Gfx::RenderTargetHandle   postProcessTarget;
+        Gfx::TextureHandle        postProcessColorTexture;
+        Gfx::TextureHandle        postProcessDepthTexture;
+        int                       postProcessTargetWidth;
+        int                       postProcessTargetHeight;
 
         void SortTransparentRenderables();
         void SortOpaqueRenderables();
         void UploadFrameUniforms();
 
-        // Second pass of an offscreen scene pass: draw offscreenPostQuad into
+        // Creates the offscreen scene target, or rebuilds it at the new
+        // resolution if the framebuffer has resized since it was created.
+        void EnsurePostProcessTarget(int width, int height);
+        void DestroyPostProcessTarget();
+
+        // Second pass of a post-processed frame: draws postProcessQuad into
         // the backbuffer, sampling the offscreen colour texture. No-op unless
-        // SetOffscreenScenePass is active. Called from Render after the scene
-        // passes end.
-        void DrawOffscreenPostPass();
+        // an effect is set. Called from Render after the scene passes end.
+        void DrawPostProcessPass();
         Gfx::RenderTargetHandle SceneTargetForFrame() const;
 
         static const int MAX_RENDERABLES = 1024;

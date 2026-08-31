@@ -28,11 +28,24 @@ private:
     enum ShowcaseActions
     {
         Pause = CC::InputAction::GameActionStart,
+        CyclePostProcess,
         ShowcaseActionMax
+    };
+
+    // Off renders straight to the backbuffer; Passthrough renders through the
+    // engine's post-process target with the effect dialled out, so it must be
+    // indistinguishable from Off apart from the lost multisampling; Invert is
+    // the visible effect.
+    enum class PostProcessMode
+    {
+        Off,
+        Passthrough,
+        Invert
     };
 
     bool isPaused;
     bool pendingTogglePause;
+    PostProcessMode postProcessMode;
     bool wasMouseLocked;
     float elapsedTime;
 
@@ -45,6 +58,7 @@ private:
     void SceneInit();
     void SceneShutdown();
     void TogglePause();
+    void CyclePostProcessMode();
     void UpdateTimerDisplay();
 };
 

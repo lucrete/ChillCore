@@ -12,10 +12,10 @@ Last reviewed against the source: 2026-08-29.
 
 Gaps left open by the offscreen render-target work (AGD-0080 Limitations). None blocking:
 
-- Multisampled offscreen targets. Offscreen output is single-sample, so an offscreen scene pass loses the backbuffer's MSAA.
+- Multisampled offscreen targets. Offscreen output is single-sample, so an active post-process effect loses the backbuffer's MSAA.
 - Array-layer and cubemap-face attachments. Needed before a cascaded shadow map or a cubemap reflection probe.
 - The backbuffer as a pool handle rather than an invalid one, which would remove the special case in the pass brackets.
-- A multi-stage post-process chain. The frontend supports one offscreen pass feeding one post pass.
+- A multi-stage post-process chain. The renderer supports one offscreen pass feeding one post pass.
 
 ### Camera registration by name
 

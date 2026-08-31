@@ -32,7 +32,10 @@ namespace CC
         , fullscreenQuad(false)
         , fadeOverlay(nullptr)
         , fadeColor(0.0f, 0.0f, 0.0f, 0.0f)
-        , offscreenPostQuad(nullptr)
+        , postProcessMaterial(nullptr)
+        , postProcessQuad(nullptr)
+        , postProcessTargetWidth(0)
+        , postProcessTargetHeight(0)
     {
         CC_ASSERT(instance == nullptr, "RenderManager already created");
         instance = this;
@@ -112,11 +115,13 @@ namespace CC
             gfxApi->DestroyBuffer(frameUniformBuffer);
         }
 
-        if (offscreenSampler.IsValid())
+        DestroyPostProcessTarget();
+
+        if (postProcessSampler.IsValid())
         {
-            gfxApi->DestroySampler(offscreenSampler);
+            gfxApi->DestroySampler(postProcessSampler);
         }
-        delete offscreenPostQuad;
+        delete postProcessQuad;
         delete fadeOverlay;
         delete renderableFullscreenQuad;
         delete pipelineCache;
@@ -152,9 +157,14 @@ namespace CC
         PlatformWindow::Get()->GetFramebufferSize(width, height);
         TextRenderer::Get()->BeginFrame(width, height);
 
+        if (postProcessMaterial != nullptr)
+        {
+            EnsurePostProcessTarget(width, height);
+        }
+
         // Begin the scene render pass. Normally the backbuffer path (MSAA
-        // scene FB + resolve/blit in EndRenderPass); an active offscreen
-        // scene pass redirects it into the caller's render target instead.
+        // scene FB + resolve/blit in EndRenderPass); an active post-process
+        // effect redirects it into the offscreen target instead.
         gfxApi->BeginRenderPass(SceneTargetForFrame());
 
         shaderManager->Update();
@@ -163,9 +173,9 @@ namespace CC
     Gfx::RenderTargetHandle RenderManager::SceneTargetForFrame() const
     {
         Gfx::RenderTargetHandle result = gfxApi->GetBackbuffer();
-        if (offscreenScenePass.isEnabled)
+        if (IsPostProcessEnabled())
         {
-            result = offscreenScenePass.target;
+            result = postProcessTarget;
         }
         return result;
     }
@@ -239,30 +249,25 @@ namespace CC
     }
 
     // ========================
-    // Offscreen scene pass
+    // Post-processing
     // ========================
 
-    void RenderManager::SetOffscreenScenePass(Gfx::RenderTargetHandle target,
-                                              Gfx::TextureHandle colorTexture,
-                                              Material* postMaterial)
+    void RenderManager::SetPostProcessMaterial(Material* material)
     {
-        offscreenScenePass.target       = target;
-        offscreenScenePass.colorTexture = colorTexture;
-        offscreenScenePass.postMaterial = postMaterial;
-        offscreenScenePass.isEnabled    = target.IsValid() && colorTexture.IsValid() && postMaterial != nullptr;
+        postProcessMaterial = material;
 
-        if (offscreenScenePass.isEnabled)
+        if (material != nullptr)
         {
-            if (offscreenPostQuad == nullptr)
+            if (postProcessQuad == nullptr)
             {
-                offscreenPostQuad = new RenderableFullscreenQuad(postMaterial);
+                postProcessQuad = new RenderableFullscreenQuad(material);
             }
             else
             {
-                offscreenPostQuad->SetMaterial(postMaterial);
+                postProcessQuad->SetMaterial(material);
             }
 
-            if (!offscreenSampler.IsValid())
+            if (!postProcessSampler.IsValid())
             {
                 // Non-mipmapped, edge-clamped, linear. A mipmap-filtering
                 // sampler on the single-level target texture reads as black
@@ -275,37 +280,112 @@ namespace CC
                 samplerDesc.addressU   = Gfx::AddressMode::ClampToEdge;
                 samplerDesc.addressV   = Gfx::AddressMode::ClampToEdge;
                 samplerDesc.addressW   = Gfx::AddressMode::ClampToEdge;
-                samplerDesc.debugName  = "RenderManager::OffscreenSampler";
-                offscreenSampler = gfxApi->CreateSampler(samplerDesc);
+                samplerDesc.debugName  = "RenderManager::PostProcessSampler";
+                postProcessSampler = gfxApi->CreateSampler(samplerDesc);
             }
+        }
+        else
+        {
+            DestroyPostProcessTarget();
         }
     }
 
-    void RenderManager::ClearOffscreenScenePass()
+    Material* RenderManager::GetPostProcessMaterial() const
     {
-        offscreenScenePass = OffscreenScenePass();
+        return postProcessMaterial;
     }
 
-    bool RenderManager::HasOffscreenScenePass() const
+    bool RenderManager::IsPostProcessEnabled() const
     {
-        return offscreenScenePass.isEnabled;
+        return postProcessMaterial != nullptr && postProcessTarget.IsValid();
     }
 
-    void RenderManager::DrawOffscreenPostPass()
+    void RenderManager::EnsurePostProcessTarget(int width, int height)
     {
-        if (offscreenScenePass.isEnabled)
+        bool isTargetCurrent = postProcessTarget.IsValid()
+            && width == postProcessTargetWidth
+            && height == postProcessTargetHeight;
+
+        if (!isTargetCurrent && width > 0 && height > 0)
+        {
+            DestroyPostProcessTarget();
+
+            Gfx::TextureDescription colorDesc;
+            colorDesc.width          = width;
+            colorDesc.height         = height;
+            colorDesc.format         = Gfx::TextureFormat::Rgba8Unorm;
+            colorDesc.isRenderTarget = true;
+            colorDesc.debugName      = "RenderManager::PostProcessColor";
+            postProcessColorTexture = gfxApi->CreateTexture(colorDesc);
+
+            Gfx::TextureDescription depthDesc;
+            depthDesc.width          = width;
+            depthDesc.height         = height;
+            depthDesc.format         = Gfx::TextureFormat::Depth24Stencil8;
+            depthDesc.isRenderTarget = true;
+            depthDesc.debugName      = "RenderManager::PostProcessDepth";
+            postProcessDepthTexture = gfxApi->CreateTexture(depthDesc);
+
+            Gfx::RenderTargetDescription targetDesc;
+            targetDesc.width                = width;
+            targetDesc.height               = height;
+            targetDesc.colorAttachmentCount = 1;
+            targetDesc.colorAttachments[0].texture       = postProcessColorTexture;
+            targetDesc.colorAttachments[0].loadOp        = Gfx::LoadOp::Clear;
+            targetDesc.colorAttachments[0].storeOp       = Gfx::StoreOp::Store;
+            targetDesc.colorAttachments[0].clearColor[0] = 0.10f;
+            targetDesc.colorAttachments[0].clearColor[1] = 0.10f;
+            targetDesc.colorAttachments[0].clearColor[2] = 0.12f;
+            targetDesc.colorAttachments[0].clearColor[3] = 1.0f;
+            targetDesc.hasDepthStencil                   = true;
+            targetDesc.depthStencilAttachment.texture    = postProcessDepthTexture;
+            targetDesc.depthStencilAttachment.loadOp     = Gfx::LoadOp::Clear;
+            targetDesc.depthStencilAttachment.storeOp    = Gfx::StoreOp::DontCare;
+            targetDesc.debugName                         = "RenderManager::PostProcessTarget";
+            postProcessTarget = gfxApi->CreateRenderTarget(targetDesc);
+
+            postProcessTargetWidth  = width;
+            postProcessTargetHeight = height;
+        }
+    }
+
+    void RenderManager::DestroyPostProcessTarget()
+    {
+        if (postProcessTarget.IsValid())
+        {
+            gfxApi->DestroyRenderTarget(postProcessTarget);
+            postProcessTarget = Gfx::RenderTargetHandle();
+        }
+        if (postProcessColorTexture.IsValid())
+        {
+            gfxApi->DestroyTexture(postProcessColorTexture);
+            postProcessColorTexture = Gfx::TextureHandle();
+        }
+        if (postProcessDepthTexture.IsValid())
+        {
+            gfxApi->DestroyTexture(postProcessDepthTexture);
+            postProcessDepthTexture = Gfx::TextureHandle();
+        }
+
+        postProcessTargetWidth  = 0;
+        postProcessTargetHeight = 0;
+    }
+
+    void RenderManager::DrawPostProcessPass()
+    {
+        if (IsPostProcessEnabled())
         {
             gfxApi->BeginRenderPass(gfxApi->GetBackbuffer());
             gfxApi->InvalidateCachedState();
 
-            offscreenPostQuad->PreRender();
+            postProcessQuad->PreRender();
             // Override texture unit 0 (PreRender bound the material's own base
             // texture there) with the offscreen colour target.
-            gfxApi->BindTexture(0, offscreenScenePass.colorTexture, offscreenSampler);
-            offscreenPostQuad->Render(nullptr);
+            gfxApi->BindTexture(0, postProcessColorTexture, postProcessSampler);
+            postProcessQuad->Render(nullptr);
 
             gfxApi->EndRenderPass();
-            gfxApi->AddGpuTimestamp("GpuAfterOffscreenPost");
+            gfxApi->AddGpuTimestamp("GpuAfterPostProcessPass");
         }
     }
 
@@ -351,7 +431,7 @@ namespace CC
             gfxApi->AddGpuTimestamp("GpuAfterTransparent");
             gfxApi->EndRenderPass();
             gfxApi->AddGpuTimestamp("GpuAfterPostProcess");
-            DrawOffscreenPostPass();
+            DrawPostProcessPass();
         }
         else
         {
@@ -385,7 +465,7 @@ namespace CC
 
             gfxApi->EndRenderPass();
             gfxApi->AddGpuTimestamp("GpuAfterPostProcess");
-            DrawOffscreenPostPass();
+            DrawPostProcessPass();
         }
     }
 

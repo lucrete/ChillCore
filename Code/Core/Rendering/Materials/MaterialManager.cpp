@@ -21,7 +21,7 @@ namespace CC
         GetMaterial("FullScreenFade")->SetAlphaMode(AlphaBlendMode::Blend);
         GetMaterial("FullScreenFade")->SetDepthTestEnabled(false);
 
-        // Post-process pass for an offscreen scene render (AppStateRenderTarget).
+        // Colour-invert effect for RenderManager's post-process pass.
         // Screen-space: depth test off, like the fade overlay.
         CreateMaterial("PostProcessInvert", "PostProcess");
         GetMaterial("PostProcessInvert")->SetDepthTestEnabled(false);

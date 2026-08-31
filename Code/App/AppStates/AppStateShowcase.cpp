@@ -3,6 +3,7 @@
 #include "InputManager.h"
 #include "PrintManager.h"
 #include "CameraManager.h"
+#include "Material.h"
 #include "MaterialManager.h"
 #include "RenderManager.h"
 #include "SceneHierarchy.h"
@@ -23,6 +24,7 @@ AppStateShowcase::AppStateShowcase()
     : currentMode(InWorld)
     , isPaused(false)
     , pendingTogglePause(false)
+    , postProcessMode(PostProcessMode::Off)
     , wasMouseLocked(false)
     , elapsedTime(0.0f)
     , procArtController(nullptr)
@@ -51,6 +53,7 @@ void AppStateShowcase::Init()
     CC::InputActionMap& actionMap = CC::InputManager::Get()->GetActionMap();
     actionMap.CreateContext("AppStateShowcase");
     actionMap.RegisterAction(CC::ActionDef(Pause, "Pause", CC::InputTrigger::GamepadStart));
+    actionMap.RegisterAction(CC::ActionDef(CyclePostProcess, "CyclePostProcess", CC::InputTrigger::GamepadFaceRight));
 
     CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
     screens->RegisterScreen("ShowcaseHud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
@@ -73,6 +76,7 @@ void AppStateShowcase::Init()
     pendingTogglePause = false;
     currentMode = InWorld;
     elapsedTime = 0.0f;
+    postProcessMode = PostProcessMode::Off;
 }
 
 void AppStateShowcase::SceneInit()
@@ -116,6 +120,11 @@ void AppStateShowcase::Update()
     if (CC::InputManager::Get()->EdgePositive(Pause))
     {
         TogglePause();
+    }
+
+    if (CC::InputManager::Get()->EdgePositive(CyclePostProcess))
+    {
+        CyclePostProcessMode();
     }
 
     if (CC::InputManager::Get()->EdgePositive(CC::InputAction::DevReloadScene))
@@ -202,6 +211,39 @@ void AppStateShowcase::TogglePause()
     }
 }
 
+void AppStateShowcase::CyclePostProcessMode()
+{
+    CC::Material* postMaterial = CC::MaterialManager::Get()->GetMaterial("PostProcessInvert");
+    const char* modeName = "off";
+
+    switch (postProcessMode)
+    {
+    case PostProcessMode::Off:
+        postProcessMode = PostProcessMode::Passthrough;
+        postMaterial->SetUniform("effectAmount", 0.0f);
+        CC::RenderManager::Get()->SetPostProcessMaterial(postMaterial);
+        modeName = "passthrough";
+        break;
+
+    case PostProcessMode::Passthrough:
+        postProcessMode = PostProcessMode::Invert;
+        postMaterial->SetUniform("effectAmount", 1.0f);
+        modeName = "invert";
+        break;
+
+    case PostProcessMode::Invert:
+        postProcessMode = PostProcessMode::Off;
+        CC::RenderManager::Get()->SetPostProcessMaterial(nullptr);
+        modeName = "off";
+        break;
+
+    default:
+        break;
+    }
+
+    CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateShowcase: post-process %s", modeName);
+}
+
 void AppStateShowcase::UpdateTimerDisplay()
 {
     CC::UiElement* timerElement = CC::UiManager::Get()->GetElementById("timer");
@@ -219,6 +261,8 @@ void AppStateShowcase::UpdateTimerDisplay()
 
 void AppStateShowcase::Shutdown()
 {
+    CC::RenderManager::Get()->SetPostProcessMaterial(nullptr);
+
     CC::UiScreenSystem::Get()->ClearAllScreens();
 
     CC::SceneHierarchy::Get()->SetPaused(false);
