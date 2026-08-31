@@ -40,7 +40,7 @@ The boundary is checkable: no graphics API type or header may appear outside thi
 A pass targets either the backbuffer or an offscreen render target, selected by the handle passed when entering it. An invalid handle means the backbuffer.
 
 - **Backbuffer pass.** Entering binds the multisampled scene framebuffer and clears it. Ending resolves the multisampled output and presents it into the default target as an ordinary draw, using a pipeline like any other.
-- **Offscreen pass.** Entering binds the target's framebuffer, sets the viewport to its dimensions, and applies each attachment's load behaviour — clear, or preserve what is there. Ending applies each attachment's store behaviour, discarding what is not needed, and does no resolve or present. Offscreen targets are single-sample.
+- **Offscreen pass.** Entering binds the target's framebuffer, sets the viewport to its dimensions, and applies each attachment's load behaviour — clear, or preserve what is there. Ending resolves multisampled storage into the attachment textures if the target asked for more than one sample, then applies each attachment's store behaviour, discarding what is not needed. No present.
 
 Passes do not nest. Both pass boundaries bind framebuffers outside the tracked binds, so both invalidate the cached bind state.
 
@@ -122,6 +122,8 @@ This settles a question left open since the abstraction was built — whether to
 
 The frontend opens the scene pass before any application code runs, and passes do not nest. A caller bracketing its own pass from inside the update would therefore be opening a pass inside an open one. The options were to move the frame's pass structure into application code, or to keep the frontend the only thing that brackets passes. The second keeps the frame sequence in one place and leaves the ordering invariant checkable.
 
+Reconfiguring the backbuffer is bound by the same invariant. It rebuilds framebuffers and leaves the binding pointing elsewhere, so running it inside an open pass silently redirects the rest of the frame and then resolves and invalidates the wrong framebuffer. The rendering frontend therefore records the request and applies it at the next frame boundary, and the backends assert on a reconfigure attempted mid-pass rather than letting it corrupt the frame quietly.
+
 The split is by convention rather than by a separate restricted interface. Nothing in the type system stops a caller reaching for the brackets directly; the runtime assert on a nested pass is what catches it. A narrower interface for general callers remains available if this proves insufficient.
 
 The cost is that a caller cannot express an arbitrary pass graph. What it can express is one offscreen pass feeding one post pass, which is what the current features need and is not the general case.
@@ -134,7 +136,8 @@ They differ by operating system rather than by graphics API, and a backend has n
 
 ## Limitations
 
-- Offscreen render targets are single-sample. Multisampling exists on the backbuffer only, so offscreen output has aliased edges the direct path does not.
+- A multisampled offscreen target resolves with a hardware blit, which averages samples before any tone curve is applied. On very high contrast edges that is not the same as tone mapping each sample and then averaging, and shows as slightly bright fringing. Correcting it needs a shader resolve with per-sample access.
+- Multisampled offscreen targets carry exactly one colour attachment. More would need a resolve blit per attachment.
 - Render target attachments are single-layer. Array layers and cubemap faces are rejected, which is what a cubemap reflection probe or a cascaded shadow map would need.
 - The backbuffer is not itself addressable as a render target. It is reached by an invalid handle rather than by a handle from the pool.
 - Redundancy elimination covers pipeline binds only. Vertex buffer, texture, and uniform buffer binds are not compared against current state.

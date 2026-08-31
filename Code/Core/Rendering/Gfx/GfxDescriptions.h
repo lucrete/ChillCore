@@ -179,6 +179,12 @@ namespace CC::Gfx
         bool                   hasDepthStencil      = false;
         int                    width                = 0;
         int                    height               = 0;
+        // Samples per pixel. 1 renders straight into the attachment textures.
+        // Above 1, the backend renders into multisampled storage of its own
+        // and resolves into those textures when the pass ends, so the caller
+        // samples a resolved single-sample texture either way. Must not
+        // exceed GfxCapabilities::maxMsaaSamples.
+        int                    sampleCount          = 1;
         const char*            debugName            = nullptr;
     };
 

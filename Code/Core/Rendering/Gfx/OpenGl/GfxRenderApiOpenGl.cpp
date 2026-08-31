@@ -411,6 +411,7 @@ namespace CC::Gfx
         capabilities.supportsBcTextureFormats      = true;
         capabilities.supportsAstcTextureFormats    = false;
         capabilities.supportsAnisotropicFiltering  = true;
+        capabilities.supportsHalfFloatRenderTargets = true;
         capabilities.supportsDebugMarkers          = true;
         capabilities.supportsGpuTimestamps         = (GLAD_GL_ARB_timer_query != 0);
 
@@ -489,6 +490,11 @@ namespace CC::Gfx
 
     void RenderApiOpenGl::ConfigureBackbuffer(const BackbufferDescription& description)
     {
+        // Rebuilding the framebuffers rebinds, so an open pass would
+        // lose its target mid-frame and end up invalidating and
+        // resolving the wrong framebuffer.
+        CC_ASSERT(!renderPassActive, "ConfigureBackbuffer: cannot reconfigure while a render pass is active");
+
         backbufferDescription = description;
 
         // MSAA sample count of 1 means "disabled"; the FrameBufferOpenGl
@@ -560,7 +566,7 @@ namespace CC::Gfx
             GlRenderTarget& entry = renderTargets[slotIndex];
             const RenderTargetDescription& desc = entry.description;
 
-            glBindFramebuffer(GL_FRAMEBUFFER, entry.fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, entry.sampleCount > 1 ? entry.msaaFbo : entry.fbo);
             glViewport(0, 0, entry.width, entry.height);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
@@ -651,7 +657,21 @@ namespace CC::Gfx
             // blit to the default framebuffer. Honour StoreOp::DontCare as a
             // discard hint so tiled GPUs can drop the contents.
             uint32_t slotIndex = currentRenderTarget.id;
-            const RenderTargetDescription& desc = renderTargets[slotIndex].description;
+            const GlRenderTarget& target = renderTargets[slotIndex];
+            const RenderTargetDescription& desc = target.description;
+
+            // Resolve multisampled storage into the attachment texture the
+            // caller samples. Without this the caller would read an untouched
+            // texture, because drawing went to the multisampled side.
+            if (target.sampleCount > 1)
+            {
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, target.msaaFbo);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target.fbo);
+                glBlitFramebuffer(0, 0, target.width, target.height,
+                                  0, 0, target.width, target.height,
+                                  GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                glBindFramebuffer(GL_FRAMEBUFFER, target.msaaFbo);
+            }
 
             GLenum discard[MAX_COLOR_ATTACHMENTS + 1];
             int discardCount = 0;
@@ -1248,6 +1268,45 @@ namespace CC::Gfx
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         CC_ASSERT(status == GL_FRAMEBUFFER_COMPLETE, "CreateRenderTarget: framebuffer incomplete");
 
+        // Multisampled storage alongside the resolve target. Only single
+        // colour attachment 0 is resolved: a multi-attachment MSAA target
+        // would need a blit per attachment and nothing asks for one yet.
+        entry.sampleCount = description.sampleCount > 1 ? description.sampleCount : 1;
+        if (entry.sampleCount > 1)
+        {
+            CC_ASSERT(description.colorAttachmentCount == 1,
+                      "CreateRenderTarget: multisampled targets support exactly one colour attachment");
+
+            uint32_t texSlot = description.colorAttachments[0].texture.id;
+            GlTextureFormatInfo colorInfo = ToGlTextureFormat(textures[texSlot].format);
+
+            glGenFramebuffers(1, &entry.msaaFbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, entry.msaaFbo);
+
+            glGenRenderbuffers(1, &entry.msaaColorRenderbuffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, entry.msaaColorRenderbuffer);
+            glRenderbufferStorageMultisample(GL_RENDERBUFFER, entry.sampleCount,
+                                             colorInfo.internalFormat, entry.width, entry.height);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                      GL_RENDERBUFFER, entry.msaaColorRenderbuffer);
+
+            // Depth lives with the multisampled colour or depth testing would
+            // run against the wrong sample count. The caller's depth texture
+            // stays attached to the resolve FBO and simply goes unused.
+            if (description.hasDepthStencil)
+            {
+                glGenRenderbuffers(1, &entry.msaaDepthRenderbuffer);
+                glBindRenderbuffer(GL_RENDERBUFFER, entry.msaaDepthRenderbuffer);
+                glRenderbufferStorageMultisample(GL_RENDERBUFFER, entry.sampleCount,
+                                                 GL_DEPTH24_STENCIL8, entry.width, entry.height);
+                glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                                          GL_RENDERBUFFER, entry.msaaDepthRenderbuffer);
+            }
+
+            GLenum msaaStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            CC_ASSERT(msaaStatus == GL_FRAMEBUFFER_COMPLETE, "CreateRenderTarget: MSAA framebuffer incomplete");
+        }
+
         // The raw binds above bypassed the tracked state; restore a known one.
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         InvalidateCachedState();
@@ -1284,6 +1343,15 @@ namespace CC::Gfx
                     InvalidateCachedState();
                 }
                 // Attachment textures are owned by the caller and left intact.
+                if (entry.msaaFbo != 0)
+                {
+                    glDeleteFramebuffers(1, &entry.msaaFbo);
+                    glDeleteRenderbuffers(1, &entry.msaaColorRenderbuffer);
+                    if (entry.msaaDepthRenderbuffer != 0)
+                    {
+                        glDeleteRenderbuffers(1, &entry.msaaDepthRenderbuffer);
+                    }
+                }
                 glDeleteFramebuffers(1, &entry.fbo);
                 entry = GlRenderTarget();
                 freeRenderTargetSlots.push_back(slotIndex);

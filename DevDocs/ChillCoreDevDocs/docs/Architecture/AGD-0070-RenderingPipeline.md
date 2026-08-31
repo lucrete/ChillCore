@@ -40,7 +40,7 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 **Transparent pass.** The list is sorted back to front by distance from the camera. Blending is on and depth writing is off — both baked into the pipelines rather than toggled around the pass.
 
-**Post-process pass (optional).** A caller may set a post-process material. The opaque and transparent passes then draw into an offscreen colour target the renderer owns, and a fullscreen pass with that material draws that target into the backbuffer, sampling the colour texture at unit 0. Setting no material renders directly, as before.
+**Post-process stack (optional).** The scene target carries the backbuffer's sample count and is resolved before any effect samples it, so antialiasing survives post-processing. Enabling any effect redirects the opaque and transparent passes into an offscreen colour target the renderer owns. Bloom then runs its own half-resolution passes, and a single fused pass applies every other enabled effect while resolving that target into the backbuffer. With every effect off the scene renders straight to the backbuffer, as before, and the target is released.
 
 **End of frame.** UI and text draw, then the developer overlay, then the fade overlay if it is not fully transparent, then the frame is presented. These follow the post pass, so UI is never subject to a scene post-process effect.
 
@@ -116,11 +116,31 @@ This removes an entire category of bug, where state is left enabled by an early 
 
 The cost is that changing a material's transparency after creation requires recreating its pipeline rather than flipping a flag.
 
+### Effects fuse into one pass rather than chaining
+
+Vignette, colour grading and tone mapping are uniform-gated blocks inside a single fragment shader. Only bloom gets passes of its own.
+
+A full-screen pass is bandwidth bound, not arithmetic bound: it reads a frame and writes a frame, and at 1080p that is roughly 16 MB of traffic whatever the shader does in between. Chaining three effects as three passes would triple that to save a handful of instructions per pixel. On a desktop GPU the difference is invisible; on a tiled mobile GPU, where bandwidth is shared with the CPU and every pass is a resolve, it is the dominant cost. Both major commercial engines reached the same structure, and Unity's is named for it.
+
+Bloom is the exception because it cannot be expressed as a block: it needs a downsampled bright pass and a separable blur, each sampling the result of the last. It runs at half resolution — the blur is low frequency, so the detail is not missed, and it quarters the bandwidth of every bloom pass — and hands its result to the fused pass as a second texture.
+
+The cost is that effect order is fixed by the shader rather than chosen by the caller, and that every effect's code is compiled into one shader whether or not it is enabled.
+
+### Grading happens before the tone curve, in log space
+
+The fused pass runs bloom composite, exposure, vignette, log encode, grade, tone map, output — in that order.
+
+Grading after the tone curve would be simpler, and it is what a naive reading suggests, but it makes every grade depend on the exposure it was authored at: the same contrast value lands differently once the tone curve has already compressed the highlights. Encoding to log first and grading there is what makes a preset portable between scenes, and it is what both commercial engines do. Vignette runs earlier still, in linear, because it is a lens effect on incoming light rather than a look applied to a finished image.
+
+Tone mapping is a mode rather than a toggle: off clamps, which is exactly what the direct-to-backbuffer path does, so switching it off stays well defined instead of blowing out everything above white.
+
 ### Post-processing is an engine capability, chosen by effect alone
 
 A caller names the effect it wants. It does not create the offscreen target, size it, rebuild it when the window resizes, or open and close the passes.
 
 The frame's scene pass opens before any application code runs, and passes cannot nest, so a caller has no point at which it could bracket a pass of its own. Declaring the effect lets the renderer redirect the pass it already opens, which needs no change to the frame sequence and keeps pass ordering in one place. This is the frontend half of a split that also constrains the graphics abstraction: entering and ending a pass is the frontend's alone, while resource creation, binding, and drawing stay open to any caller.
+
+Effects are described, not coded, at the call site. Each carries its own name, its parameters, and each parameter's range and default. The developer panel builds its sliders from that description and the scene loader resolves yaml keys against it, so adding an effect costs a shader block and a parameter list rather than an edit to the panel and the loader as well.
 
 Target ownership follows the same reasoning. The resolution a post-process target must match is the framebuffer resolution, which the renderer already tracks and the caller only observes; a caller that owned the target would have to watch for resizes and rebuild on its own, and every future caller would repeat that. So the renderer creates the target on demand, rebuilds it when the resolution changes, and releases it when the effect is cleared. Only the material crosses the boundary, and it stays owned by the caller.
 
@@ -144,8 +164,10 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
-- The post-process pass supports one target and one material. A multi-stage post chain is not expressible.
-- An active post-process effect loses backbuffer multisampling, because offscreen targets are single-sample.
+- Effect order in the fused pass is fixed by the shader. A caller cannot reorder effects or insert one of its own.
+- The renderer is not linear end to end: lit shaders write display-referred values with no output transform. Tone mapping therefore operates on values that are not scene-linear, which is why it is off by default and is a look choice rather than a correction.
+- Bloom has nothing to act on in a scene whose brightest value is white. Its threshold must be dropped below 1 to show anything until content carries values above white.
+- Where the backend cannot render to a half-float target the scene target falls back to 8-bit, so tone mapping and bloom keep working but have no range above white to use.
 - Shadow maps and reflection probes are not built. Render targets make them possible; nothing in the frontend produces or consumes one yet.
 - A shader's own parameter block is parsed from its fragment source, not queried from the graphics interface. A block declared in a vertex section is not seen. Only scalar, vector, and 4x4 matrix members are placed; anything else drops the whole block rather than risk offsets that disagree with the driver.
 - Hot reload handles one nominated shader and is unavailable where assets are packaged.

@@ -10,6 +10,7 @@ namespace CC
     class DevUiViewSceneHierarchy;
     class DevUiViewCommandConsole;
     class DevUiViewAbout;
+    class DevUiViewPostProcess;
 
     class DevUi
     {
@@ -37,6 +38,7 @@ namespace CC
         DevUiViewSceneHierarchy* sceneHierarchyView = nullptr;
         DevUiViewCommandConsole* commandConsoleView = nullptr;
         DevUiViewAbout* aboutView = nullptr;
+        DevUiViewPostProcess* postProcessView = nullptr;
 
         void DrawDevOverlay();
         void DrawViewToggles();

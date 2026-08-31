@@ -11,6 +11,7 @@
 #include "GfxHandles.h"
 #include "GfxDescriptions.h"
 #include "PipelineCache.h"
+#include "PostProcess.h"
 #include "CCVector4.h"
 
 namespace CC
@@ -35,6 +36,10 @@ namespace CC
         void ToggleFullscreen();
         bool IsFullscreen() const;
 
+        // Both take effect at the start of the next frame: rebuilding the
+        // backbuffer mid-frame would pull the framebuffer out from under an
+        // open render pass. The getters report the requested value straight
+        // away, so a caller reads back what it just asked for.
         void SetAntialiasingEnabled(bool isEnabled);
         bool IsAntialiasingEnabled() const;
 
@@ -59,19 +64,19 @@ namespace CC
         // Post-processing
         // ========================
         //
-        // Setting a material redirects the opaque and transparent passes
-        // into an offscreen colour target, then draws that material as a
-        // fullscreen pass into the backbuffer with the target's colour
-        // texture bound at unit 0. The target belongs to RenderManager: it
-        // is created on demand at framebuffer resolution and rebuilt when
-        // that resolution changes, so callers only choose the effect.
-        // Passing nullptr restores the direct-to-backbuffer path and
-        // releases the target.
+        // Enabling any effect on the stack redirects the opaque and
+        // transparent passes into an offscreen colour target, which the
+        // stack then resolves into the backbuffer. With every effect off
+        // the scene renders straight to the backbuffer as before, and the
+        // target is released.
         //
-        // The material stays owned by the caller. Offscreen targets are
-        // single-sample, so an active effect costs backbuffer multisampling.
-        void SetPostProcessMaterial(Material* material);
-        Material* GetPostProcessMaterial() const;
+        // The target belongs to RenderManager: created on demand at
+        // framebuffer resolution, rebuilt when that changes. It is
+        // half-float where the backend can render to one, so tone mapping
+        // and bloom have range above white to work with. Offscreen targets
+        // are single-sample, so an active effect costs backbuffer
+        // multisampling.
+        PostProcess* GetPostProcess() const { return postProcess; }
         bool IsPostProcessEnabled() const;
 
     private:
@@ -89,15 +94,16 @@ namespace CC
 
         Gfx::BufferHandle     frameUniformBuffer;
         Gfx::BackbufferDescription backbufferDescription;
+        bool                       isBackbufferReconfigurePending;
 
-        Material*                 postProcessMaterial;
-        RenderableFullscreenQuad* postProcessQuad;
+        PostProcess*              postProcess;
         Gfx::SamplerHandle        postProcessSampler;
         Gfx::RenderTargetHandle   postProcessTarget;
         Gfx::TextureHandle        postProcessColorTexture;
         Gfx::TextureHandle        postProcessDepthTexture;
         int                       postProcessTargetWidth;
         int                       postProcessTargetHeight;
+        int                       postProcessTargetSamples;
 
         void SortTransparentRenderables();
         void SortOpaqueRenderables();
@@ -105,12 +111,14 @@ namespace CC
 
         // Creates the offscreen scene target, or rebuilds it at the new
         // resolution if the framebuffer has resized since it was created.
+        void EnsurePostProcessSampler();
         void EnsurePostProcessTarget(int width, int height);
         void DestroyPostProcessTarget();
 
-        // Second pass of a post-processed frame: draws postProcessQuad into
-        // the backbuffer, sampling the offscreen colour texture. No-op unless
-        // an effect is set. Called from Render after the scene passes end.
+        // Resolve half of a post-processed frame: hands the offscreen colour
+        // texture to the effect stack, which draws into the backbuffer. No-op
+        // unless an effect is enabled. Called from Render after the scene
+        // passes end.
         void DrawPostProcessPass();
         Gfx::RenderTargetHandle SceneTargetForFrame() const;
 

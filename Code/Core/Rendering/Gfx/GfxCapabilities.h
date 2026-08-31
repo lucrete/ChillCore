@@ -30,6 +30,10 @@ namespace CC::Gfx
         bool supportsBcTextureFormats  = false;
         bool supportsAstcTextureFormats = false;
         bool supportsAnisotropicFiltering = false;
+        // Half-float colour attachments. Core on desktop GL; on GLES 3.1 it
+        // needs EXT_color_buffer_half_float, so an HDR scene target cannot be
+        // assumed. Without it, tone mapping has no range to compress.
+        bool supportsHalfFloatRenderTargets = false;
         bool supportsDebugMarkers      = false;
         bool supportsGpuTimestamps     = false;
 

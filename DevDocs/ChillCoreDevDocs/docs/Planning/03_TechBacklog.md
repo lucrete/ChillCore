@@ -12,10 +12,17 @@ Last reviewed against the source: 2026-08-29.
 
 Gaps left open by the offscreen render-target work (AGD-0080 Limitations). None blocking:
 
-- Multisampled offscreen targets. Offscreen output is single-sample, so an active post-process effect loses the backbuffer's MSAA.
 - Array-layer and cubemap-face attachments. Needed before a cascaded shadow map or a cubemap reflection probe.
 - The backbuffer as a pool handle rather than an invalid one, which would remove the special case in the pass brackets.
-- A multi-stage post-process chain. The renderer supports one offscreen pass feeding one post pass.
+
+### Post-processing follow-ups
+
+Gaps left open by the post-process stack (AGD-0070 Limitations). None blocking:
+
+- A linear rendering workflow. Lit shaders write display-referred values with no output transform, so tone mapping operates on values that are not scene-linear and bloom has nothing above white to find. This is what would make the tone map a correction rather than a look, and it is the largest of these.
+- Baking grade and tone map into a 3D LUT, as both commercial engines do. Needs render-to-3D-texture or the 2D strip fallback mobile paths use; the array-layer attachment gap above blocks the first.
+- A caller-defined post-process chain. Effects fuse into one pass in a fixed order; a caller cannot reorder them or insert its own.
+- Colour grading works on scalar parameters. Per-channel lift, gamma and gain are what a real grade needs, and would want a colour picker in the panel rather than three sliders each.
 
 ### Camera registration by name
 

@@ -1,4 +1,5 @@
 #include "GfxRenderApiGles.h"
+#include <cstring>
 #include "GlHandlePool.h"
 #include "CCAssert.h"
 #include "PrintManager.h"
@@ -332,6 +333,26 @@ namespace CC::Gfx
         return capabilities;
     }
 
+    // GLES exposes extensions only as an indexed list; there is no single
+    // space-separated string to search on ES 3.
+    static bool HasGlExtension(const char* extensionName)
+    {
+        bool result = false;
+        GLint extensionCount = 0;
+        glGetIntegerv(GL_NUM_EXTENSIONS, &extensionCount);
+
+        for (GLint i = 0; i < extensionCount && !result; i++)
+        {
+            const char* name = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
+            if (name != nullptr && strcmp(name, extensionName) == 0)
+            {
+                result = true;
+            }
+        }
+
+        return result;
+    }
+
     void RenderApiGles::QueryCapabilities()
     {
         GLint maxTextureSize        = 0;
@@ -364,6 +385,7 @@ namespace CC::Gfx
         capabilities.supportsBcTextureFormats      = false;
         capabilities.supportsAstcTextureFormats    = true;
         capabilities.supportsAnisotropicFiltering  = false;  // EXT_texture_filter_anisotropic; not gated in v1.
+        capabilities.supportsHalfFloatRenderTargets = HasGlExtension("GL_EXT_color_buffer_half_float");
         capabilities.supportsDebugMarkers          = false;  // KHR_debug; not gated in v1.
         capabilities.supportsGpuTimestamps         = false;  // EXT_disjoint_timer_query; not gated in v1.
 
@@ -402,6 +424,11 @@ namespace CC::Gfx
 
     void RenderApiGles::ConfigureBackbuffer(const BackbufferDescription& description)
     {
+        // Rebuilding the framebuffers rebinds, so an open pass would
+        // lose its target mid-frame and end up invalidating and
+        // resolving the wrong framebuffer.
+        CC_ASSERT(!renderPassActive, "ConfigureBackbuffer: cannot reconfigure while a render pass is active");
+
         backbufferDescription = description;
     }
 
@@ -450,7 +477,7 @@ namespace CC::Gfx
             GlRenderTarget& entry = renderTargets[slotIndex];
             const RenderTargetDescription& desc = entry.description;
 
-            glBindFramebuffer(GL_FRAMEBUFFER, entry.fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, entry.sampleCount > 1 ? entry.msaaFbo : entry.fbo);
             glViewport(0, 0, entry.width, entry.height);
             glEnable(GL_DEPTH_TEST);
             glDepthMask(GL_TRUE);
@@ -502,7 +529,21 @@ namespace CC::Gfx
             // Honour StoreOp::DontCare as a discard hint — valuable on the
             // tiled mobile GPUs this backend runs on.
             uint32_t slotIndex = currentRenderTarget.id;
-            const RenderTargetDescription& desc = renderTargets[slotIndex].description;
+            const GlRenderTarget& target = renderTargets[slotIndex];
+            const RenderTargetDescription& desc = target.description;
+
+            // Resolve multisampled storage into the attachment texture the
+            // caller samples. Without this the caller reads an untouched
+            // texture, because drawing went to the multisampled side.
+            if (target.sampleCount > 1)
+            {
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, target.msaaFbo);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target.fbo);
+                glBlitFramebuffer(0, 0, target.width, target.height,
+                                  0, 0, target.width, target.height,
+                                  GL_COLOR_BUFFER_BIT, GL_NEAREST);
+                glBindFramebuffer(GL_FRAMEBUFFER, target.msaaFbo);
+            }
 
             GLenum discard[MAX_COLOR_ATTACHMENTS + 1];
             int discardCount = 0;
@@ -1073,6 +1114,44 @@ namespace CC::Gfx
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
         CC_ASSERT(status == GL_FRAMEBUFFER_COMPLETE, "CreateRenderTarget: framebuffer incomplete");
 
+        // Multisampled storage alongside the resolve target. Multisample
+        // renderbuffers and the resolve blit are both core in GLES 3.0.
+        // A tiled GPU would prefer EXT_multisampled_render_to_texture, which
+        // resolves inside tile memory and never spills the samples to main
+        // memory; that is a later optimisation, not a different design.
+        entry.sampleCount = description.sampleCount > 1 ? description.sampleCount : 1;
+        if (entry.sampleCount > 1)
+        {
+            CC_ASSERT(description.colorAttachmentCount == 1,
+                      "CreateRenderTarget: multisampled targets support exactly one colour attachment");
+
+            uint32_t texSlot = description.colorAttachments[0].texture.id;
+            GlTextureFormatInfo colorInfo = ToGlTextureFormat(textures[texSlot].format);
+
+            glGenFramebuffers(1, &entry.msaaFbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, entry.msaaFbo);
+
+            glGenRenderbuffers(1, &entry.msaaColorRenderbuffer);
+            glBindRenderbuffer(GL_RENDERBUFFER, entry.msaaColorRenderbuffer);
+            glRenderbufferStorageMultisample(GL_RENDERBUFFER, entry.sampleCount,
+                                             colorInfo.internalFormat, entry.width, entry.height);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                      GL_RENDERBUFFER, entry.msaaColorRenderbuffer);
+
+            if (description.hasDepthStencil)
+            {
+                glGenRenderbuffers(1, &entry.msaaDepthRenderbuffer);
+                glBindRenderbuffer(GL_RENDERBUFFER, entry.msaaDepthRenderbuffer);
+                glRenderbufferStorageMultisample(GL_RENDERBUFFER, entry.sampleCount,
+                                                 GL_DEPTH24_STENCIL8, entry.width, entry.height);
+                glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                                          GL_RENDERBUFFER, entry.msaaDepthRenderbuffer);
+            }
+
+            GLenum msaaStatus = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            CC_ASSERT(msaaStatus == GL_FRAMEBUFFER_COMPLETE, "CreateRenderTarget: MSAA framebuffer incomplete");
+        }
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         InvalidateCachedState();
 
@@ -1108,6 +1187,15 @@ namespace CC::Gfx
                     InvalidateCachedState();
                 }
                 // Attachment textures are owned by the caller and left intact.
+                if (entry.msaaFbo != 0)
+                {
+                    glDeleteFramebuffers(1, &entry.msaaFbo);
+                    glDeleteRenderbuffers(1, &entry.msaaColorRenderbuffer);
+                    if (entry.msaaDepthRenderbuffer != 0)
+                    {
+                        glDeleteRenderbuffers(1, &entry.msaaDepthRenderbuffer);
+                    }
+                }
                 glDeleteFramebuffers(1, &entry.fbo);
                 entry = GlRenderTarget();
                 freeRenderTargetSlots.push_back(slotIndex);

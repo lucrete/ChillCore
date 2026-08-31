@@ -21,11 +21,6 @@ namespace CC
         GetMaterial("FullScreenFade")->SetAlphaMode(AlphaBlendMode::Blend);
         GetMaterial("FullScreenFade")->SetDepthTestEnabled(false);
 
-        // Colour-invert effect for RenderManager's post-process pass.
-        // Screen-space: depth test off, like the fade overlay.
-        CreateMaterial("PostProcessInvert", "PostProcess");
-        GetMaterial("PostProcessInvert")->SetDepthTestEnabled(false);
-
         CreateMaterial("ProcArt_Fractal2d", "Fractal2d");
         CreateMaterial("ProcArt_GradientViewer", "GradientViewer");
         CreateMaterial("ProcArt_UnitCircleRipples", "UnitCircleRipples");

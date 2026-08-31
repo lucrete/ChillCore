@@ -32,8 +32,9 @@ namespace CC
         , fullscreenQuad(false)
         , fadeOverlay(nullptr)
         , fadeColor(0.0f, 0.0f, 0.0f, 0.0f)
-        , postProcessMaterial(nullptr)
-        , postProcessQuad(nullptr)
+        , postProcess(nullptr)
+        , isBackbufferReconfigurePending(false)
+        , postProcessTargetSamples(1)
         , postProcessTargetWidth(0)
         , postProcessTargetHeight(0)
     {
@@ -102,6 +103,11 @@ namespace CC
         frameUniformBuffer = gfxApi->CreateBuffer(frameUboDesc);
 
         RenderableSphere::InitSharedMesh();
+
+        // After the material and shader managers exist: the stack builds its
+        // own materials.
+        postProcess = new PostProcess();
+        postProcess->Init();
     }
 
     RenderManager::~RenderManager()
@@ -115,13 +121,17 @@ namespace CC
             gfxApi->DestroyBuffer(frameUniformBuffer);
         }
 
+        if (postProcess != nullptr)
+        {
+            postProcess->Shutdown();
+        }
         DestroyPostProcessTarget();
 
         if (postProcessSampler.IsValid())
         {
             gfxApi->DestroySampler(postProcessSampler);
         }
-        delete postProcessQuad;
+        delete postProcess;
         delete fadeOverlay;
         delete renderableFullscreenQuad;
         delete pipelineCache;
@@ -149,6 +159,16 @@ namespace CC
         {
             PlatformWindow::Get()->ToggleFullscreen();
         }
+        // Reconfiguring the backbuffer rebuilds framebuffers and leaves the
+        // binding pointing elsewhere, so it can only run between passes.
+        // Callers set the description whenever they like; it is applied here,
+        // before the frame's pass opens.
+        if (isBackbufferReconfigurePending)
+        {
+            gfxApi->ConfigureBackbuffer(backbufferDescription);
+            isBackbufferReconfigurePending = false;
+        }
+
         renderableCount = 0;
         transparentRenderableCount = 0;
 
@@ -157,9 +177,13 @@ namespace CC
         PlatformWindow::Get()->GetFramebufferSize(width, height);
         TextRenderer::Get()->BeginFrame(width, height);
 
-        if (postProcessMaterial != nullptr)
+        if (postProcess->IsAnyEffectEnabled())
         {
             EnsurePostProcessTarget(width, height);
+        }
+        else
+        {
+            DestroyPostProcessTarget();
         }
 
         // Begin the scene render pass. Normally the backbuffer path (MSAA
@@ -252,68 +276,59 @@ namespace CC
     // Post-processing
     // ========================
 
-    void RenderManager::SetPostProcessMaterial(Material* material)
-    {
-        postProcessMaterial = material;
-
-        if (material != nullptr)
-        {
-            if (postProcessQuad == nullptr)
-            {
-                postProcessQuad = new RenderableFullscreenQuad(material);
-            }
-            else
-            {
-                postProcessQuad->SetMaterial(material);
-            }
-
-            if (!postProcessSampler.IsValid())
-            {
-                // Non-mipmapped, edge-clamped, linear. A mipmap-filtering
-                // sampler on the single-level target texture reads as black
-                // on some drivers (the same hazard the EndRenderPass blit
-                // guards against).
-                Gfx::SamplerDescription samplerDesc;
-                samplerDesc.minFilter  = Gfx::FilterMode::Linear;
-                samplerDesc.magFilter  = Gfx::FilterMode::Linear;
-                samplerDesc.mipmapMode = Gfx::MipmapMode::None;
-                samplerDesc.addressU   = Gfx::AddressMode::ClampToEdge;
-                samplerDesc.addressV   = Gfx::AddressMode::ClampToEdge;
-                samplerDesc.addressW   = Gfx::AddressMode::ClampToEdge;
-                samplerDesc.debugName  = "RenderManager::PostProcessSampler";
-                postProcessSampler = gfxApi->CreateSampler(samplerDesc);
-            }
-        }
-        else
-        {
-            DestroyPostProcessTarget();
-        }
-    }
-
-    Material* RenderManager::GetPostProcessMaterial() const
-    {
-        return postProcessMaterial;
-    }
-
     bool RenderManager::IsPostProcessEnabled() const
     {
-        return postProcessMaterial != nullptr && postProcessTarget.IsValid();
+        return postProcess->IsAnyEffectEnabled() && postProcessTarget.IsValid();
+    }
+
+    void RenderManager::EnsurePostProcessSampler()
+    {
+        if (!postProcessSampler.IsValid())
+        {
+            // Non-mipmapped, edge-clamped, linear. A mipmap-filtering
+            // sampler on the single-level target texture reads as black
+            // on some drivers (the same hazard the EndRenderPass blit
+            // guards against).
+            Gfx::SamplerDescription samplerDesc;
+            samplerDesc.minFilter  = Gfx::FilterMode::Linear;
+            samplerDesc.magFilter  = Gfx::FilterMode::Linear;
+            samplerDesc.mipmapMode = Gfx::MipmapMode::None;
+            samplerDesc.addressU   = Gfx::AddressMode::ClampToEdge;
+            samplerDesc.addressV   = Gfx::AddressMode::ClampToEdge;
+            samplerDesc.addressW   = Gfx::AddressMode::ClampToEdge;
+            samplerDesc.debugName  = "RenderManager::PostProcessSampler";
+            postProcessSampler = gfxApi->CreateSampler(samplerDesc);
+        }
     }
 
     void RenderManager::EnsurePostProcessTarget(int width, int height)
     {
+        // Sample count is part of what makes the target current: toggling
+        // antialiasing has to rebuild it, or post-processed frames would keep
+        // the sample count they were created with.
         bool isTargetCurrent = postProcessTarget.IsValid()
             && width == postProcessTargetWidth
-            && height == postProcessTargetHeight;
+            && height == postProcessTargetHeight
+            && backbufferDescription.sampleCount == postProcessTargetSamples;
 
         if (!isTargetCurrent && width > 0 && height > 0)
         {
             DestroyPostProcessTarget();
+            EnsurePostProcessSampler();
+
+            // Half-float where the backend can render to one, so values above
+            // white survive to be tone mapped instead of clipping in the
+            // scene pass. Where it cannot, the stack still runs — tone mapping
+            // simply has nothing above white left to compress.
+            const Gfx::GfxCapabilities& caps = gfxApi->GetCapabilities();
+            Gfx::TextureFormat colorFormat = caps.supportsHalfFloatRenderTargets
+                ? Gfx::TextureFormat::Rgba16Float
+                : Gfx::TextureFormat::Rgba8Unorm;
 
             Gfx::TextureDescription colorDesc;
             colorDesc.width          = width;
             colorDesc.height         = height;
-            colorDesc.format         = Gfx::TextureFormat::Rgba8Unorm;
+            colorDesc.format         = colorFormat;
             colorDesc.isRenderTarget = true;
             colorDesc.debugName      = "RenderManager::PostProcessColor";
             postProcessColorTexture = gfxApi->CreateTexture(colorDesc);
@@ -341,11 +356,16 @@ namespace CC
             targetDesc.depthStencilAttachment.texture    = postProcessDepthTexture;
             targetDesc.depthStencilAttachment.loadOp     = Gfx::LoadOp::Clear;
             targetDesc.depthStencilAttachment.storeOp    = Gfx::StoreOp::DontCare;
+            // The scene keeps the backbuffer's antialiasing: the target is
+            // multisampled and the backend resolves it into the colour texture
+            // the effects sample.
+            targetDesc.sampleCount                       = backbufferDescription.sampleCount;
             targetDesc.debugName                         = "RenderManager::PostProcessTarget";
             postProcessTarget = gfxApi->CreateRenderTarget(targetDesc);
 
-            postProcessTargetWidth  = width;
-            postProcessTargetHeight = height;
+            postProcessTargetWidth   = width;
+            postProcessTargetHeight  = height;
+            postProcessTargetSamples = backbufferDescription.sampleCount;
         }
     }
 
@@ -367,25 +387,17 @@ namespace CC
             postProcessDepthTexture = Gfx::TextureHandle();
         }
 
-        postProcessTargetWidth  = 0;
-        postProcessTargetHeight = 0;
+        postProcessTargetWidth   = 0;
+        postProcessTargetHeight  = 0;
+        postProcessTargetSamples = 1;
     }
 
     void RenderManager::DrawPostProcessPass()
     {
         if (IsPostProcessEnabled())
         {
-            gfxApi->BeginRenderPass(gfxApi->GetBackbuffer());
-            gfxApi->InvalidateCachedState();
-
-            postProcessQuad->PreRender();
-            // Override texture unit 0 (PreRender bound the material's own base
-            // texture there) with the offscreen colour target.
-            gfxApi->BindTexture(0, postProcessColorTexture, postProcessSampler);
-            postProcessQuad->Render(nullptr);
-
-            gfxApi->EndRenderPass();
-            gfxApi->AddGpuTimestamp("GpuAfterPostProcessPass");
+            postProcess->Execute(postProcessColorTexture, postProcessSampler,
+                                 postProcessTargetWidth, postProcessTargetHeight);
         }
     }
 
@@ -500,7 +512,7 @@ namespace CC
             newSampleCount = 1;
         }
         backbufferDescription.sampleCount = newSampleCount;
-        gfxApi->ConfigureBackbuffer(backbufferDescription);
+        isBackbufferReconfigurePending = true;
     }
 
     bool RenderManager::IsAntialiasingEnabled() const
@@ -512,7 +524,7 @@ namespace CC
     {
         int clamped = samples > 1 ? samples : 1;
         backbufferDescription.sampleCount = clamped;
-        gfxApi->ConfigureBackbuffer(backbufferDescription);
+        isBackbufferReconfigurePending = true;
     }
 
     int RenderManager::GetMsaaSamples() const

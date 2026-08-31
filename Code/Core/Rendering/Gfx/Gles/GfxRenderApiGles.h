@@ -153,6 +153,13 @@ namespace CC::Gfx
         struct GlRenderTarget
         {
             GLuint                  fbo                  = 0;
+            // Multisampled storage, used only when sampleCount > 1. Drawing
+            // goes here and is resolved into fbo's textures when the pass
+            // ends, so what the caller samples is always single-sample.
+            GLuint                  msaaFbo              = 0;
+            GLuint                  msaaColorRenderbuffer = 0;
+            GLuint                  msaaDepthRenderbuffer = 0;
+            int                     sampleCount          = 1;
             int                     width                = 0;
             int                     height               = 0;
             RenderTargetDescription description;

@@ -32,15 +32,14 @@ private:
         ShowcaseActionMax
     };
 
-    // Off renders straight to the backbuffer; Passthrough renders through the
-    // engine's post-process target with the effect dialled out, so it must be
-    // indistinguishable from Off apart from the lost multisampling; Invert is
-    // the visible effect.
+    // Off renders straight to the backbuffer. Tonemap is the cheapest stack
+    // that still routes through the offscreen target, so it is the A/B against
+    // the direct path. Full turns on everything the stack can do at once.
     enum class PostProcessMode
     {
         Off,
-        Passthrough,
-        Invert
+        Tonemap,
+        Full
     };
 
     bool isPaused;

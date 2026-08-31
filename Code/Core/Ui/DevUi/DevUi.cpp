@@ -12,6 +12,7 @@
 #include "DevUiViewSceneHierarchy.h"
 #include "DevUiViewCommandConsole.h"
 #include "DevUiViewAbout.h"
+#include "DevUiViewPostProcess.h"
 
 namespace CC
 {
@@ -26,6 +27,7 @@ namespace CC
         sceneHierarchyView = new DevUiViewSceneHierarchy();
         commandConsoleView = new DevUiViewCommandConsole();
         aboutView = new DevUiViewAbout();
+        postProcessView = new DevUiViewPostProcess();
 
         commandConsole->RegisterCommand("profile",
             "Frame profiling. 'profile' for snapshot, 'profile long' for 3s CSV capture",
@@ -54,6 +56,7 @@ namespace CC
 
     DevUi::~DevUi()
     {
+        delete postProcessView;
         delete aboutView;
         delete commandConsoleView;
         delete sceneHierarchyView;
@@ -132,6 +135,11 @@ namespace CC
         if (aboutView->IsVisible())
         {
             aboutView->Draw();
+        }
+
+        if (postProcessView->IsVisible())
+        {
+            postProcessView->Draw();
         }
     }
 
@@ -285,6 +293,12 @@ namespace CC
             if (ImGui::Checkbox("Command Console", &isCommandConsoleVisible))
             {
                 commandConsoleView->SetVisible(isCommandConsoleVisible);
+            }
+
+            bool isPostProcessVisible = postProcessView->IsVisible();
+            if (ImGui::Checkbox("Post Process", &isPostProcessVisible))
+            {
+                postProcessView->SetVisible(isPostProcessVisible);
             }
 
             bool isAboutVisible = aboutView->IsVisible();

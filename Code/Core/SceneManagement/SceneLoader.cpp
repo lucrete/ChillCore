@@ -9,6 +9,9 @@
 #include "Component.h"
 #include "ComponentFactory.h"
 #include "MaterialManager.h"
+#include "PostProcess.h"
+#include "PostProcessEffect.h"
+#include "RenderManager.h"
 #include "PrintManager.h"
 #include "GltfLoader.h"
 #include "PlatformFileSystem.h"
@@ -27,6 +30,16 @@ namespace CC
         }
         c4::csubstr val = node.val();
         return std::string(val.data(), val.size());
+    }
+
+    static std::string KeyToString(ryml::ConstNodeRef node)
+    {
+        if (!node.has_key())
+        {
+            return "";
+        }
+        c4::csubstr key = node.key();
+        return std::string(key.data(), key.size());
     }
 
     static float NodeToFloat(ryml::ConstNodeRef node)
@@ -91,6 +104,14 @@ namespace CC
                     }
                 }
 
+                // Post-process stack before objects: it is frame-wide state
+                // rather than anything an object refers to, so nothing in the
+                // object pass depends on the order.
+                if (root.has_child("postProcess") && root["postProcess"].is_map())
+                {
+                    ProcessPostProcess(root["postProcess"]);
+                }
+
                 // Process objects
                 if (root.has_child("objects") && root["objects"].is_seq())
                 {
@@ -109,6 +130,60 @@ namespace CC
         }
 
         return succeeded;
+    }
+
+    void SceneLoader::ProcessPostProcess(ryml::ConstNodeRef postProcessNode)
+    {
+        PostProcess* postProcess = RenderManager::Get()->GetPostProcess();
+
+        // The block is authoritative for the scene: anything it does not name
+        // is off, so a scene cannot inherit an effect left enabled by whatever
+        // ran before it.
+        postProcess->DisableAllEffects();
+
+        if (postProcessNode.has_child("preset"))
+        {
+            std::string presetName = NodeToString(postProcessNode["preset"]);
+            if (!postProcess->ApplyPreset(presetName.c_str()))
+            {
+                CCPrint(PrintManager::CHANNEL_WARN,
+                    "SceneLoader: Unknown post-process preset '%s'", presetName.c_str());
+            }
+        }
+
+        for (ryml::ConstNodeRef effectNode : postProcessNode.children())
+        {
+            std::string effectName = KeyToString(effectNode);
+
+            if (effectName != "preset")
+            {
+                PostProcessEffect* effect = postProcess->FindEffect(effectName.c_str());
+
+                if (effect == nullptr)
+                {
+                    CCPrint(PrintManager::CHANNEL_WARN,
+                        "SceneLoader: Unknown post-process effect '%s'", effectName.c_str());
+                }
+                else
+                {
+                    for (ryml::ConstNodeRef paramNode : effectNode.children())
+                    {
+                        std::string paramName = KeyToString(paramNode);
+
+                        if (paramName == "enabled")
+                        {
+                            effect->SetEnabled(NodeToString(paramNode) == "true");
+                        }
+                        else if (!effect->SetParamValue(paramName.c_str(), NodeToFloat(paramNode)))
+                        {
+                            CCPrint(PrintManager::CHANNEL_WARN,
+                                "SceneLoader: Unknown parameter '%s' on post-process effect '%s'",
+                                paramName.c_str(), effectName.c_str());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     bool SceneLoader::ProcessMaterials(ryml::ConstNodeRef materials)

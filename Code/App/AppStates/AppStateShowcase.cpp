@@ -3,8 +3,8 @@
 #include "InputManager.h"
 #include "PrintManager.h"
 #include "CameraManager.h"
-#include "Material.h"
 #include "MaterialManager.h"
+#include "PostProcess.h"
 #include "RenderManager.h"
 #include "SceneHierarchy.h"
 #include "RenderableSphere.h"
@@ -213,27 +213,29 @@ void AppStateShowcase::TogglePause()
 
 void AppStateShowcase::CyclePostProcessMode()
 {
-    CC::Material* postMaterial = CC::MaterialManager::Get()->GetMaterial("PostProcessInvert");
+    CC::PostProcess* postProcess = CC::RenderManager::Get()->GetPostProcess();
     const char* modeName = "off";
 
     switch (postProcessMode)
     {
     case PostProcessMode::Off:
-        postProcessMode = PostProcessMode::Passthrough;
-        postMaterial->SetUniform("effectAmount", 0.0f);
-        CC::RenderManager::Get()->SetPostProcessMaterial(postMaterial);
-        modeName = "passthrough";
+        postProcessMode = PostProcessMode::Tonemap;
+        postProcess->DisableAllEffects();
+        postProcess->GetEffect(CC::PostProcessEffectId::Tonemap).SetEnabled(true);
+        modeName = "tonemap";
         break;
 
-    case PostProcessMode::Passthrough:
-        postProcessMode = PostProcessMode::Invert;
-        postMaterial->SetUniform("effectAmount", 1.0f);
-        modeName = "invert";
+    case PostProcessMode::Tonemap:
+        postProcessMode = PostProcessMode::Full;
+        postProcess->GetEffect(CC::PostProcessEffectId::Bloom).SetEnabled(true);
+        postProcess->GetEffect(CC::PostProcessEffectId::Vignette).SetEnabled(true);
+        postProcess->ApplyPreset("Warm");
+        modeName = "bloom + vignette + warm grade";
         break;
 
-    case PostProcessMode::Invert:
+    case PostProcessMode::Full:
         postProcessMode = PostProcessMode::Off;
-        CC::RenderManager::Get()->SetPostProcessMaterial(nullptr);
+        postProcess->DisableAllEffects();
         modeName = "off";
         break;
 
@@ -261,7 +263,7 @@ void AppStateShowcase::UpdateTimerDisplay()
 
 void AppStateShowcase::Shutdown()
 {
-    CC::RenderManager::Get()->SetPostProcessMaterial(nullptr);
+    CC::RenderManager::Get()->GetPostProcess()->DisableAllEffects();
 
     CC::UiScreenSystem::Get()->ClearAllScreens();
 
