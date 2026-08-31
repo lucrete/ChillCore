@@ -1,8 +1,24 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is one unimplemented optimisation and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, one unimplemented optimisation, and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
-**Sequence:** rows 1–2 of `02_Roadmap.md`. Rendering work not yet scheduled (camera registration, the open design questions) is in `03_TechBacklog.md`.
+**Sequence:** rows 1–3 of `02_Roadmap.md`. Rendering work not yet scheduled (camera registration, the open design questions) is in `03_TechBacklog.md`.
+
+---
+
+## Frame-rate dependent camera control
+
+`CameraFree::UpdateTransform` paces itself per frame rather than per second, in three separate ways.
+
+- **Movement uses a hardcoded step.** `deltaSeconds` is the literal `0.016f`, so the free camera travels at its nominal speed only at 62.5 FPS and is wrong everywhere else. `FrameTimer::Get()->DeltaTime()` is what the rest of the engine already uses.
+- **Rotation is not time-scaled at all.** Yaw and pitch accumulate the raw stick value times a velocity constant every frame. A gamepad or touch stick is a *rate* input — held deflection should mean a constant turn per second — so the same stick position turns twenty times faster at 1200 FPS than at 60. The showcase scene runs at four-figure frame rates in a Debug build, so this is the common case, not the corner.
+- **The mouse ceiling moves with the frame rate.** The mouse is a *displacement* input, not a rate one: `InputManager` re-centres the cursor each frame, so the value the camera reads is already the distance moved since the last frame. Summed over a gesture it is frame-rate independent, and multiplying it by delta time would be wrong. What is frame-rate dependent is the clamp — the offset saturates at `MAX_MOUSE_DEFLECTION` pixels *per frame*, so a fast flick loses motion at low frame rates and loses none at high ones.
+
+**Why it matters.** Look sensitivity is the most immediately felt property of a 3D camera, and it currently changes with scene complexity, build configuration, and vsync. It also makes any tuning of the velocity constants meaningless, since the value that feels right on one machine is wrong on another.
+
+**Watch out.** The rate/displacement split is the substance of the work: scaling every input by delta time uniformly would fix the sticks and break the mouse. The two paths meet in `CameraFree::UpdateTransform` because `InputManager` presents the mouse as a virtual right stick, so whatever separates them has to survive that. Clamping the mouse per second rather than per frame is one option; another is to leave the mouse path alone and scale only the true rate inputs.
+
+**Done when:** the free camera moves and turns at the same speed per second across frame rates, verified by comparing a vsync-limited run against an uncapped one, and a mouse gesture of a given physical distance turns the camera by the same angle in both.
 
 ---
 

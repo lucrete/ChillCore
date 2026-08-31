@@ -333,10 +333,10 @@ namespace CC
             targetDesc.colorAttachments[0].texture       = postProcessColorTexture;
             targetDesc.colorAttachments[0].loadOp        = Gfx::LoadOp::Clear;
             targetDesc.colorAttachments[0].storeOp       = Gfx::StoreOp::Store;
-            targetDesc.colorAttachments[0].clearColor[0] = 0.10f;
-            targetDesc.colorAttachments[0].clearColor[1] = 0.10f;
-            targetDesc.colorAttachments[0].clearColor[2] = 0.12f;
-            targetDesc.colorAttachments[0].clearColor[3] = 1.0f;
+            // Left at the attachment default of opaque black, which is what
+            // the backbuffer scene pass clears to. A different clear colour
+            // here would tint everything the scene does not cover, so an
+            // effect that changes nothing would still change the frame.
             targetDesc.hasDepthStencil                   = true;
             targetDesc.depthStencilAttachment.texture    = postProcessDepthTexture;
             targetDesc.depthStencilAttachment.loadOp     = Gfx::LoadOp::Clear;
