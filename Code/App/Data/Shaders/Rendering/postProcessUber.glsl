@@ -33,11 +33,55 @@ layout(std140, binding = 5) uniform CustomParams
     vec4 bloomAndExposure;  // x: bloom on, y: bloom intensity, z: exposure, w: tonemap on
     vec4 vignetteParams;    // x: intensity (0 disables), y: smoothness, z: roundness
     vec4 gradeParamsA;      // x: grade on, y: contrast, z: saturation, w: temperature
-    vec4 gradeParamsB;      // x: tint
+    vec4 gradeParamsB;      // x: tint, y: blend mode
     vec4 gradeLift;         // xyz: per-channel lift, moves the shadows
     vec4 gradeGamma;        // xyz: per-channel gamma, moves the mid-tones
     vec4 gradeGain;         // xyz: per-channel gain, moves the highlights
+    vec4 gradeBlend;        // xyz: blend colour, w: blend strength
 };
+
+// ========================
+// Blend modes
+// ========================
+//
+// The photographic filter looks are built by compositing a flat colour over
+// the image, not by curves alone, so the grade needs the same tool.
+//
+// These run in log space, alongside contrast, for two reasons: the operations
+// are defined on a bounded 0..1 signal and log is where the scene is bounded,
+// and the log excursion already exists so no extra transfer function is paid.
+// The consequence is that results are not identical to the same mode in an
+// image editor working on display-referred pixels — looks are authored against
+// this implementation rather than ported by their numbers.
+
+const int BLEND_MULTIPLY  = 0;
+const int BLEND_SCREEN    = 1;
+const int BLEND_OVERLAY   = 2;
+const int BLEND_SOFT_LIGHT = 3;
+
+vec3 ApplyBlend(vec3 base, vec3 blend, int mode)
+{
+    vec3 result = base * blend;
+
+    if (mode == BLEND_SCREEN)
+    {
+        result = vec3(1.0) - (vec3(1.0) - base) * (vec3(1.0) - blend);
+    }
+    else if (mode == BLEND_OVERLAY)
+    {
+        result = mix(2.0 * base * blend,
+                     vec3(1.0) - 2.0 * (vec3(1.0) - base) * (vec3(1.0) - blend),
+                     step(vec3(0.5), base));
+    }
+    else if (mode == BLEND_SOFT_LIGHT)
+    {
+        result = mix(2.0 * base * blend + base * base * (vec3(1.0) - 2.0 * blend),
+                     sqrt(max(base, vec3(0.0))) * (2.0 * blend - vec3(1.0)) + 2.0 * base * (vec3(1.0) - blend),
+                     step(vec3(0.5), blend));
+    }
+
+    return result;
+}
 
 // ========================
 // Arri LogC v3
@@ -144,6 +188,9 @@ void main()
         float saturation  = gradeParamsA.z;
         float temperature = gradeParamsA.w;
         float tint        = gradeParamsB.x;
+        int   blendMode   = int(gradeParamsB.y + 0.5);
+        vec3  blendColor  = gradeBlend.xyz;
+        float blendAmount = gradeBlend.w;
         vec3  lift        = gradeLift.xyz;
         vec3  gammaValue  = gradeGamma.xyz;
         vec3  gain        = gradeGain.xyz;
@@ -152,6 +199,12 @@ void main()
 
         vec3 logColor = LinearToLogC(max(color, vec3(0.0)));
         logColor = (logColor - LOGC_MID_GREY) * contrast + LOGC_MID_GREY;
+
+        if (blendAmount > 0.0)
+        {
+            logColor = mix(logColor, ApplyBlend(logColor, blendColor, blendMode), blendAmount);
+        }
+
         color = LogCToLinear(logColor);
 
         color = color * gain + lift;

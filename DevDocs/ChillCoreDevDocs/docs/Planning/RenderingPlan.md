@@ -10,41 +10,21 @@
 
 Gaps left open when the post-process stack landed. Ordered by what they unlock, not by cost.
 
-The effect chain and the procedural-art question each need a decision recorded before code is written; the notes below say which.
-
-### A caller-defined effect chain
-
-Effects fuse into one pass in an order fixed by the shader. A caller cannot reorder them or insert its own.
-
-**Why it matters.** It is the ceiling on the whole stack. Any effect that does not fit the fused pass — depth of field, motion blur, anything needing its own targets — has nowhere to go, and the fused-pass shader grows a block per effect whether or not it is enabled.
-
-**Shape of the work.** The open question is what a chain entry is: a shader plus parameters, or something that can also declare intermediate targets. Bloom is the existing example of an effect that needs its own targets and its own passes, so it is the case to design against rather than an exception to it. Resolve that before writing anything.
-
-**Watch out.** The fused pass exists for a reason — a chain of separate passes is bandwidth bound and costs a full read and write of the frame per effect, which is the dominant cost on a tiled mobile GPU. A chain must still fuse what it can rather than becoming a pass per effect.
-
-**Done when:** a caller can declare an ordered chain including an effect of its own, and effects that can fuse still share one pass.
-
 ### Baking grade and tone map into a LUT
 
 Both commercial engines evaluate the grade and tone curve once into a lookup table and sample it per pixel, rather than evaluating the maths per pixel.
 
 **Why it matters.** It moves the whole grade off the per-pixel path, and it is what makes an arbitrarily expensive grade cost the same as a cheap one.
 
-**Shape of the work.** Render to a 3D texture, or to the 2D strip that mobile paths use where 3D render targets are unavailable. The 3D route needs array-layer attachments, so the render-target follow-up above blocks it; the 2D strip route does not and is the sensible first target.
+**Shape of the work.** Render to a 3D texture, or to the 2D strip that mobile paths use where 3D render targets are unavailable. Texture creation covers 2D, array and cubemap shapes only, so the 3D route needs that gap closed first; the 2D strip route needs nothing new and is the sensible first target.
+
+**Measured before assuming.** The grade and tone curve are not what the fused pass spends its time on. At 800x600 the pass averages 0.598 ms with both enabled and 0.565 ms with both disabled: the ACES curve costs 0.031 ms and the entire per-channel grade a further 0.002 ms, around 0.2% of a frame. A grade doing three logs, three exps and three pows per pixel for 0.002 ms means the pass is bandwidth bound rather than arithmetic bound — which is the same reason the pass is fused in the first place. A lookup table moves arithmetic off the per-pixel path and adds a texture fetch, so on this evidence it would save nothing and could cost. Desktop only; the balance on device is unmeasured.
+
+**So the reason to do it is authoring, not speed.** A baked table can be imported: a colourist grades in a standalone tool and hands over a `.cube` file, which the preset table cannot accept. If this is picked up, it should be framed as that feature.
 
 **Watch out.** LUT resolution trades against banding in smooth gradients. Decide the resolution against a test gradient rather than a scene.
 
 **Done when:** grade and tone map are sampled from a baked table, the result matches the per-pixel path within a visually indistinguishable margin, and a capability-poor backend still has a path.
-
-### Procedural art through the tone curve
-
-Procedural art authors display-referred colour and converts to linear on output. With the tone map on, the curve then compresses it, so the art reads softer than it was picked. With the tone map off the round trip is exact.
-
-**Why it matters.** The art is finished pixels, not scene light, so applying a tone curve to it is a category error. It is cosmetic today because the art is the only content of its kind, and it stops being cosmetic as soon as anything else authors finished pixels.
-
-**Shape of the work.** Either the art is retuned against the curve, which is cheap and keeps the pipeline uniform, or the path gains a way to mark content as already display-referred and skip the output transform. The stack has no concept of the second. Pick one deliberately rather than drifting into the first by inaction.
-
-**Done when:** procedural art reads as authored with the tone map in its default state.
 
 ### Photometric light units
 

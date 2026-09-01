@@ -1,6 +1,12 @@
 #include "PostProcess.h"
 
+#include <cstdio>
 #include <cstring>
+#include <string>
+
+#include <rapidyaml-0.10.0.hpp>
+#include "PlatformFileSystem.h"
+#include "YamlUtils.h"
 
 #include "CCAssert.h"
 #include "CCVector4.h"
@@ -36,42 +42,24 @@ namespace
         return ToLowerAscii(left[index]) == ToLowerAscii(right[index]);
     }
 
-    struct GradePreset
+    void CopyBounded(char* destination, const char* source, int capacity)
     {
-        const char* name;
-        float       contrast;
-        float       saturation;
-        float       temperature;
-        float       tint;
-        CC::Vector3 lift;
-        CC::Vector3 gamma;
-        CC::Vector3 gain;
-    };
+        int index = 0;
+        while (source != nullptr && source[index] != '\0' && index < capacity - 1)
+        {
+            destination[index] = source[index];
+            index++;
+        }
+        destination[index] = '\0';
+    }
 
-    // Descriptive rather than branded: these are ordinary grade bundles, and
-    // naming them after someone else's filters would tie the scene format to
-    // a third party's product.
-    const GradePreset GRADE_PRESETS[] =
-    {
-        //  name       contrast satur.  temp.   tint         lift (r,g,b)                  gamma (r,g,b)                 gain (r,g,b)
-        {  "Neutral",   1.00f,   1.00f,  0.00f,  0.00f, { 0.00f,  0.00f,  0.00f}, {1.00f, 1.00f, 1.00f}, {1.00f, 1.00f, 1.00f} },
-        // Warm lifts the shadows towards amber and gains the highlights
-        // towards straw, which is the split a warm grade actually makes.
-        {  "Warm",      1.05f,   1.10f,  0.25f,  0.05f, { 0.03f,  0.01f, -0.01f}, {1.00f, 1.00f, 1.02f}, {1.06f, 1.02f, 0.96f} },
-        // Cool is the mirror: shadows towards blue, highlights cooled.
-        {  "Cool",      1.05f,   0.95f, -0.25f, -0.05f, {-0.01f,  0.00f,  0.03f}, {1.02f, 1.00f, 1.00f}, {0.96f, 1.00f, 1.06f} },
-        // Faded is the film look: shadows lifted off black, highlights pulled
-        // down, so the image never reaches either end of the range.
-        {  "Faded",     0.85f,   0.80f,  0.05f,  0.02f, { 0.07f,  0.06f,  0.05f}, {1.10f, 1.10f, 1.08f}, {0.94f, 0.95f, 0.97f} },
-        // Noir removes colour, then leans the remaining grey slightly cold.
-        {  "Noir",      1.30f,   0.00f,  0.00f,  0.00f, {-0.02f, -0.02f, -0.01f}, {0.95f, 0.95f, 0.97f}, {1.00f, 1.00f, 1.02f} },
-    };
+
 }
 
 namespace CC
 {
     PostProcess::PostProcess()
-        : activePresetName("Neutral")
+        : presetCount(0)
         , uberMaterial(nullptr)
         , bloomPrefilterMaterial(nullptr)
         , bloomBlurMaterial(nullptr)
@@ -86,8 +74,12 @@ namespace CC
     {
     }
 
+    const char* PostProcess::PRESET_FILE_PATH = "Data/PostProcess/GradePresets.yaml";
+
     void PostProcess::Init()
     {
+        LoadPresets(PRESET_FILE_PATH);
+
         MaterialManager* materialManager = MaterialManager::Get();
 
         materialManager->CreateMaterial("PostProcessUber", "PostProcessUber");
@@ -187,32 +179,201 @@ namespace CC
             effects[i].ResetToDefaults();
         }
 
-        activePresetName = "Neutral";
+        CopyBounded(activePresetName, "Neutral", MAX_PRESET_NAME);
+    }
+
+    bool PostProcess::LoadPresets(const char* filePath)
+    {
+        std::string content;
+        bool result = PlatformFileSystem::Get()->ReadFileText(filePath, content);
+
+        if (!result)
+        {
+            CCPrint(PrintManager::CHANNEL_WARN, "PostProcess: could not read presets from %s", filePath);
+        }
+        else
+        {
+            ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(content));
+            ryml::ConstNodeRef root = tree.rootref();
+            presetCount = 0;
+
+            if (root.has_child("presets"))
+            {
+                for (ryml::ConstNodeRef presetNode : root["presets"].children())
+                {
+                    if (presetCount >= MAX_GRADE_PRESETS)
+                    {
+                        CCPrint(PrintManager::CHANNEL_WARN,
+                                "PostProcess: more than %d presets, the rest are ignored", MAX_GRADE_PRESETS);
+                    }
+                    else if (presetNode.has_child("name"))
+                    {
+                        GradePreset& preset = presets[presetCount];
+                        preset.entryCount = 0;
+                        CopyBounded(preset.name, NodeToString(presetNode["name"]).c_str(), MAX_PRESET_NAME);
+
+                        for (ryml::ConstNodeRef valueNode : presetNode.children())
+                        {
+                            std::string key = KeyToString(valueNode);
+
+                            if (key != "name" && preset.entryCount < MAX_POST_PROCESS_PARAMS)
+                            {
+                                GradePresetEntry& entry = preset.entries[preset.entryCount];
+                                CopyBounded(entry.paramName, key.c_str(), MAX_PRESET_NAME);
+
+                                if (valueNode.num_children() >= 3)
+                                {
+                                    entry.value = Vector3(NodeToFloat(valueNode[0]),
+                                                          NodeToFloat(valueNode[1]),
+                                                          NodeToFloat(valueNode[2]));
+                                }
+                                else
+                                {
+                                    float scalar = NodeToFloat(valueNode);
+                                    entry.value = Vector3(scalar, scalar, scalar);
+                                }
+                                preset.entryCount++;
+                            }
+                        }
+                        presetCount++;
+                    }
+                }
+            }
+
+            CCPrint(PrintManager::CHANNEL_ALWAYS, "PostProcess: loaded %d grade presets from %s",
+                    presetCount, filePath);
+        }
+
+        return result;
+    }
+
+    bool PostProcess::SavePresets(const char* filePath) const
+    {
+        std::string yaml;
+        yaml += "# Grade presets. A preset names colour-grade parameters and the\n";
+        yaml += "# values to set them to; anything it does not name is left alone.\n";
+        yaml += "presets:\n";
+
+        char line[256];
+        for (int i = 0; i < presetCount; i++)
+        {
+            const GradePreset& preset = presets[i];
+            snprintf(line, sizeof(line), "  - name: %s\n", preset.name);
+            yaml += line;
+
+            for (int e = 0; e < preset.entryCount; e++)
+            {
+                const GradePresetEntry& entry = preset.entries[e];
+                const PostProcessEffect& grade = GetEffect(PostProcessEffectId::ColorGrade);
+                int paramIndex = -1;
+                for (int p = 0; p < grade.GetParamCount(); p++)
+                {
+                    if (EqualsIgnoreCase(grade.GetParam(p).name, entry.paramName))
+                    {
+                        paramIndex = p;
+                    }
+                }
+
+                bool isColor = paramIndex >= 0
+                    && grade.GetParam(paramIndex).type == PostProcessParamType::Color;
+
+                if (isColor)
+                {
+                    snprintf(line, sizeof(line), "    %s: [%.4f, %.4f, %.4f]\n",
+                             entry.paramName, entry.value.x, entry.value.y, entry.value.z);
+                }
+                else
+                {
+                    snprintf(line, sizeof(line), "    %s: %.4f\n", entry.paramName, entry.value.x);
+                }
+                yaml += line;
+            }
+        }
+
+        bool result = PlatformFileSystem::Get()->WriteFileTextAtomic(filePath, yaml);
+        CCPrint(PrintManager::CHANNEL_ALWAYS, result
+                ? "PostProcess: saved %d grade presets to %s"
+                : "PostProcess: failed to write %s", presetCount, filePath);
+        return result;
+    }
+
+    int PostProcess::FindPresetIndex(const char* presetName) const
+    {
+        int result = -1;
+        for (int i = 0; i < presetCount; i++)
+        {
+            if (EqualsIgnoreCase(presets[i].name, presetName))
+            {
+                result = i;
+            }
+        }
+        return result;
     }
 
     bool PostProcess::ApplyPreset(const char* presetName)
     {
-        bool result = false;
+        int index = FindPresetIndex(presetName);
+        bool result = index >= 0;
 
-        for (int i = 0; i < PRESET_COUNT && !result; i++)
+        if (result)
         {
-            const GradePreset& preset = GRADE_PRESETS[i];
+            const GradePreset& preset = presets[index];
+            PostProcessEffect& grade = GetEffect(PostProcessEffectId::ColorGrade);
 
-            if (strcmp(preset.name, presetName) == 0)
+            // Start from defaults so a preset that does not mention a control
+            // gets the neutral value rather than whatever the last look left.
+            grade.ResetToDefaults();
+
+            for (int e = 0; e < preset.entryCount; e++)
             {
-                PostProcessEffect& grade = GetEffect(PostProcessEffectId::ColorGrade);
-                grade.SetParamValue("contrast",    preset.contrast);
-                grade.SetParamValue("saturation",  preset.saturation);
-                grade.SetParamValue("temperature", preset.temperature);
-                grade.SetParamValue("tint",        preset.tint);
-                grade.SetParamColor("lift",        preset.lift);
-                grade.SetParamColor("gamma",       preset.gamma);
-                grade.SetParamColor("gain",        preset.gain);
-                grade.SetEnabled(true);
-
-                activePresetName = preset.name;
-                result = true;
+                if (!grade.SetParamColor(preset.entries[e].paramName, preset.entries[e].value))
+                {
+                    CCPrint(PrintManager::CHANNEL_WARN,
+                            "PostProcess: preset '%s' names unknown grade parameter '%s'",
+                            preset.name, preset.entries[e].paramName);
+                }
             }
+
+            grade.SetEnabled(true);
+            CopyBounded(activePresetName, preset.name, MAX_PRESET_NAME);
+        }
+
+        return result;
+    }
+
+    bool PostProcess::CaptureCurrentAsPreset(const char* presetName)
+    {
+        int index = FindPresetIndex(presetName);
+        bool result = true;
+
+        if (index < 0 && presetCount < MAX_GRADE_PRESETS)
+        {
+            index = presetCount;
+            presetCount++;
+        }
+        else if (index < 0)
+        {
+            CCPrint(PrintManager::CHANNEL_WARN, "PostProcess: no room for another preset");
+            result = false;
+        }
+
+        if (result)
+        {
+            const PostProcessEffect& grade = GetEffect(PostProcessEffectId::ColorGrade);
+            GradePreset& preset = presets[index];
+            CopyBounded(preset.name, presetName, MAX_PRESET_NAME);
+            preset.entryCount = 0;
+
+            for (int p = 0; p < grade.GetParamCount(); p++)
+            {
+                const PostProcessParam& param = grade.GetParam(p);
+                GradePresetEntry& entry = preset.entries[preset.entryCount];
+                CopyBounded(entry.paramName, param.name, MAX_PRESET_NAME);
+                entry.value = param.value;
+                preset.entryCount++;
+            }
+
+            CopyBounded(activePresetName, presetName, MAX_PRESET_NAME);
         }
 
         return result;
@@ -220,13 +381,13 @@ namespace CC
 
     int PostProcess::GetPresetCount() const
     {
-        return PRESET_COUNT;
+        return presetCount;
     }
 
     const char* PostProcess::GetPresetName(int index) const
     {
-        CC_ASSERT(index >= 0 && index < PRESET_COUNT, "Grade preset index out of range");
-        return GRADE_PRESETS[index].name;
+        CC_ASSERT(index >= 0 && index < presetCount, "Grade preset index out of range");
+        return presets[index].name;
     }
 
     const char* PostProcess::GetActivePresetName() const
@@ -332,6 +493,13 @@ namespace CC
         grade.AddColorParam("gamma",  Vector3(1.0f, 1.0f, 1.0f),  0.1f, 3.0f);
         grade.AddColorParam("gain",   Vector3(1.0f, 1.0f, 1.0f),  0.0f, 2.0f);
 
+        // A flat colour composited over the image. This is how the classic
+        // photographic filters are built, and curves alone cannot reach them.
+        // Mode is an index: 0 multiply, 1 screen, 2 overlay, 3 soft light.
+        grade.AddColorParam("blendColor", Vector3(0.5f, 0.5f, 0.5f), 0.0f, 1.0f);
+        grade.AddParam("blendMode",     0.0f, 0.0f, 3.0f);
+        grade.AddParam("blendStrength", 0.0f, 0.0f, 1.0f);
+
         // On by default. The scene is rendered in scene-linear light, so
         // values above white are real and need a curve to roll them off.
         // Switching it off falls back to a hard clamp, which clips an emissive
@@ -374,7 +542,11 @@ namespace CC
             grade.GetParamValue("temperature")));
 
         uberMaterial->SetUniform("gradeParamsB", Vector4(
-            grade.GetParamValue("tint"), 0.0f, 0.0f, 0.0f));
+            grade.GetParamValue("tint"), grade.GetParamValue("blendMode"), 0.0f, 0.0f));
+
+        Vector3 blendColor = grade.GetParamColor("blendColor");
+        uberMaterial->SetUniform("gradeBlend", Vector4(
+            blendColor.x, blendColor.y, blendColor.z, grade.GetParamValue("blendStrength")));
 
         // One vec4 each: std140 pads a vec3 to 16 bytes anyway, so nothing is
         // saved by packing them together and the w stays free for later use.

@@ -16,6 +16,12 @@ namespace CC
 
     private:
         void DrawPresets();
+        void DrawPresetSaving();
+
+        // Name for the next save. Held here so it survives between frames
+        // while the artist is typing it.
+        static const int MAX_PRESET_NAME_INPUT = 32;
+        char presetNameInput[MAX_PRESET_NAME_INPUT] = {};
     };
 }
 

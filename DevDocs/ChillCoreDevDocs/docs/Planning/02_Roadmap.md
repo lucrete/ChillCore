@@ -6,7 +6,7 @@ Sequenced on dependency and cost, not product priority. Where priorities differ,
 
 | # | Work | Workstream | Plan doc | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | Post-processing follow-ups | Rendering | `RenderingPlan.md` | Per-channel grading first, then a caller-defined effect chain, then the baked LUT, procedural art through the tone curve, and photometric light units. The chain is the ceiling on the whole stack. |
+| 1 | Post-processing follow-ups | Rendering | `RenderingPlan.md` | Baking the grade and tone map into a lookup table, then photometric light units. The lookup table needs no new render-target work — the 2D strip route is available now. |
 | 2 | Frame-rate dependent camera control | Rendering | `RenderingPlan.md` | Free-camera look and movement are paced per frame, not per second. Hours of work, user-visible, and independent of the rest of the block. |
 | 3 | Dirty-state cache beyond pipelines | Rendering | `RenderingPlan.md` | Cheapest call-count win. |
 | 4 | Compute shaders | Rendering | `RenderingPlan.md` | Backend surface is built. Gated on shader compilation recognising a `#shader compute` stage — that one change unblocks the rest. Ends with a compute demo state. |

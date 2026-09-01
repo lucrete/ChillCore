@@ -69,11 +69,13 @@ namespace CC
 
             ImGui::Separator();
             DrawPresets();
+            DrawPresetSaving();
 
             ImGui::Separator();
 
-            // Prints rather than writes: there is no YAML writer, and a scene
-            // file is hand-authored with comments a serialiser would discard.
+            // Prints rather than writes, unlike the preset save above. This
+            // dumps a block for a scene file, and a scene file is hand-authored
+            // with comments and surrounding content a serialiser would discard.
             if (ImGui::Button("Print YAML"))
             {
                 postProcess->PrintYaml();
@@ -98,6 +100,39 @@ namespace CC
     // ========================
     // Private
     // ========================
+
+    // Saving writes the whole preset file, not just the new look: the file is
+    // the engine's source of presets, so the panel and the file cannot drift.
+    void DevUiViewPostProcess::DrawPresetSaving()
+    {
+        PostProcess* postProcess = RenderManager::Get()->GetPostProcess();
+
+        ImGui::SetNextItemWidth(160.0f);
+        ImGui::InputText("##presetName", presetNameInput, MAX_PRESET_NAME_INPUT);
+        ImGui::SameLine();
+
+        bool hasName = presetNameInput[0] != '\0';
+        if (!hasName)
+        {
+            ImGui::BeginDisabled();
+        }
+
+        if (ImGui::Button("Save look"))
+        {
+            if (postProcess->CaptureCurrentAsPreset(presetNameInput))
+            {
+                postProcess->SavePresets(PostProcess::PRESET_FILE_PATH);
+            }
+        }
+
+        if (!hasName)
+        {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("(saves every preset to the file)");
+    }
 
     void DevUiViewPostProcess::DrawPresets()
     {

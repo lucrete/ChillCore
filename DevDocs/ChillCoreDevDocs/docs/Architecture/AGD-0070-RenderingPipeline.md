@@ -40,7 +40,7 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 **Transparent pass.** The list is sorted back to front by distance from the camera. Blending is on and depth writing is off — both baked into the pipelines rather than toggled around the pass.
 
-**Post-process stack.** The opaque and transparent passes render into an offscreen colour target the renderer owns, holding scene-linear light. The target carries the backbuffer's sample count and is resolved before any effect samples it, so antialiasing survives post-processing. Bloom then runs its own half-resolution passes, and a single fused pass applies every other enabled effect, encodes to display space, and draws into the backbuffer.
+**Post-process stack.** A frame drawn as a fullscreen quad skips this entirely and has already presented itself; what follows describes a scene. The opaque and transparent passes render into an offscreen colour target the renderer owns, holding scene-linear light. The target carries the backbuffer's sample count and is resolved before any effect samples it, so antialiasing survives post-processing. Bloom then runs its own half-resolution passes, and a single fused pass applies every other enabled effect, encodes to display space, and draws into the backbuffer.
 
 This runs every frame, not only when an effect is enabled: the encode is the pass's own job, so the scene cannot be presented without it. Individual effects still switch on and off independently.
 
@@ -134,7 +134,9 @@ Colour textures are decoded by the sampler rather than by a `pow()` in the shade
 
 The encode back to display space happens once, at the end of the post-process pass. That is what makes the pass mandatory: it runs every frame whether or not any effect is enabled, because the scene cannot otherwise be presented. The alternative — an sRGB backbuffer with a hardware encode — was rejected because UI and text draw after the pass with sRGB-authored colours, and a hardware encode would apply to them too.
 
-Two consequences are worth stating plainly. Emissive values above 1.0 are now real rather than clamped on the way out, which is what gives bloom's threshold something to discriminate on and the tone curve something to roll off. And a shader that authors display-referred colour by hand — the procedural art — must convert on output, because it is writing into a linear target; with the tone map off that round trip is exact, and with it on the art passes through the curve like any other scene content.
+Two consequences are worth stating plainly. Emissive values above 1.0 are now real rather than clamped on the way out, which is what gives bloom's threshold something to discriminate on and the tone curve something to roll off. And a frame drawn as a fullscreen quad is not scene light at all: it is finished, display-referred pixels, so it does not belong in this pipeline.
+
+That is why the fullscreen-quad path bypasses post-processing entirely. It renders straight to the backbuffer with no effect, no tone curve and no encode applied, and the offscreen target it would otherwise have used is released for the frame. The quad's shaders therefore write display colour unconverted, and what reaches the screen is exactly what they authored. Applying a tone curve to finished pixels is not a matter of degree — it is the wrong operation, and it shows as a hue shift rather than a slight softening.
 
 ### Effects fuse into one pass rather than chaining
 
@@ -164,6 +166,14 @@ The frame's scene pass opens before any application code runs, and passes cannot
 
 Effects are described, not coded, at the call site. Each carries its own name, its parameters, and each parameter's range, type and default. The developer panel builds its controls from that description and the scene loader resolves yaml keys against it, so adding an effect costs a shader block and a parameter list rather than an edit to the panel and the loader as well.
 
+Looks are data, not code. A grade preset is a named bundle of colour-grade parameter values held in a file, so a look can be authored, named and shared without a rebuild, and the developer panel writes that same file rather than a second copy of it. A preset stores each value against its parameter *name* rather than as a fixed set of fields, which is what lets the grade gain a control without invalidating every saved look: an older preset simply does not mention the new one, and applying a preset resets the grade to defaults first so an unmentioned control is neutral rather than left over from the previous look.
+
+A preset carries grade values only. The photographic filter looks pair a grade with a heavy vignette, and that pairing is expressed where effects are combined — a scene selects the preset and sets the vignette alongside it — rather than by letting a preset reach into other effects.
+
+Saving rewrites the whole preset file, so hand-written comments in it do not survive a save. That is the accepted cost of the file being the single source of looks; the scene-block dump is a separate button that prints rather than writes, because a scene file has surrounding content worth keeping.
+
+The grade includes a blend of a flat colour over the image, which curves alone cannot reach and which is how the classic photographic looks are constructed. It runs in log space alongside contrast: the blend modes are defined on a bounded signal, log is where the scene is bounded, and the log excursion already exists so no extra transfer function is paid. Results therefore differ from the same mode in an image editor working on display-referred pixels, and looks are authored against this implementation rather than ported by their numbers.
+
 A parameter is a scalar or a colour. Colour is not a convenience: a grade needs lift, gamma and gain per channel, since tinting the shadows one way and the highlights another is what separates a grade from a brightness adjustment, and a colour counts as one parameter rather than three against an effect's budget. A scalar written to a colour sets every channel, so a grade authored before the distinction existed still loads and still means the same thing.
 
 Target ownership follows the same reasoning. The resolution a post-process target must match is the framebuffer resolution, which the renderer already tracks and the caller only observes; a caller that owned the target would have to watch for resizes and rebuild on its own, and every future caller would repeat that. So the renderer creates the target on demand, rebuilds it when the resolution changes, and releases it when the effect is cleared. Only the material crosses the boundary, and it stays owned by the caller.
@@ -189,7 +199,8 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
 - Effect order in the fused pass is fixed by the shader. A caller cannot reorder effects or insert one of its own.
-- Procedural art authors display-referred colour and converts on output, so with the tone map on it passes through the curve and reads softer than it was picked. Switching the tone map off makes the round trip exact.
+- A fullscreen quad cannot have any post-process effect applied to it, by construction. Bloom or a vignette over a procedurally drawn frame is not available.
+- Post-processing receives scene colour only. The depth attachment exists on the scene target but is not handed to the stack, so no effect can depend on depth.
 - Specular highlights alias under motion. Multisampling fixes geometry edges, not shading inside a triangle, so a highlight smaller than a pixel shimmers as it moves whether or not bloom is on. The bright pass no longer amplifies it, but the underlying shimmer remains.
 - Lighting is linear but the light values themselves are not physical: intensities are authored numbers, not photometric units, so a scene is still tuned by eye rather than by measurement.
 - Where the backend cannot render to a half-float target the scene target falls back to 8-bit, so tone mapping and bloom keep working but have no range above white to use.
