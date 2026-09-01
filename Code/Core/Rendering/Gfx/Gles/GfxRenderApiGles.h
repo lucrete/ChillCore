@@ -45,7 +45,6 @@ namespace CC::Gfx
         virtual void EndFrame() override;
 
         // Render pass
-        virtual void BeginDefaultRenderPass(const float clearColor[4], float clearDepth) override;
         virtual void BeginRenderPass(RenderTargetHandle target, const char* scopeName) override;
         virtual void EndRenderPass() override;
 
@@ -127,6 +126,9 @@ namespace CC::Gfx
             TextureFormat format       = TextureFormat::Unknown;
             int           width        = 0;
             int           height       = 0;
+            // Layers an attachment may select: cubemap faces or array
+            // layers. 1 for a plain 2D texture, where only layer 0 is valid.
+            int           layerCount   = 1;
             bool          isAlive      = false;
         };
 
@@ -163,6 +165,12 @@ namespace CC::Gfx
             int                     width                = 0;
             int                     height               = 0;
             RenderTargetDescription description;
+            // The backbuffer occupies a pool slot like any other target so
+            // that a pass names one thing. Its framebuffer is not owned here
+            // — the platform surface and the scene framebuffer are — so the
+            // pass brackets take a different route for it, and destroying it
+            // is refused.
+            bool                    isBackbuffer         = false;
             bool                    isAlive              = false;
         };
 
@@ -183,6 +191,11 @@ namespace CC::Gfx
         std::vector<uint32_t>       freeShaderSlots;
         std::vector<uint32_t>       freePipelineSlots;
         std::vector<uint32_t>       freeRenderTargetSlots;
+
+        // Pool slot standing for the backbuffer. Reserved on first
+        // configuration and never freed.
+        RenderTargetHandle          backbufferTarget;
+        void                        EnsureBackbufferTarget();
 
         // ========================
         // State tracking

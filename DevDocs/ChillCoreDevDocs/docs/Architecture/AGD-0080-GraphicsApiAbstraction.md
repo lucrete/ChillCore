@@ -37,7 +37,9 @@ The boundary is checkable: no graphics API type or header may appear outside thi
 
 **Per frame**, a frame begins, a render pass is entered against a target, pipelines and resources are bound and draws are issued, the pass ends, and the frame ends with presentation.
 
-A pass targets either the backbuffer or an offscreen render target, selected by the handle passed when entering it. An invalid handle means the backbuffer.
+A pass targets either the backbuffer or an offscreen render target, selected by the handle passed when entering it. The backbuffer holds a pool slot like any other target, so a pass always names a real handle; the slot is reserved when the backbuffer is first configured, tracks its current size and sample count, and refuses to be destroyed. Its framebuffer is not owned by the pool — the platform surface is — which is why the brackets still take a different route for it internally.
+
+An attachment names one image of a texture, not the whole texture: a mip level, and a layer that selects a cubemap face or an array layer. A plain 2D texture offers one layer, so the default names its only image.
 
 - **Backbuffer pass.** Entering binds the multisampled scene framebuffer and clears it. Ending resolves the multisampled output and presents it into the default target as an ordinary draw, using a pipeline like any other.
 - **Offscreen pass.** Entering binds the target's framebuffer, sets the viewport to its dimensions, and applies each attachment's load behaviour — clear, or preserve what is there. Ending resolves multisampled storage into the attachment textures if the target asked for more than one sample, then applies each attachment's store behaviour, discarding what is not needed. No present.
@@ -138,8 +140,9 @@ They differ by operating system rather than by graphics API, and a backend has n
 
 - A multisampled offscreen target resolves with a hardware blit, which averages samples before any tone curve is applied. On very high contrast edges that is not the same as tone mapping each sample and then averaging, and shows as slightly bright fringing. Correcting it needs a shader resolve with per-sample access.
 - Multisampled offscreen targets carry exactly one colour attachment. More would need a resolve blit per attachment.
-- Render target attachments are single-layer. Array layers and cubemap faces are rejected, which is what a cubemap reflection probe or a cascaded shadow map would need.
-- The backbuffer is not itself addressable as a render target. It is reached by an invalid handle rather than by a handle from the pool.
+- Texture creation covers 2D, array and cubemap shapes. There is no 3D texture, and no cubemap array.
+- An array texture cannot be given initial data; it can only be rendered into.
+- A multisampled target resolves colour attachment 0 only, so a layered target that also wants multisampling is not covered.
 - Redundancy elimination covers pipeline binds only. Vertex buffer, texture, and uniform buffer binds are not compared against current state.
 - GPU spans are a flat ordered sequence per frame, with no nesting.
 - Any code path bypassing this interface to call the graphics API directly must invalidate the cached bind state, or stale state becomes visible as incorrect rendering.

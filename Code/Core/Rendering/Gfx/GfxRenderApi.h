@@ -62,7 +62,6 @@ namespace CC::Gfx
         // into one phase, while capture tools keep the full name. That is
         // what lets a phase stay a fixed part of the frame while the passes
         // inside it come and go. See the GPU timing section below.
-        virtual void BeginDefaultRenderPass(const float clearColor[4], float clearDepth) = 0;
         virtual void BeginRenderPass(RenderTargetHandle target, const char* scopeName)   = 0;
         virtual void EndRenderPass()                                                     = 0;
 

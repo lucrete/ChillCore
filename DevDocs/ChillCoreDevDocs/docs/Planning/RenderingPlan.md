@@ -1,38 +1,8 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two sets of follow-ups left by work that has landed, a camera-control defect, one unimplemented optimisation, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is one set of follow-ups left by work that has landed, a camera-control defect, one unimplemented optimisation, and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
 **Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — specular antialiasing, camera registration, the open design questions — is not covered here.
-
----
-
-## Render target follow-ups
-
-Gaps left open when offscreen render targets landed. Neither blocks anything today; both block something specific next.
-
-### Array-layer and cubemap-face attachments
-
-A render target attaches whole textures only. A layer of an array texture, or one face of a cubemap, cannot be named as an attachment.
-
-**Why it matters.** It is the gate on two features rather than a quality issue in its own right. A cascaded shadow map renders each cascade into one layer of an array texture; a cubemap reflection probe renders each of six faces in turn. Neither can be built without it. It also blocks baking the colour grade into a 3D LUT — see the post-process follow-ups below — so a single change unblocks three consumers.
-
-**Shape of the work.** The attachment description gains a layer or face index, defaulting to the whole-texture behaviour that exists now. Both backends bind the named layer when creating the framebuffer. The desktop and GLES paths differ in which entry point does this, so the abstraction must not expose either directly.
-
-**Watch out.** Depth attachments have the same question and are easy to forget; a shadow cascade needs a layered depth attachment, not a layered colour one.
-
-**Done when:** a target can attach one layer of an array texture and one face of a cubemap, on both backends, and rendering into each layer in turn produces independent results.
-
-### The backbuffer as a pool handle
-
-The backbuffer is addressed as an invalid handle. Every pass bracket therefore carries a branch: valid handle means an offscreen target, invalid means the backbuffer.
-
-**Why it matters.** The special case is small but it is in the most-used path in the abstraction, and it is the reason pass code reads as two cases rather than one. Giving the backbuffer a real handle from the pool removes the branch and makes "the target for this pass" mean one thing.
-
-**Shape of the work.** Reserve a pool slot at initialisation whose description tracks the backbuffer's current size and sample count. Reconfiguring the backbuffer updates that entry rather than a separate description. The pass brackets then look up one entry with no branch.
-
-**Watch out.** The reserved entry must survive backbuffer reconfiguration, which currently rebuilds framebuffers wholesale, and it must never be destroyed by a caller holding the handle.
-
-**Done when:** the pass brackets have no backbuffer special case, and reconfiguring the backbuffer while holding the handle is safe.
 
 ---
 

@@ -57,6 +57,38 @@ namespace CC::Gfx
         bool   isDepth;
     };
 
+    // Which target names one attachable image of a texture.
+    //
+    // A cubemap cannot be attached as a whole: the framebuffer call wants a
+    // single face, so the layer selects one. A plain 2D texture has one
+    // image, and its own target names it.
+    static GLenum ToFramebufferTextureTarget(GLenum textureTarget, int layer)
+    {
+        return textureTarget == GL_TEXTURE_CUBE_MAP
+            ? static_cast<GLenum>(GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer)
+            : textureTarget;
+    }
+
+    // Attaches one image of a texture to the bound framebuffer.
+    //
+    // An array layer needs the layered entry point; a cubemap face and a plain
+    // 2D image need the 2D one, with the face named by the target. Keeping the
+    // choice here means the two attachment sites do not each repeat it.
+    static void AttachTextureImage(GLenum attachPoint, GLenum textureTarget,
+                                   GLuint textureHandle, int mipLevel, int layer)
+    {
+        if (textureTarget == GL_TEXTURE_2D_ARRAY)
+        {
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, attachPoint, textureHandle, mipLevel, layer);
+        }
+        else
+        {
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint,
+                                   ToFramebufferTextureTarget(textureTarget, layer),
+                                   textureHandle, mipLevel);
+        }
+    }
+
     static GlTextureFormatInfo ToGlTextureFormat(TextureFormat format)
     {
         GlTextureFormatInfo result = { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE, false, false };
@@ -520,15 +552,41 @@ namespace CC::Gfx
             sceneFrameBuffer->SetMsaaSamples(glSamples);
             sceneFrameBuffer->SetMsaaEnabled(glSamples > 0);
         }
+
+        EnsureBackbufferTarget();
+    }
+
+    void RenderApiOpenGl::EnsureBackbufferTarget()
+    {
+        if (!backbufferTarget.IsValid())
+        {
+            GlRenderTarget entry;
+            entry.isBackbuffer = true;
+            entry.isAlive      = true;
+
+            uint32_t slotIndex = GlCommon::AcquireSlot(freeRenderTargetSlots,
+                                                       static_cast<uint32_t>(renderTargets.size()));
+            if (slotIndex == renderTargets.size())
+            {
+                renderTargets.push_back(entry);
+            }
+            else
+            {
+                renderTargets[slotIndex] = entry;
+            }
+            backbufferTarget.id = slotIndex;
+        }
+
+        // Size and sample count follow the backbuffer rather than being fixed
+        // at creation, so a caller holding the handle sees the current values.
+        GlRenderTarget& entry = renderTargets[backbufferTarget.id];
+        GetBackbufferSize(entry.width, entry.height);
+        entry.sampleCount = backbufferDescription.sampleCount > 1 ? backbufferDescription.sampleCount : 1;
     }
 
     RenderTargetHandle RenderApiOpenGl::GetBackbuffer() const
     {
-        // The default-framebuffer target isn't managed through the
-        // RenderTarget pool yet. Callers that want to draw to the
-        // backbuffer use BeginDefaultRenderPass. This accessor reserves a
-        // seat for when render-pass handles subsume the concept.
-        return RenderTargetHandle();
+        return backbufferTarget;
     }
 
     void RenderApiOpenGl::GetBackbufferSize(int& width, int& height) const
@@ -548,14 +606,6 @@ namespace CC::Gfx
     // Render pass
     // ========================
 
-    void RenderApiOpenGl::BeginDefaultRenderPass(const float clearColor[4], float clearDepth)
-    {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        glClearDepth(static_cast<double>(clearDepth));
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-
     void RenderApiOpenGl::BeginRenderPass(RenderTargetHandle target, const char* scopeName)
     {
         CC_ASSERT(!renderPassActive, "BeginRenderPass: a render pass is already active");
@@ -573,11 +623,13 @@ namespace CC::Gfx
         }
         currentPassScopeName[nameLength] = '\0';
 
-        if (target.IsValid())
+        CC_ASSERT(target.IsValid(), "BeginRenderPass: render target handle is invalid");
+        uint32_t slotIndex = target.id;
+        CC_ASSERT(slotIndex < renderTargets.size() && renderTargets[slotIndex].isAlive,
+                  "BeginRenderPass: render target not alive");
+
+        if (!renderTargets[slotIndex].isBackbuffer)
         {
-            uint32_t slotIndex = target.id;
-            CC_ASSERT(slotIndex < renderTargets.size() && renderTargets[slotIndex].isAlive,
-                      "BeginRenderPass: render target not alive");
             GlRenderTarget& entry = renderTargets[slotIndex];
             const RenderTargetDescription& desc = entry.description;
 
@@ -616,7 +668,7 @@ namespace CC::Gfx
             glDepthMask(GL_TRUE);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            currentRenderTarget    = RenderTargetHandle();
+            currentRenderTarget    = target;
             currentPassIsOffscreen = false;
         }
 
@@ -846,12 +898,40 @@ namespace CC::Gfx
         entry.width   = description.width;
         entry.height  = description.height;
         entry.isAlive = true;
-        entry.target  = description.isCubemap ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D;
+        // A texture is one of three shapes. Layers are what an attachment
+        // selects between, so a plain 2D texture offers exactly one.
+        const bool isArray = description.arrayLayers > 1;
+        CC_ASSERT(!(description.isCubemap && isArray), "TextureDescription: cubemap arrays are not supported");
+        CC_ASSERT(description.depth == 1, "TextureDescription: 3D textures are not supported");
+
+        if (description.isCubemap)
+        {
+            entry.target     = GL_TEXTURE_CUBE_MAP;
+            entry.layerCount = 6;
+        }
+        else if (isArray)
+        {
+            entry.target     = GL_TEXTURE_2D_ARRAY;
+            entry.layerCount = description.arrayLayers;
+        }
+        else
+        {
+            entry.target     = GL_TEXTURE_2D;
+            entry.layerCount = 1;
+        }
 
         glGenTextures(1, &entry.glHandle);
         glBindTexture(entry.target, entry.glHandle);
 
-        glTexStorage2D(entry.target, description.mipLevels, formatInfo.internalFormat, description.width, description.height);
+        if (isArray)
+        {
+            glTexStorage3D(entry.target, description.mipLevels, formatInfo.internalFormat,
+                           description.width, description.height, description.arrayLayers);
+        }
+        else
+        {
+            glTexStorage2D(entry.target, description.mipLevels, formatInfo.internalFormat, description.width, description.height);
+        }
 
         // glTexStorage2D does NOT set TEXTURE_MAX_LEVEL; it stays at the default 1000.
         // Some drivers (observed on NVIDIA) treat the texture as mipmap-incomplete when
@@ -860,7 +940,12 @@ namespace CC::Gfx
         glTexParameteri(entry.target, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(entry.target, GL_TEXTURE_MAX_LEVEL, description.mipLevels - 1);
 
-        if (description.initialData != nullptr && !formatInfo.isCompressed)
+        // Uploading into an array texture has no caller yet, and an untested
+        // upload path is worse than none.
+        CC_ASSERT(!(isArray && description.initialData != nullptr),
+                  "TextureDescription: initial data for an array texture is not supported");
+
+        if (description.initialData != nullptr && !formatInfo.isCompressed && !isArray)
         {
             if (description.isCubemap)
             {
@@ -1235,17 +1320,18 @@ namespace CC::Gfx
         for (int i = 0; i < description.colorAttachmentCount; i++)
         {
             const RenderTargetAttachment& attachment = description.colorAttachments[i];
-            CC_ASSERT(attachment.arrayLayer == 0, "CreateRenderTarget: array-layer attachments not supported yet");
             CC_ASSERT(attachment.texture.IsValid(), "CreateRenderTarget: colour attachment texture is invalid");
             uint32_t texSlot = attachment.texture.id;
             CC_ASSERT(texSlot < textures.size() && textures[texSlot].isAlive,
                       "CreateRenderTarget: colour attachment texture not alive");
             GlTexture& tex = textures[texSlot];
+            CC_ASSERT(attachment.arrayLayer >= 0 && attachment.arrayLayer < tex.layerCount,
+                      "CreateRenderTarget: colour attachment layer out of range for this texture");
 
             // TODO(webgl): a WebGL backend needs a WEBGL_draw_buffers /
             // colour-renderable format check at this point.
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, tex.target,
-                                   tex.glHandle, attachment.mipLevel);
+            AttachTextureImage(GL_COLOR_ATTACHMENT0 + i, tex.target, tex.glHandle,
+                               attachment.mipLevel, attachment.arrayLayer);
             drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
 
             if (entry.width == 0 || entry.height == 0)
@@ -1273,11 +1359,13 @@ namespace CC::Gfx
             CC_ASSERT(depthSlot < textures.size() && textures[depthSlot].isAlive,
                       "CreateRenderTarget: depth attachment texture not alive");
             GlTexture& depthTex = textures[depthSlot];
+            CC_ASSERT(depthAttachment.arrayLayer >= 0 && depthAttachment.arrayLayer < depthTex.layerCount,
+                      "CreateRenderTarget: depth attachment layer out of range for this texture");
             GlTextureFormatInfo depthInfo = ToGlTextureFormat(depthTex.format);
             GLenum attachPoint = (depthInfo.pixelFormat == GL_DEPTH_STENCIL)
                 ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-            glFramebufferTexture2D(GL_FRAMEBUFFER, attachPoint, depthTex.target,
-                                   depthTex.glHandle, depthAttachment.mipLevel);
+            AttachTextureImage(attachPoint, depthTex.target, depthTex.glHandle,
+                               depthAttachment.mipLevel, depthAttachment.arrayLayer);
 
             if (entry.width == 0 || entry.height == 0)
             {
@@ -1356,6 +1444,8 @@ namespace CC::Gfx
             GlRenderTarget& entry = renderTargets[slotIndex];
             if (entry.isAlive)
             {
+                CC_ASSERT(!entry.isBackbuffer, "DestroyRenderTarget: the backbuffer target cannot be destroyed");
+
                 if (currentRenderTarget.id == slotIndex)
                 {
                     glBindFramebuffer(GL_FRAMEBUFFER, 0);
