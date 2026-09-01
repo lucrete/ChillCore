@@ -270,7 +270,7 @@ namespace CC
 
         UploadUberParameters();
 
-        gfxApi->BeginRenderPass(gfxApi->GetBackbuffer());
+        gfxApi->BeginRenderPass(gfxApi->GetBackbuffer(), "PostProcess");
         gfxApi->InvalidateCachedState();
 
         fullscreenQuad->SetMaterial(uberMaterial);
@@ -284,7 +284,6 @@ namespace CC
         fullscreenQuad->Render(nullptr);
 
         gfxApi->EndRenderPass();
-        gfxApi->AddGpuTimestamp("GpuAfterPostProcessPass");
     }
 
     // ========================
@@ -375,7 +374,7 @@ namespace CC
             Vector4(threshold, knee, 0.0f, 0.0f));
 
         // Pass 1: bright pass, full res in, half res out.
-        gfxApi->BeginRenderPass(bloomTarget[0]);
+        gfxApi->BeginRenderPass(bloomTarget[0], "PostProcess/BloomPrefilter");
         gfxApi->InvalidateCachedState();
         fullscreenQuad->SetMaterial(bloomPrefilterMaterial);
         fullscreenQuad->PreRender();
@@ -389,7 +388,7 @@ namespace CC
         // Pass 2 and 3: separable blur, horizontal then vertical. Ping-pong
         // because a pass cannot sample the target it is writing.
         bloomBlurMaterial->SetUniform("blurParams", Vector4(texelU, texelV, 1.0f, 0.0f));
-        gfxApi->BeginRenderPass(bloomTarget[1]);
+        gfxApi->BeginRenderPass(bloomTarget[1], "PostProcess/BloomBlurH");
         gfxApi->InvalidateCachedState();
         fullscreenQuad->SetMaterial(bloomBlurMaterial);
         fullscreenQuad->PreRender();
@@ -398,15 +397,13 @@ namespace CC
         gfxApi->EndRenderPass();
 
         bloomBlurMaterial->SetUniform("blurParams", Vector4(texelU, texelV, 0.0f, 1.0f));
-        gfxApi->BeginRenderPass(bloomTarget[0]);
+        gfxApi->BeginRenderPass(bloomTarget[0], "PostProcess/BloomBlurV");
         gfxApi->InvalidateCachedState();
         fullscreenQuad->SetMaterial(bloomBlurMaterial);
         fullscreenQuad->PreRender();
         gfxApi->BindTexture(0, bloomTexture[1], sampler);
         fullscreenQuad->Render(nullptr);
         gfxApi->EndRenderPass();
-
-        gfxApi->AddGpuTimestamp("GpuAfterBloom");
     }
 
     void PostProcess::EnsureBloomTargets(int width, int height)

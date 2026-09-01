@@ -465,9 +465,22 @@ namespace CC::Gfx
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
-    void RenderApiGles::BeginRenderPass(RenderTargetHandle target)
+    void RenderApiGles::BeginRenderPass(RenderTargetHandle target, const char* scopeName)
     {
         CC_ASSERT(!renderPassActive, "BeginRenderPass: a render pass is already active");
+
+        // Opened before the clear rather than after it, so the pass's own
+        // clear is charged to the pass instead of to whatever ran before it.
+        AddGpuTimestamp(scopeName);
+
+        int nameLength = 0;
+        while (scopeName != nullptr && scopeName[nameLength] != '\0'
+               && nameLength < MAX_PASS_SCOPE_NAME - 1)
+        {
+            currentPassScopeName[nameLength] = scopeName[nameLength];
+            nameLength++;
+        }
+        currentPassScopeName[nameLength] = '\0';
 
         if (target.IsValid())
         {

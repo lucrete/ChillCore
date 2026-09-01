@@ -43,7 +43,7 @@ namespace CC::Gfx
 
         // Render pass
         virtual void BeginDefaultRenderPass(const float clearColor[4], float clearDepth) override;
-        virtual void BeginRenderPass(RenderTargetHandle target) override;
+        virtual void BeginRenderPass(RenderTargetHandle target, const char* scopeName) override;
         virtual void EndRenderPass() override;
 
         // Buffers
@@ -245,6 +245,12 @@ namespace CC::Gfx
         // stay here because their entry points are GL-version-specific.
 
         GlCommon::ScopeTimerState scopeTimer;
+
+        // Name of the pass currently open, so the resolve and blit that end
+        // it are charged to the pass that produced them rather than to
+        // whatever runs next.
+        static const int MAX_PASS_SCOPE_NAME = 32;
+        char currentPassScopeName[MAX_PASS_SCOPE_NAME] = {};
 
         void ResolveFrameScopes(GlCommon::GpuScopeFrame& frame);
 

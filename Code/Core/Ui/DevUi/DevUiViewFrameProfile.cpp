@@ -36,17 +36,9 @@ namespace CC
         ImVec4(0.6f, 0.6f, 0.6f, 1.0f)
     };
 
-    static const char* GPU_PHASE_NAMES[DevUiViewFrameProfile::GPU_PHASE_COUNT] =
-    {
-        "Idle",
-        "Opaque",
-        "Transparent",
-        "MSAA",
-        "PostProcess",
-        "UI",
-        "Finalize"
-    };
-
+    // Phase names are owned by the backend and read through FrameTimer, so
+    // only the palette lives here. It is indexed with a wrap because the
+    // number of phases is not fixed — bloom adds three of its own.
     static const ImU32 GPU_PHASE_COLORS[DevUiViewFrameProfile::GPU_PHASE_COUNT] =
     {
         IM_COL32(100, 100, 100, 255),
@@ -126,10 +118,10 @@ namespace CC
         {
             float gpuMs = FrameTimer::Get()->GetProfileGpuDurationMs(currentIndex);
             result += "\n--- GPU Phases ---\n";
-            for (int i = 0; i < DevUiViewFrameProfile::GPU_PHASE_COUNT; i++)
+            for (int i = 0; i < FrameTimer::Get()->GetProfileGpuPhaseCount(); i++)
             {
                 float phaseMs = FrameTimer::Get()->GetProfileGpuPhase(i, currentIndex);
-                snprintf(line, sizeof(line), "  %-14s %7.3f ms\n", GPU_PHASE_NAMES[i], phaseMs);
+                snprintf(line, sizeof(line), "  %-14s %7.3f ms\n", FrameTimer::Get()->GetProfileGpuPhaseName(i), phaseMs);
                 result += line;
             }
             float vsyncMs = FrameTimer::Get()->GetProfileGpuVsyncMs(currentIndex);
@@ -407,7 +399,7 @@ namespace CC
             float cumulative0 = 0.0f;
             float cumulative1 = 0.0f;
 
-            for (int p = 0; p < DevUiViewFrameProfile::GPU_PHASE_COUNT; p++)
+            for (int p = 0; p < FrameTimer::Get()->GetProfileGpuPhaseCount(); p++)
             {
                 float phase0 = FrameTimer::Get()->GetProfileGpuPhase(p, idx0);
                 float phase1 = FrameTimer::Get()->GetProfileGpuPhase(p, idx1);
@@ -424,7 +416,7 @@ namespace CC
                 drawList->AddQuadFilled(
                     ImVec2(x0, layerBottom0), ImVec2(x1, layerBottom1),
                     ImVec2(x1, layerTop1), ImVec2(x0, layerTop0),
-                    GPU_PHASE_COLORS[p]);
+                    GPU_PHASE_COLORS[p % DevUiViewFrameProfile::GPU_PHASE_COUNT]);
             }
 
             // VSync layer on top
@@ -463,7 +455,7 @@ namespace CC
         int currentIndex = (FrameTimer::Get()->GetProfileWriteIndex() - 1 + historySize) % historySize;
 
         float totalGpuMs = FrameTimer::Get()->GetProfileGpuVsyncMs(currentIndex);
-        for (int p = 0; p < DevUiViewFrameProfile::GPU_PHASE_COUNT; p++)
+        for (int p = 0; p < FrameTimer::Get()->GetProfileGpuPhaseCount(); p++)
         {
             totalGpuMs += FrameTimer::Get()->GetProfileGpuPhase(p, currentIndex);
         }
@@ -483,7 +475,7 @@ namespace CC
         float x = cursorPos.x;
         float y = cursorPos.y;
 
-        for (int p = 0; p < DevUiViewFrameProfile::GPU_PHASE_COUNT; p++)
+        for (int p = 0; p < FrameTimer::Get()->GetProfileGpuPhaseCount(); p++)
         {
             float phaseMs = FrameTimer::Get()->GetProfileGpuPhase(p, currentIndex);
             float fraction = phaseMs / totalGpuMs;
@@ -492,7 +484,7 @@ namespace CC
             drawList->AddRectFilled(
                 ImVec2(x, y),
                 ImVec2(x + segmentWidth, y + barHeight),
-                GPU_PHASE_COLORS[p]);
+                GPU_PHASE_COLORS[p % DevUiViewFrameProfile::GPU_PHASE_COUNT]);
 
             x += segmentWidth;
         }
@@ -508,10 +500,10 @@ namespace CC
         ImGui::Dummy(ImVec2(barWidth, barHeight));
 
         // Phase labels: 3 per row
-        for (int p = 0; p < DevUiViewFrameProfile::GPU_PHASE_COUNT; p++)
+        for (int p = 0; p < FrameTimer::Get()->GetProfileGpuPhaseCount(); p++)
         {
             float phaseMs = FrameTimer::Get()->GetProfileGpuPhase(p, currentIndex);
-            ImGui::TextColored(GPU_PHASE_TEXT_COLORS[p], "%s: %.2f", GPU_PHASE_NAMES[p], phaseMs);
+            ImGui::TextColored(GPU_PHASE_TEXT_COLORS[p % DevUiViewFrameProfile::GPU_PHASE_COUNT], "%s: %.2f", FrameTimer::Get()->GetProfileGpuPhaseName(p), phaseMs);
             ImGui::SameLine();
 
             if (p % 3 == 2)

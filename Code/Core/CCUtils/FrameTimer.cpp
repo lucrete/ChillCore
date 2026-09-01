@@ -139,6 +139,23 @@ namespace CC
     // Profile Data
     // ========================
 
+    // A scope name is either a plain phase name or a "Group/Detail" pair. The
+    // profiler shows the group, so several passes read as one phase, while
+    // capture tools keep the full name and its per-pass detail.
+    static void CopyGpuGroupName(const char* scopeName, char* outGroupName)
+    {
+        int length = 0;
+        while (scopeName != nullptr
+               && scopeName[length] != '\0'
+               && scopeName[length] != '/'
+               && length < FrameTimer::PROFILE_GPU_PHASE_NAME_LENGTH - 1)
+        {
+            outGroupName[length] = scopeName[length];
+            length++;
+        }
+        outGroupName[length] = '\0';
+    }
+
     void FrameTimer::RecordProfileData()
     {
         float frameTimeMs = deltaTime * 1000.0f;
@@ -182,23 +199,65 @@ namespace CC
                 // is the swap / vsync wait; everything before it is a
                 // render-time phase.
                 int scopeCount = Gfx::RenderApi::Get()->GetGpuScopeCount();
-                int phaseCount = scopeCount - 1;
-                if (phaseCount < 0)
+                int renderScopeCount = scopeCount - 1;
+                if (renderScopeCount < 0)
                 {
-                    phaseCount = 0;
+                    renderScopeCount = 0;
                 }
-                if (phaseCount > PROFILE_MAX_GPU_PHASES)
+                if (renderScopeCount > PROFILE_MAX_GPU_PHASES)
                 {
-                    phaseCount = PROFILE_MAX_GPU_PHASES;
+                    renderScopeCount = PROFILE_MAX_GPU_PHASES;
                 }
 
-                profileGpuPhaseCount = phaseCount;
+                // Contiguous scopes sharing a group fold into one phase, so
+                // the phase set stays fixed while the passes inside a group
+                // come and go — bloom's three passes are part of the
+                // post-process phase whether or not bloom is enabled.
+                char  groupNames[PROFILE_MAX_GPU_PHASES][PROFILE_GPU_PHASE_NAME_LENGTH] = {};
+                float groupDurations[PROFILE_MAX_GPU_PHASES] = {};
+                int   groupCount = 0;
+
+                for (int i = 0; i < renderScopeCount; i++)
+                {
+                    char groupName[PROFILE_GPU_PHASE_NAME_LENGTH];
+                    CopyGpuGroupName(Gfx::RenderApi::Get()->GetGpuScopeNameAt(i), groupName);
+
+                    bool isNewGroup = groupCount == 0
+                        || strncmp(groupNames[groupCount - 1], groupName,
+                                   PROFILE_GPU_PHASE_NAME_LENGTH) != 0;
+
+                    if (isNewGroup && groupCount < PROFILE_MAX_GPU_PHASES)
+                    {
+                        CopyGpuGroupName(groupName, groupNames[groupCount]);
+                        groupDurations[groupCount] = 0.0f;
+                        groupCount++;
+                    }
+
+                    if (groupCount > 0)
+                    {
+                        groupDurations[groupCount - 1] +=
+                            Gfx::RenderApi::Get()->GetGpuScopeDurationMsAt(i);
+                    }
+                }
+
+                // A changed phase set invalidates the history, and resets the
+                // write position, so it has to happen before this frame's
+                // sample is written.
+                if (AdoptGpuPhaseNames(groupNames, groupCount))
+                {
+                    profileTotalMs[profileWriteIndex] = frameTimeMs;
+                    for (int i = 0; i < PROFILE_CPU_PHASES; i++)
+                    {
+                        profileCpuPhases[i][profileWriteIndex] = 0.0f;
+                    }
+                }
+
+                profileGpuPhaseCount = groupCount;
                 profileGpuDurationMs[profileWriteIndex] = Gfx::RenderApi::Get()->GetGpuFrameDurationMs();
 
-                for (int i = 0; i < phaseCount; i++)
+                for (int i = 0; i < groupCount; i++)
                 {
-                    profileGpuPhases[i][profileWriteIndex] =
-                        Gfx::RenderApi::Get()->GetGpuScopeDurationMsAt(i);
+                    profileGpuPhases[i][profileWriteIndex] = groupDurations[i];
                 }
 
                 profileGpuVsyncMs[profileWriteIndex] = (scopeCount > 0)
@@ -254,9 +313,11 @@ namespace CC
             count = profileSampleCount;
         }
 
+        // Columns come from the recorded phase set rather than from the
+        // backend's live scopes, so the header always describes the samples
+        // underneath it even if the phase set changed since they were taken.
         bool hasGpu = Gfx::RenderApi::Get()->IsGpuTimerSupported();
-        int  gpuScopeCount = hasGpu ? Gfx::RenderApi::Get()->GetGpuScopeCount() : 0;
-        int  gpuPhaseCount = gpuScopeCount > 0 ? gpuScopeCount - 1 : 0;
+        int  gpuPhaseCount = hasGpu ? profileGpuPhaseCount : 0;
 
         std::string csv;
         csv += "Frame,Total,FrameStart,Update,UiUpdate,Render,UiRender,SwapBuffers";
@@ -264,15 +325,10 @@ namespace CC
         {
             for (int phase = 0; phase < gpuPhaseCount; phase++)
             {
-                csv += ",";
-                csv += Gfx::RenderApi::Get()->GetGpuScopeNameAt(phase);
+                csv += ",Gpu";
+                csv += profileGpuPhaseNames[phase];
             }
-            csv += ",GpuTotal";
-            if (gpuScopeCount > 0)
-            {
-                csv += ",";
-                csv += Gfx::RenderApi::Get()->GetGpuScopeNameAt(gpuScopeCount - 1);
-            }
+            csv += ",GpuTotal,GpuVSync";
         }
         csv += "\n";
 
@@ -347,7 +403,46 @@ namespace CC
 
     float FrameTimer::GetProfileGpuPhase(int phase, int index) const
     {
-        return profileGpuPhases[phase][index];
+        float result = 0.0f;
+        if (phase >= 0 && phase < PROFILE_MAX_GPU_PHASES)
+        {
+            result = profileGpuPhases[phase][index];
+        }
+        return result;
+    }
+
+    const char* FrameTimer::GetProfileGpuPhaseName(int phase) const
+    {
+        const char* result = "";
+        if (phase >= 0 && phase < profileGpuPhaseCount)
+        {
+            result = profileGpuPhaseNames[phase];
+        }
+        return result;
+    }
+
+    bool FrameTimer::AdoptGpuPhaseNames(const char names[][PROFILE_GPU_PHASE_NAME_LENGTH], int phaseCount)
+    {
+        bool hasChanged = phaseCount != profileGpuPhaseCount;
+
+        for (int i = 0; i < phaseCount && !hasChanged; i++)
+        {
+            hasChanged = strncmp(profileGpuPhaseNames[i], names[i],
+                                 PROFILE_GPU_PHASE_NAME_LENGTH) != 0;
+        }
+
+        if (hasChanged)
+        {
+            for (int i = 0; i < phaseCount; i++)
+            {
+                CopyGpuGroupName(names[i], profileGpuPhaseNames[i]);
+            }
+
+            profileWriteIndex  = 0;
+            profileSampleCount = 0;
+        }
+
+        return hasChanged;
     }
 
     float FrameTimer::GetProfileGpuDurationMs(int index) const

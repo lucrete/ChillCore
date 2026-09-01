@@ -1,4 +1,5 @@
 #include "GfxRenderApiOpenGl.h"
+#include <cstdio>
 #include "GlHandlePool.h"
 #include <GLFW/glfw3.h>
 #include "CCAssert.h"
@@ -443,9 +444,10 @@ namespace CC::Gfx
 
     void RenderApiOpenGl::EndFrame()
     {
-        // Open a "GpuRenderEnd" scope that spans the swap / vsync wait.
-        // AdvanceScopeRing closes it after SwapBuffers returns.
-        AddGpuTimestamp("GpuRenderEnd");
+        // Open a scope that spans the swap / vsync wait. AdvanceScopeRing
+        // closes it after SwapBuffers returns. FrameTimer treats the frame's
+        // last scope as the vsync wait rather than as a render phase.
+        AddGpuTimestamp("Swap");
         CC::PlatformWindow::Get()->SwapBuffers();
         AdvanceScopeRing();
     }
@@ -479,9 +481,9 @@ namespace CC::Gfx
         frame.scopeCount       = 0;
         frame.currentOpenScope = -1;
 
-        // Open the Idle scope on the new ring slot. Closes on the next
-        // "GpuRenderBegin" timestamp emitted by BeginRenderPass.
-        AddGpuTimestamp("GpuFrameBegin");
+        // Open the Idle scope on the new ring slot. Closes when the frame's
+        // first render pass opens a scope of its own.
+        AddGpuTimestamp("Idle");
     }
 
     // ========================
@@ -554,9 +556,22 @@ namespace CC::Gfx
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
-    void RenderApiOpenGl::BeginRenderPass(RenderTargetHandle target)
+    void RenderApiOpenGl::BeginRenderPass(RenderTargetHandle target, const char* scopeName)
     {
         CC_ASSERT(!renderPassActive, "BeginRenderPass: a render pass is already active");
+
+        // Opened before the clear rather than after it, so the pass's own
+        // clear is charged to the pass instead of to whatever ran before it.
+        AddGpuTimestamp(scopeName);
+
+        int nameLength = 0;
+        while (scopeName != nullptr && scopeName[nameLength] != '\0'
+               && nameLength < MAX_PASS_SCOPE_NAME - 1)
+        {
+            currentPassScopeName[nameLength] = scopeName[nameLength];
+            nameLength++;
+        }
+        currentPassScopeName[nameLength] = '\0';
 
         if (target.IsValid())
         {
@@ -609,7 +624,6 @@ namespace CC::Gfx
         InvalidateCachedState();
 
         renderPassActive = true;
-        AddGpuTimestamp("GpuRenderBegin");
     }
 
     void RenderApiOpenGl::EnsureBlitPipeline()
@@ -653,9 +667,10 @@ namespace CC::Gfx
 
         if (currentPassIsOffscreen)
         {
-            // Offscreen targets are single-sample: no MSAA resolve and no
-            // blit to the default framebuffer. Honour StoreOp::DontCare as a
-            // discard hint so tiled GPUs can drop the contents.
+            // No blit to the default framebuffer: an offscreen target is
+            // sampled, not presented. Multisampled storage is still resolved
+            // below, and StoreOp::DontCare is honoured as a discard hint so
+            // tiled GPUs can drop the contents.
             uint32_t slotIndex = currentRenderTarget.id;
             const GlRenderTarget& target = renderTargets[slotIndex];
             const RenderTargetDescription& desc = target.description;
@@ -704,7 +719,13 @@ namespace CC::Gfx
 
             // Resolve MSAA into the single-sample colorbuffer.
             sceneFrameBuffer->Resolve();
-            AddGpuTimestamp("GpuAfterMsaaResolve");
+
+            // Named after the pass being ended, so the resolve and the blit
+            // that presents it group with the work that produced them rather
+            // than appearing as a phase of their own.
+            char presentScopeName[MAX_PASS_SCOPE_NAME + 8];
+            snprintf(presentScopeName, sizeof(presentScopeName), "%s/Present", currentPassScopeName);
+            AddGpuTimestamp(presentScopeName);
 
             // Blit the resolved colorbuffer to the default framebuffer.
             EnsureBlitPipeline();

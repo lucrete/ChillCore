@@ -133,10 +133,11 @@ namespace CC
 
         // UiRender phase
         frameTimer->AddTimestamp(StandardTimestamp::UiRender,         "Ui Render");
+        Gfx::RenderApi::Get()->AddGpuTimestamp("UI");
         uiManager->Render();
         textRenderer->EndFrame();
         devUi->EndFrame();
-        Gfx::RenderApi::Get()->AddGpuTimestamp("GpuAfterUi");
+        Gfx::RenderApi::Get()->AddGpuTimestamp("Finalize");
 
         // SwapBuffers phase
         frameTimer->AddTimestamp(StandardTimestamp::SwapBuffers,      "SwapBuffers");

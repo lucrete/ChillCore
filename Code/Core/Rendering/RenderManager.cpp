@@ -187,7 +187,7 @@ namespace CC
         // Begin the scene render pass, into the offscreen target whenever one
         // could be built. The backbuffer is the fallback for a zero-sized
         // framebuffer (a minimised window), where there is nothing to present.
-        gfxApi->BeginRenderPass(SceneTargetForFrame());
+        gfxApi->BeginRenderPass(SceneTargetForFrame(), "Opaque");
 
         shaderManager->Update();
     }
@@ -437,10 +437,8 @@ namespace CC
         {
             renderableFullscreenQuad->PreRender();
             renderableFullscreenQuad->Render(nullptr);
-            gfxApi->AddGpuTimestamp("GpuAfterOpaque");
-            gfxApi->AddGpuTimestamp("GpuAfterTransparent");
+            gfxApi->AddGpuTimestamp("MSAA");
             gfxApi->EndRenderPass();
-            gfxApi->AddGpuTimestamp("GpuAfterPostProcess");
             DrawPostProcessPass();
         }
         else
@@ -454,7 +452,7 @@ namespace CC
                 renderables[i]->PreRender();
                 renderables[i]->Render(nullptr);
             }
-            gfxApi->AddGpuTimestamp("GpuAfterOpaque");
+            gfxApi->AddGpuTimestamp("Transparent");
 
             // Pass 2: Transparent objects (sorted back-to-front).
             // Each transparent renderable's pipeline bakes blend=on, depth-write=off.
@@ -471,10 +469,10 @@ namespace CC
                     transparentRenderables[i]->Render(nullptr);
                 }
             }
-            gfxApi->AddGpuTimestamp("GpuAfterTransparent");
-
+            // Ends the scene pass, which resolves its multisampled storage.
+            gfxApi->AddGpuTimestamp("MSAA");
             gfxApi->EndRenderPass();
-            gfxApi->AddGpuTimestamp("GpuAfterPostProcess");
+
             DrawPostProcessPass();
         }
     }

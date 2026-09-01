@@ -43,7 +43,17 @@ Three ordering constraints are worth knowing before rearranging anything:
 - Audio's update follows UI and developer UI, so a sound started by a button press this frame is not reaped in the same frame it began.
 - The developer UI draws after everything else, and the screen fade overlay draws after that, inside the render subsystem's end-of-frame. The fade must cover the developer UI, so nothing may draw later.
 
-Each phase boundary records a timestamp. The profiler's phase breakdown is generated from these, so adding a phase to the loop adds it to the profiler with no further work.
+Each phase boundary records a timestamp. The profiler's CPU breakdown is generated from these, so adding a phase to the loop adds it to the profiler with no further work.
+
+The GPU breakdown works the same way but is built from a separate set of markers, because GPU work does not align with the CPU phases that submitted it. A render pass opens a timing scope named by its caller, and a phase runs from one marker to the next, so each phase is named for the work it contains rather than for the boundary that precedes it. A frame reads as seven phases plus the swap wait: idle, opaque, transparent, the multisample resolve, post-processing, UI, and the final overlay.
+
+Three properties hold this together, and all three are load-bearing:
+
+- **A name is written down once, at the marker.** Anything displaying or recording phases reads the names back from the frame, so the profiler panel and the CSV export cannot drift from what the frame actually did. A panel holding its own list of phase names silently mislabels every phase after the first one that moves.
+- **Passes group into phases.** A scope named `Group/Detail` folds together with its neighbours in the same group, so post-processing is one phase whether it ran one pass or four. A capture tool still sees each pass separately. Without this the breakdown would restructure itself whenever an effect was switched on, which is exactly when it is being read.
+- **A pass's resolve is charged to the pass.** Ending a pass resolves and presents what it drew, so that cost is named after the pass rather than landing on whichever phase happens to follow.
+
+Grouping keeps the phase set fixed in normal use, but it is not guaranteed: a future phase could appear or disappear. A frame whose phase set differs from the recorded one cannot be compared against it, because the same index would mean two different things, so adopting a new set discards the history rather than blending the two.
 
 ## Design decisions
 
