@@ -2,7 +2,7 @@
 
 **Status:** The pipeline builds a self-contained output directory and runs it. What remains in plan is automated testing and packaged distribution.
 **Current state:** AGD-0040 (Build and Targets) describes the pipeline as it exists. This plan covers only what does not.
-**Sequence:** rows 9–10 of `02_Roadmap.md`. Android through the pipeline is not yet scheduled — see `03_TechBacklog.md`.
+**Scope:** the pipeline work that is in plan, in the order below. Building Android through the pipeline is not in plan and is not covered here.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Status:** Phases 0 to 5 have landed. What remains is the primary editing affordance, project file handling, several editor first-cuts, and the deferred polish phase.
 **Current state:** AGD-0150 (AudioTracker) describes what exists. This plan covers only what does not.
-**Sequence:** rows 4–6 of `02_Roadmap.md`. Editor first-cuts and the polish phase are not yet scheduled — see `03_TechBacklog.md`.
+**Scope:** the tracker work that is in plan, in the order below. The editor first-cuts and the polish phase are not in plan and are not covered here.
 
 ---
 

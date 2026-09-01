@@ -8,23 +8,6 @@ Last reviewed against the source: 2026-09-01.
 
 ## Rendering
 
-### Render target follow-ups
-
-Gaps left open by the offscreen render-target work (AGD-0080 Limitations). None blocking:
-
-- Array-layer and cubemap-face attachments. Needed before a cascaded shadow map or a cubemap reflection probe.
-- The backbuffer as a pool handle rather than an invalid one, which would remove the special case in the pass brackets.
-
-### Post-processing follow-ups
-
-Gaps left open by the post-process stack (AGD-0070 Limitations). None blocking:
-
-- Baking grade and tone map into a 3D LUT, as both commercial engines do. Needs render-to-3D-texture or the 2D strip fallback mobile paths use; the array-layer attachment gap above blocks the first.
-- A caller-defined post-process chain. Effects fuse into one pass in a fixed order; a caller cannot reorder them or insert its own.
-- Colour grading works on scalar parameters. Per-channel lift, gamma and gain are what a real grade needs, and would want a colour picker in the panel rather than three sliders each.
-- Procedural art passes through the tone curve. It authors display-referred colour, converts to linear on output, and the curve then compresses it, so it reads softer than it was picked. Either the art retunes against the curve or the path opts out of it; the second needs a way to mark content as already display-referred, which the stack has no concept of.
-- Scene lighting is authored in arbitrary intensities rather than photometric units. Linear lighting makes physical units possible; nothing yet requires them.
-
 ### Specular antialiasing
 
 Specular highlights shimmer under motion. Measured on the helmet model over a rotation sweep of 0.35 degrees per step: peak per-pixel change of 219 of 255 between adjacent steps, with bloom disabled.

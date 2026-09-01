@@ -1,8 +1,102 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, one unimplemented optimisation, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two sets of follow-ups left by work that has landed, a camera-control defect, one unimplemented optimisation, and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
-**Sequence:** rows 1–3 of `02_Roadmap.md`. Rendering work not yet scheduled (camera registration, the open design questions) is in `03_TechBacklog.md`.
+**Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — specular antialiasing, camera registration, the open design questions — is not covered here.
+
+---
+
+## Render target follow-ups
+
+Gaps left open when offscreen render targets landed. Neither blocks anything today; both block something specific next.
+
+### Array-layer and cubemap-face attachments
+
+A render target attaches whole textures only. A layer of an array texture, or one face of a cubemap, cannot be named as an attachment.
+
+**Why it matters.** It is the gate on two features rather than a quality issue in its own right. A cascaded shadow map renders each cascade into one layer of an array texture; a cubemap reflection probe renders each of six faces in turn. Neither can be built without it. It also blocks baking the colour grade into a 3D LUT — see the post-process follow-ups below — so a single change unblocks three consumers.
+
+**Shape of the work.** The attachment description gains a layer or face index, defaulting to the whole-texture behaviour that exists now. Both backends bind the named layer when creating the framebuffer. The desktop and GLES paths differ in which entry point does this, so the abstraction must not expose either directly.
+
+**Watch out.** Depth attachments have the same question and are easy to forget; a shadow cascade needs a layered depth attachment, not a layered colour one.
+
+**Done when:** a target can attach one layer of an array texture and one face of a cubemap, on both backends, and rendering into each layer in turn produces independent results.
+
+### The backbuffer as a pool handle
+
+The backbuffer is addressed as an invalid handle. Every pass bracket therefore carries a branch: valid handle means an offscreen target, invalid means the backbuffer.
+
+**Why it matters.** The special case is small but it is in the most-used path in the abstraction, and it is the reason pass code reads as two cases rather than one. Giving the backbuffer a real handle from the pool removes the branch and makes "the target for this pass" mean one thing.
+
+**Shape of the work.** Reserve a pool slot at initialisation whose description tracks the backbuffer's current size and sample count. Reconfiguring the backbuffer updates that entry rather than a separate description. The pass brackets then look up one entry with no branch.
+
+**Watch out.** The reserved entry must survive backbuffer reconfiguration, which currently rebuilds framebuffers wholesale, and it must never be destroyed by a caller holding the handle.
+
+**Done when:** the pass brackets have no backbuffer special case, and reconfiguring the backbuffer while holding the handle is safe.
+
+---
+
+## Post-processing follow-ups
+
+Gaps left open when the post-process stack landed. Ordered by what they unlock, not by cost.
+
+### Per-channel colour grading
+
+Lift, gamma and gain are scalars. A grade needs them per channel — that is what makes a preset a look rather than a brightness adjustment.
+
+**Why it matters.** It is the difference between the grade being usable and being a demonstration. Every reference grade in the presets is currently approximated with a single number where a colour is wanted.
+
+**Shape of the work.** Each of the three becomes a colour. The packed parameter block grows accordingly, and the developer panel wants a colour picker per control rather than three sliders each — the panel builds itself from the parameter description, so the description has to gain a colour type first.
+
+**Watch out.** The parameter block has a fixed capacity, and three colours cost more slots than three scalars. Check the budget before designing the layout, not after.
+
+**Done when:** lift, gamma and gain are per channel, the panel edits them as colours, and the presets are re-authored against the new controls.
+
+### A caller-defined effect chain
+
+Effects fuse into one pass in an order fixed by the shader. A caller cannot reorder them or insert its own.
+
+**Why it matters.** It is the ceiling on the whole stack. Any effect that does not fit the fused pass — depth of field, motion blur, anything needing its own targets — has nowhere to go, and the fused-pass shader grows a block per effect whether or not it is enabled.
+
+**Shape of the work.** The open question is what a chain entry is: a shader plus parameters, or something that can also declare intermediate targets. Bloom is the existing example of an effect that needs its own targets and its own passes, so it is the case to design against rather than an exception to it. Resolve that before writing anything.
+
+**Watch out.** The fused pass exists for a reason — a chain of separate passes is bandwidth bound and costs a full read and write of the frame per effect, which is the dominant cost on a tiled mobile GPU. A chain must still fuse what it can rather than becoming a pass per effect.
+
+**Done when:** a caller can declare an ordered chain including an effect of its own, and effects that can fuse still share one pass.
+
+### Baking grade and tone map into a LUT
+
+Both commercial engines evaluate the grade and tone curve once into a lookup table and sample it per pixel, rather than evaluating the maths per pixel.
+
+**Why it matters.** It moves the whole grade off the per-pixel path, and it is what makes an arbitrarily expensive grade cost the same as a cheap one.
+
+**Shape of the work.** Render to a 3D texture, or to the 2D strip that mobile paths use where 3D render targets are unavailable. The 3D route needs array-layer attachments, so the render-target follow-up above blocks it; the 2D strip route does not and is the sensible first target.
+
+**Watch out.** LUT resolution trades against banding in smooth gradients. Decide the resolution against a test gradient rather than a scene.
+
+**Done when:** grade and tone map are sampled from a baked table, the result matches the per-pixel path within a visually indistinguishable margin, and a capability-poor backend still has a path.
+
+### Procedural art through the tone curve
+
+Procedural art authors display-referred colour and converts to linear on output. With the tone map on, the curve then compresses it, so the art reads softer than it was picked. With the tone map off the round trip is exact.
+
+**Why it matters.** The art is finished pixels, not scene light, so applying a tone curve to it is a category error. It is cosmetic today because the art is the only content of its kind, and it stops being cosmetic as soon as anything else authors finished pixels.
+
+**Shape of the work.** Either the art is retuned against the curve, which is cheap and keeps the pipeline uniform, or the path gains a way to mark content as already display-referred and skip the output transform. The stack has no concept of the second. Pick one deliberately rather than drifting into the first by inaction.
+
+**Done when:** procedural art reads as authored with the tone map in its default state.
+
+### Photometric light units
+
+Light intensities are authored numbers, not physical units.
+
+**Why it matters.** Linear lighting makes real units possible, and real units are what let a light be specified once and behave the same in every scene. Nothing requires it yet, which is why it sits at the end of this list.
+
+**Shape of the work.** Light intensity gains a unit, exposure becomes a camera property rather than a post-process parameter, and existing scenes are re-authored. The exposure control already lives in the post-process stack, so this crosses two subsystems.
+
+**Watch out.** Re-authoring every existing scene is the bulk of the work, not the shader change.
+
+**Done when:** lights are specified in physical units, exposure is a camera property, and shipped scenes are re-authored against both.
 
 ---
 
