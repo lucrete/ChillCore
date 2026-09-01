@@ -41,7 +41,7 @@ Texture creation covers 2D, array and cubemap shapes. `depth` is present on the 
 
 Small: the shape branch and the storage call already exist for array textures, and the layered attachment path already handles selecting a slice, so a 3D texture would attach with no further work. Both backends carry identical copies of this code, so it is written twice.
 
-No consumer. The only named one is the 3D route to a baked grade table, which has a 2D strip alternative needing nothing new. Volumetric approaches and 3D noise would want it, and neither is planned.
+No consumer. Volumetric approaches and 3D noise would want it, and neither is planned.
 
 Also missing, and mentioned here so it is not rediscovered separately: cubemap arrays.
 
@@ -75,6 +75,39 @@ Implementation sits in `Code/App/Data/Shaders/Rendering/pbr.glsl`: the shading n
 
 **Done when:** the peak per-pixel change over the same rotation sweep drops substantially with bloom disabled, and tight highlights on low-roughness surfaces remain recognisably tight.
 
+### Photometric light units
+
+Light intensities are authored numbers, not physical units. `LightDirectional` holds a bare `intensity` float the PBR shader multiplies the BRDF by, so `2.0` means "twice 1.0" and nothing else. There is no answer to "how bright is the sun" beyond whatever looked right.
+
+**Deferred deliberately, not blocked.** Linear rendering was the prerequisite and it has landed: units only compose if the maths between them is linear. Nothing requires physical units yet, and the payoff is realism and authoring discipline rather than a feature. It earns its place when lighting has to match a reference photograph, or when a day/night cycle needs sun, moon and interior lamps to coexist at credible relative brightness — eyeballed multipliers stop scaling there.
+
+**Photometric, not radiometric.** Radiometric units measure raw energy in watts. Photometric units are the same quantities weighted by human eye sensitivity, so green counts for more than deep red at equal power. Realtime rendering wants the photometric set because the output is an image for a person.
+
+**Each light is expressed in its own unit, never a shared intensity.** A number that does not name its unit is not transferable, which is the whole point of the change. Which unit applies depends on the light's shape.
+
+| Light | Control | Range | Reference default |
+| --- | --- | --- | --- |
+| Directional | `Illuminance (lx)` | 0 – 130,000, logarithmic | 100,000, direct sun |
+| Point | `Luminous flux (lm)` | 0 – 20,000, logarithmic | 1,600, a 100 W-equivalent bulb |
+| Spot | `Luminous flux (lm)` | 0 – 20,000, logarithmic | 1,600 |
+| Emissive material | `Luminance (nits)` | 0 – 10,000, logarithmic | 100, a lit screen |
+
+**Logarithmic sliders are required, not a nicety.** A linear control over 0 – 130,000 spends nearly all its travel where everything is blown out, and leaves the range an interior lamp occupies too small to hit. Brightness is perceived roughly logarithmically, so the control should be too; a stop-based slider, each notch doubling, is the form artists already know.
+
+**Lumens is the authoring unit, candela the internal one.** The number on the bulb box is lumens, and the engine converts — `candela = lumens / 4π` for a point light. Spot cones force a decision that will confuse whoever tunes the second spot if it is made silently: holding **lumens** constant means narrowing the cone concentrates the same light and brightens the pool, which is what a physical reflector does; holding **candela** constant means narrowing only shrinks the pool. Film-lighting tools offer both. Lumens, with cone angle visibly affecting brightness, is the physical behaviour and matches the box.
+
+**Colour has to stop carrying brightness.** The shader currently multiplies `lightColor * lightIntensity`, so a colour of `(0.5, 0.5, 0.5)` halves the output and makes a stated lux value a lie. Colour becomes pure chromaticity, normalised so it cannot change the measured quantity, and the natural control is `Colour temperature (K)` over 1,500 – 15,000 with a swatch: 1,900 K candle, 2,700 K tungsten, 6,500 K daylight. Brightness then lives in exactly one field.
+
+**Reference values have to be within reach.** Nobody remembers that overcast daylight is 10,000 lx. A preset list beside the field that fills in a named value — "Overcast, 10,000 lx", "Office, 500 lx" — while leaving the number editable is the difference between the unit helping and it being extra typing.
+
+**Exposure becomes a camera property.** With the sun at 100,000, something must map the scene to the range the display accepts, and under physical units that something is a real camera: aperture, shutter speed and ISO combined into an EV100 value yielding the scale. It replaces the `exposure` parameter that currently sits on the tone-map effect in the post-process stack, so the work crosses two subsystems.
+
+**The cost is re-authoring, not the shader change.** Every existing scene's light values become wrong the moment the unit changes, and no mechanical conversion exists because the present numbers encode nothing. Bloom thresholds, the emissive ladder in the example scene, and the ambient term are all restated with them. Values in the tens of thousands also put more weight on the tone curve and on float precision than the current small range does.
+
+**Also note.** `LightDirectional::intensity` has a getter and no setter, and there is no light tuning panel at all, so the controls above are new surface either way. `PostProcessEffect` already solves the problem these panels pose — each effect declares its own parameter names, types, ranges and defaults, and the developer panel builds itself from that description — and lights would want the same treatment rather than a panel hardcoded per light type.
+
+**Done when:** lights are specified in physical units, exposure is a camera property, and shipped scenes are re-authored against both.
+
 ### Camera registration by name
 
 `CameraManager` keys its map by `std::string` and asserts rather than storing a null. `GetViewProjectionMatrix` and `GetCameraPosition` dereference `activeCamera` unguarded. No state registers a second camera beyond the manager's own default, so the F9 free-camera toggle is a no-op outside it. No longer crashes; not urgent.
@@ -85,13 +118,21 @@ Implementation sits in `Code/App/Data/Shaders/Rendering/pbr.glsl`: the shading n
 
 ### Editor first-cuts to replace
 
-- Track source assignment is a cycle button; the intended dropdown is blocked on `UiDropdown` supporting dynamically populated options.
-- Neither grid shows a playhead, though the transport publishes its position for exactly this.
-- The non-Windows storage path is a placeholder, pending a second desktop target.
+- Track source assignment is a "Cycle Source" button (`AudioTrackerController.cpp:583`). The intended dropdown is blocked on `UiDropdown` supporting dynamically populated options.
+- Neither grid shows a playhead. `TrackerClock` publishes its position for exactly this purpose and nothing reads it for display.
+- The non-Windows storage path is a placeholder (`TrackerPaths.h:14`), pending a second desktop target.
 
 ### Editor polish
 
-Follow-ups, none blocking anything: per-track gain and solo, variable step subdivision, pattern-length editing after creation, sample waveform display, keyboard shortcuts, mid-song tempo and time-signature automation, offline render to an audio file.
+Deferred as a group, none blocking anything. Each is a follow-up rather than part of the initial cut.
+
+- Per-track gain sliders and solo. Muting works in both views; gain and solo do not.
+- Variable step subdivision — eighths, sixteenths, thirty-seconds, triplets.
+- Editing pattern length after creation.
+- Waveform display for samples in the panel.
+- Keyboard shortcuts, including play and stop, and direct track selection.
+- Tempo and time-signature changes mid-song, with an automation lane.
+- Offline render to an audio file through the existing engine.
 
 ---
 
@@ -99,7 +140,10 @@ Follow-ups, none blocking anything: per-track gain and solo, variable step subdi
 
 ### Android platform gaps
 
-`CopyFile` / `ListDirectoryEntries` return failure and `WriteFileTextAtomic` is not atomic on Android. Deliberate — no Android consumer today — but blocks any Android feature needing directory enumeration or the atomicity guarantee. Detail in `PlatformAndBuildPlan.md`.
+Three file-system operations are unimplemented on Android (`PlatformFileSystemAndroid.cpp:158-172`). Deliberate — no Android consumer today.
+
+- `CopyFile` and `ListDirectoryEntries` both return failure, which blocks any Android feature needing to enumerate files.
+- `WriteFileTextAtomic` forwards to an ordinary write and is not atomic. Anything on Android that comes to depend on the atomicity guarantee needs this addressed first, which requires scoped-storage work.
 
 ### Android through the pipeline
 

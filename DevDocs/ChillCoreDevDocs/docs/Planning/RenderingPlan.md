@@ -1,42 +1,8 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is one set of follow-ups left by work that has landed, a camera-control defect, one unimplemented optimisation, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, one unimplemented optimisation, and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
-**Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — specular antialiasing, camera registration, the open design questions — is not covered here.
-
----
-
-## Post-processing follow-ups
-
-Gaps left open when the post-process stack landed. Ordered by what they unlock, not by cost.
-
-### Baking grade and tone map into a LUT
-
-Both commercial engines evaluate the grade and tone curve once into a lookup table and sample it per pixel, rather than evaluating the maths per pixel.
-
-**Why it matters.** It moves the whole grade off the per-pixel path, and it is what makes an arbitrarily expensive grade cost the same as a cheap one.
-
-**Shape of the work.** Render to a 3D texture, or to the 2D strip that mobile paths use where 3D render targets are unavailable. Texture creation covers 2D, array and cubemap shapes only, so the 3D route needs that gap closed first; the 2D strip route needs nothing new and is the sensible first target.
-
-**Measured before assuming.** The grade and tone curve are not what the fused pass spends its time on. At 800x600 the pass averages 0.598 ms with both enabled and 0.565 ms with both disabled: the ACES curve costs 0.031 ms and the entire per-channel grade a further 0.002 ms, around 0.2% of a frame. A grade doing three logs, three exps and three pows per pixel for 0.002 ms means the pass is bandwidth bound rather than arithmetic bound — which is the same reason the pass is fused in the first place. A lookup table moves arithmetic off the per-pixel path and adds a texture fetch, so on this evidence it would save nothing and could cost. Desktop only; the balance on device is unmeasured.
-
-**So the reason to do it is authoring, not speed.** A baked table can be imported: a colourist grades in a standalone tool and hands over a `.cube` file, which the preset table cannot accept. If this is picked up, it should be framed as that feature.
-
-**Watch out.** LUT resolution trades against banding in smooth gradients. Decide the resolution against a test gradient rather than a scene.
-
-**Done when:** grade and tone map are sampled from a baked table, the result matches the per-pixel path within a visually indistinguishable margin, and a capability-poor backend still has a path.
-
-### Photometric light units
-
-Light intensities are authored numbers, not physical units.
-
-**Why it matters.** Linear lighting makes real units possible, and real units are what let a light be specified once and behave the same in every scene. Nothing requires it yet, which is why it sits at the end of this list.
-
-**Shape of the work.** Light intensity gains a unit, exposure becomes a camera property rather than a post-process parameter, and existing scenes are re-authored. The exposure control already lives in the post-process stack, so this crosses two subsystems.
-
-**Watch out.** Re-authoring every existing scene is the bulk of the work, not the shader change.
-
-**Done when:** lights are specified in physical units, exposure is a camera property, and shipped scenes are re-authored against both.
+**Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — photometric light units, specular antialiasing, camera registration, the open design questions — is not covered here.
 
 ---
 

@@ -6,6 +6,17 @@
 
 ---
 
+## Automated testing
+
+**Not started.** Design belongs with this plan because it shares the pipeline's entry-point shape and its report folder.
+
+- `RunTests.sh` alongside `Build.sh` and `Run.sh`: interactive when double-clicked, argument-driven otherwise, same exit-code contract.
+- Results land in the same per-build folder as the build that produced them, in both a machine-readable and a human-readable form, so a build and its test results are one record.
+- The first tests are the cheapest useful ones: the engine starts, loads a scene, and shuts down without faulting. The run-and-capture machinery for that already exists.
+- What a test failure means for the build's exit code is a decision to make when the first test exists, not before.
+
+---
+
 ## Packaged distribution
 
 **Not started.** The output directory is now self-contained, so there is something worth archiving.
@@ -19,14 +30,3 @@ An archive of the output directory — executable, runtime data, and the build r
 **Later, and out of scope for this:** an installer, code signing, documentation bundling. Each is a separate decision and none blocks the archive.
 
 **Done when:** a labelled build produces an archive that, extracted anywhere on a machine with no development tooling, runs.
-
----
-
-## Automated testing
-
-**Not started.** Design belongs with this plan because it shares the pipeline's entry-point shape and its report folder.
-
-- `RunTests.sh` alongside `Build.sh` and `Run.sh`: interactive when double-clicked, argument-driven otherwise, same exit-code contract.
-- Results land in the same per-build folder as the build that produced them, in both a machine-readable and a human-readable form, so a build and its test results are one record.
-- The first tests are the cheapest useful ones: the engine starts, loads a scene, and shuts down without faulting. The run-and-capture machinery for that already exists.
-- What a test failure means for the build's exit code is a decision to make when the first test exists, not before.
