@@ -177,17 +177,28 @@ namespace CC
         PlatformWindow::Get()->GetFramebufferSize(width, height);
         TextRenderer::Get()->BeginFrame(width, height);
 
-        // The offscreen target is not optional. The scene is rendered in
-        // scene-linear light and the post-process pass is what encodes it to
-        // display space, so the pass runs every frame whether or not any
-        // effect is enabled. Rendering the scene straight to the backbuffer
+        // For a scene, the offscreen target is not optional: the scene is
+        // rendered in scene-linear light and the post-process pass is what
+        // encodes it to display space, so the pass runs every frame whether or
+        // not any effect is enabled. Rendering it straight to the backbuffer
         // would present linear values as if they were sRGB.
-        EnsurePostProcessTarget(width, height);
+        //
+        // A fullscreen quad is the opposite. It writes finished, display-
+        // referred pixels, so it goes straight to the backbuffer with nothing
+        // applied, and the target it would have rendered into is released.
+        if (fullscreenQuad)
+        {
+            DestroyPostProcessTarget();
+        }
+        else
+        {
+            EnsurePostProcessTarget(width, height);
+        }
 
-        // Begin the scene render pass, into the offscreen target whenever one
-        // could be built. The backbuffer is the fallback for a zero-sized
-        // framebuffer (a minimised window), where there is nothing to present.
-        gfxApi->BeginRenderPass(SceneTargetForFrame(), "Opaque");
+        // The backbuffer is also the fallback for a zero-sized framebuffer
+        // (a minimised window), where there is nothing to present.
+        gfxApi->BeginRenderPass(SceneTargetForFrame(),
+                                fullscreenQuad ? "FullscreenQuad" : "Opaque");
 
         shaderManager->Update();
     }
@@ -195,7 +206,7 @@ namespace CC
     Gfx::RenderTargetHandle RenderManager::SceneTargetForFrame() const
     {
         Gfx::RenderTargetHandle result = gfxApi->GetBackbuffer();
-        if (IsPostProcessEnabled())
+        if (!fullscreenQuad && IsPostProcessEnabled())
         {
             result = postProcessTarget;
         }
@@ -392,7 +403,8 @@ namespace CC
 
     void RenderManager::DrawPostProcessPass()
     {
-        if (IsPostProcessEnabled())
+        // A fullscreen quad has already presented itself.
+        if (!fullscreenQuad && IsPostProcessEnabled())
         {
             postProcess->Execute(postProcessColorTexture, postProcessSampler,
                                  postProcessTargetWidth, postProcessTargetHeight);
@@ -437,7 +449,6 @@ namespace CC
         {
             renderableFullscreenQuad->PreRender();
             renderableFullscreenQuad->Render(nullptr);
-            gfxApi->AddGpuTimestamp("MSAA");
             gfxApi->EndRenderPass();
             DrawPostProcessPass();
         }

@@ -12,7 +12,6 @@ void main() {
 
 #shader fragment
 #version 430 core
-#include "Include/colorSpace.glinc"
 out vec4 FragColor;
 
 in vec2 uv;
@@ -72,10 +71,7 @@ void main()
 
     vec3 col = palette(iter/maxIter);
     
-    // Authored in display space, but the scene target holds scene-linear
-    // light. Converting on output keeps the picked colours looking as
-    // they were chosen once the post-process pass encodes back to sRGB.
-    FragColor = vec4(SrgbToLinear(col), 1.0);
+    FragColor = vec4(col , 1.0);
 }
 
 

@@ -12,7 +12,6 @@ void main() {
 
 #shader fragment
 #version 430 core
-#include "Include/colorSpace.glinc"
 #include "Include/frameUniforms.glinc"
 
 out vec4 FragColor;
@@ -102,9 +101,6 @@ void main()
 {
     vec2 uvAdjust = aspectAdjustUvCentered(uv);
     float timeAbsolute = frameUniforms.cameraPositionAndTime.w;
-    // Authored in display space, but the scene target holds scene-linear
-    // light. Converting on output keeps the picked colours looking as
-    // they were chosen once the post-process pass encodes back to sRGB.
-    FragColor = SrgbToLinear(circle(uvAdjust, vec2(0.0, 0.0), 0.5 + 0.45*sin(.5*timeAbsolute), timeAbsolute*0.1 + -.3*cos(timeAbsolute)));
+    FragColor = circle(uvAdjust, vec2(0.0, 0.0), 0.5 + 0.45*sin(.5*timeAbsolute), timeAbsolute*0.1 + -.3*cos(timeAbsolute));
 }
 

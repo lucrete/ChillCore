@@ -12,7 +12,6 @@ void main() {
 
 #shader fragment
 #version 430 core
-#include "Include/colorSpace.glinc"
 #include "Include/frameUniforms.glinc"
 
 out vec4 FragColor;
@@ -51,8 +50,5 @@ void main() {
         finalColor += col * d;
     }   
     
-    // Authored in display space, but the scene target holds scene-linear
-    // light. Converting on output keeps the picked colours looking as
-    // they were chosen once the post-process pass encodes back to sRGB.
-    FragColor = vec4(SrgbToLinear(finalColor), 1.0);
+    FragColor = vec4(finalColor, 1.0);
 }
