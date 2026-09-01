@@ -13,6 +13,8 @@ void main()
 
 #shader fragment
 #version 430 core
+#include "Include/colorSpace.glinc"
+
 out vec4 FragColor;
 
 in vec2 TexCoords;
@@ -21,15 +23,43 @@ layout(binding = 0) uniform sampler2D sceneTexture;
 
 layout(std140, binding = 5) uniform CustomParams
 {
-    vec4 prefilterParams;  // x: threshold, y: knee
+    vec4 prefilterParams;  // x: threshold, y: knee, zw: source texel size
 };
+
+// Karis average: weight each tap by 1/(1 + luma) instead of averaging evenly.
+//
+// A specular highlight only a pixel or two across carries far more energy
+// than its neighbours. Averaged evenly, the downsampled value jumps as the
+// highlight crosses a texel boundary, and the threshold then turns that jump
+// into bloom appearing and disappearing — flicker under the smallest camera
+// movement. Weighting by inverse brightness makes a lone bright texel
+// contribute little, while an evenly bright block is left as it was, so
+// broad highlights still bloom at full strength.
+vec3 KarisAverage(vec3 a, vec3 b, vec3 c, vec3 d)
+{
+    float weightA = 1.0 / (1.0 + Luminance(a));
+    float weightB = 1.0 / (1.0 + Luminance(b));
+    float weightC = 1.0 / (1.0 + Luminance(c));
+    float weightD = 1.0 / (1.0 + Luminance(d));
+
+    return (a * weightA + b * weightB + c * weightC + d * weightD)
+         / (weightA + weightB + weightC + weightD);
+}
 
 // Soft-knee bright pass. A hard threshold makes bloom pop in and out as a
 // highlight crosses it, which reads as flicker in motion; the knee ramps the
 // contribution in over a range around the threshold instead.
 void main()
 {
-    vec3 color = texture(sceneTexture, TexCoords).rgb;
+    // The four source texels this half-resolution texel covers, taken
+    // individually so they can be weighted rather than box averaged.
+    vec2 halfTexel = prefilterParams.zw * 0.5;
+    vec3 tapA = texture(sceneTexture, TexCoords + vec2(-halfTexel.x, -halfTexel.y)).rgb;
+    vec3 tapB = texture(sceneTexture, TexCoords + vec2( halfTexel.x, -halfTexel.y)).rgb;
+    vec3 tapC = texture(sceneTexture, TexCoords + vec2(-halfTexel.x,  halfTexel.y)).rgb;
+    vec3 tapD = texture(sceneTexture, TexCoords + vec2( halfTexel.x,  halfTexel.y)).rgb;
+
+    vec3 color = KarisAverage(tapA, tapB, tapC, tapD);
 
     float threshold = prefilterParams.x;
     float knee = max(prefilterParams.y * threshold, 0.0001);

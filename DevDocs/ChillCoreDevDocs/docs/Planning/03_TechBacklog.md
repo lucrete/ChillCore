@@ -24,6 +24,7 @@ Gaps left open by the post-process stack (AGD-0070 Limitations). None blocking:
 - Colour grading works on scalar parameters. Per-channel lift, gamma and gain are what a real grade needs, and would want a colour picker in the panel rather than three sliders each.
 - Procedural art passes through the tone curve. It authors display-referred colour, converts to linear on output, and the curve then compresses it, so it reads softer than it was picked. Either the art retunes against the curve or the path opts out of it; the second needs a way to mark content as already display-referred, which the stack has no concept of.
 - Scene lighting is authored in arbitrary intensities rather than photometric units. Linear lighting makes physical units possible; nothing yet requires them.
+- Specular antialiasing. A highlight smaller than a pixel shimmers under motion, measurably and independently of bloom, because multisampling addresses geometry edges and not shading within a triangle. The usual answer is roughness regularisation from normal-map variance; temporal antialiasing would also cover it and is the larger piece of work.
 
 ### Camera registration by name
 

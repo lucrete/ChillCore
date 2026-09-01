@@ -108,7 +108,8 @@ namespace CC
     private:
         void ConfigureEffects();
         void UploadUberParameters();
-        void RunBloomPasses(Gfx::TextureHandle sceneColorTexture, Gfx::SamplerHandle sampler);
+        void RunBloomPasses(Gfx::TextureHandle sceneColorTexture, Gfx::SamplerHandle sampler,
+                            int sourceWidth, int sourceHeight);
         void EnsureBloomTargets(int width, int height);
         void DestroyBloomTargets();
 

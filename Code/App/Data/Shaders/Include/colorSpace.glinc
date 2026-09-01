@@ -28,6 +28,13 @@ vec3 LinearToSrgb(vec3 color)
     return mix(srgbHigh, srgbLow, cutoff);
 }
 
+// Rec. 709 luma. Used wherever a single brightness has to stand in for a
+// colour: the bright pass weighting, and desaturation in the grade.
+float Luminance(vec3 color)
+{
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
 vec4 SrgbToLinear(vec4 color)
 {
     return vec4(SrgbToLinear(color.rgb), color.a);

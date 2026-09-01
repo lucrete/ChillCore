@@ -265,7 +265,7 @@ namespace CC
         if (isBloomEnabled)
         {
             EnsureBloomTargets(width, height);
-            RunBloomPasses(sceneColorTexture, sampler);
+            RunBloomPasses(sceneColorTexture, sampler, width, height);
         }
 
         UploadUberParameters();
@@ -362,7 +362,8 @@ namespace CC
             grade.GetParamValue("gain")));
     }
 
-    void PostProcess::RunBloomPasses(Gfx::TextureHandle sceneColorTexture, Gfx::SamplerHandle sampler)
+    void PostProcess::RunBloomPasses(Gfx::TextureHandle sceneColorTexture, Gfx::SamplerHandle sampler,
+                                    int sourceWidth, int sourceHeight)
     {
         Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
         const PostProcessEffect& bloom = GetEffect(PostProcessEffectId::Bloom);
@@ -370,8 +371,13 @@ namespace CC
         float threshold = bloom.GetParamValue("threshold");
         float knee      = bloom.GetParamValue("knee");
 
+        // The bright pass weights the four source texels behind each of its
+        // own, so it needs the source texel size rather than its own.
+        float sourceTexelU = 1.0f / static_cast<float>(sourceWidth > 0 ? sourceWidth : 1);
+        float sourceTexelV = 1.0f / static_cast<float>(sourceHeight > 0 ? sourceHeight : 1);
+
         bloomPrefilterMaterial->SetUniform("prefilterParams",
-            Vector4(threshold, knee, 0.0f, 0.0f));
+            Vector4(threshold, knee, sourceTexelU, sourceTexelV));
 
         // Pass 1: bright pass, full res in, half res out.
         gfxApi->BeginRenderPass(bloomTarget[0], "PostProcess/BloomPrefilter");

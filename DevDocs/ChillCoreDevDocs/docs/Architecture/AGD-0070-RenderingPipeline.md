@@ -144,6 +144,8 @@ A full-screen pass is bandwidth bound, not arithmetic bound: it reads a frame an
 
 Bloom is the exception because it cannot be expressed as a block: it needs a downsampled bright pass and a separable blur, each sampling the result of the last. It runs at half resolution — the blur is low frequency, so the detail is not missed, and it quarters the bandwidth of every bloom pass — and hands its result to the fused pass as a second texture.
 
+The bright pass weights its four source texels by inverse brightness rather than averaging them evenly. A specular highlight a pixel or two across carries far more energy than its neighbours, so an even average makes the downsampled value jump as the highlight crosses a texel boundary, and the threshold turns that jump into bloom appearing and disappearing — flicker under the smallest camera movement. Weighting by inverse brightness leaves an evenly bright block alone while suppressing a lone bright texel, which measured as an 81% reduction in halo instability for a 0.6% loss of bloom energy.
+
 The cost is that effect order is fixed by the shader rather than chosen by the caller, and that every effect's code is compiled into one shader whether or not it is enabled.
 
 ### Grading happens before the tone curve, in log space
@@ -186,6 +188,7 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
 - Effect order in the fused pass is fixed by the shader. A caller cannot reorder effects or insert one of its own.
 - Procedural art authors display-referred colour and converts on output, so with the tone map on it passes through the curve and reads softer than it was picked. Switching the tone map off makes the round trip exact.
+- Specular highlights alias under motion. Multisampling fixes geometry edges, not shading inside a triangle, so a highlight smaller than a pixel shimmers as it moves whether or not bloom is on. The bright pass no longer amplifies it, but the underlying shimmer remains.
 - Lighting is linear but the light values themselves are not physical: intensities are authored numbers, not photometric units, so a scene is still tuned by eye rather than by measurement.
 - Where the backend cannot render to a half-float target the scene target falls back to 8-bit, so tone mapping and bloom keep working but have no range above white to use.
 - Shadow maps and reflection probes are not built. Render targets make them possible; nothing in the frontend produces or consumes one yet.
