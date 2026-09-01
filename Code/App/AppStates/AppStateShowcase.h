@@ -28,27 +28,15 @@ private:
     enum ShowcaseActions
     {
         Pause = CC::InputAction::GameActionStart,
-        CyclePostProcess,
+        CycleGradePreset,
         ShowcaseActionMax
-    };
-
-    // Off renders straight to the backbuffer. Tonemap is the cheapest stack
-    // that still routes through the offscreen target, so it is the A/B against
-    // the direct path. Full turns on everything the stack can do at once.
-    // Cycles the demo through the stack. Clamped is not "post-processing
-    // off" — the pass always runs to encode the frame to display space — it
-    // is the tone curve replaced by a hard clip, which is what makes the
-    // emissive ladder in the scene worth looking at.
-    enum class PostProcessMode
-    {
-        Clamped,
-        Tonemap,
-        Full
     };
 
     bool isPaused;
     bool pendingTogglePause;
-    PostProcessMode postProcessMode;
+    // Which grade preset the cycle key last applied. Held as an index because
+    // the presets are loaded from a file and their names are not known here.
+    int gradePresetIndex;
     bool wasMouseLocked;
     float elapsedTime;
 
@@ -61,7 +49,7 @@ private:
     void SceneInit();
     void SceneShutdown();
     void TogglePause();
-    void CyclePostProcessMode();
+    void ApplyNextGradePreset();
     void UpdateTimerDisplay();
 };
 

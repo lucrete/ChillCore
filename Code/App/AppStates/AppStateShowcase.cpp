@@ -24,7 +24,7 @@ AppStateShowcase::AppStateShowcase()
     : currentMode(InWorld)
     , isPaused(false)
     , pendingTogglePause(false)
-    , postProcessMode(PostProcessMode::Tonemap)
+    , gradePresetIndex(0)
     , wasMouseLocked(false)
     , elapsedTime(0.0f)
     , procArtController(nullptr)
@@ -53,7 +53,7 @@ void AppStateShowcase::Init()
     CC::InputActionMap& actionMap = CC::InputManager::Get()->GetActionMap();
     actionMap.CreateContext("AppStateShowcase");
     actionMap.RegisterAction(CC::ActionDef(Pause, "Pause", CC::InputTrigger::GamepadStart));
-    actionMap.RegisterAction(CC::ActionDef(CyclePostProcess, "CyclePostProcess", CC::InputTrigger::GamepadFaceRight));
+    actionMap.RegisterAction(CC::ActionDef(CycleGradePreset, "CycleGradePreset", CC::InputTrigger::GamepadFaceRight));
 
     CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
     screens->RegisterScreen("ShowcaseHud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
@@ -76,7 +76,7 @@ void AppStateShowcase::Init()
     pendingTogglePause = false;
     currentMode = InWorld;
     elapsedTime = 0.0f;
-    postProcessMode = PostProcessMode::Tonemap;
+    gradePresetIndex = 0;
 }
 
 void AppStateShowcase::SceneInit()
@@ -122,9 +122,9 @@ void AppStateShowcase::Update()
         TogglePause();
     }
 
-    if (CC::InputManager::Get()->EdgePositive(CyclePostProcess))
+    if (CC::InputManager::Get()->EdgePositive(CycleGradePreset))
     {
-        CyclePostProcessMode();
+        ApplyNextGradePreset();
     }
 
     if (CC::InputManager::Get()->EdgePositive(CC::InputAction::DevReloadScene))
@@ -211,39 +211,24 @@ void AppStateShowcase::TogglePause()
     }
 }
 
-void AppStateShowcase::CyclePostProcessMode()
+void AppStateShowcase::ApplyNextGradePreset()
 {
     CC::PostProcess* postProcess = CC::RenderManager::Get()->GetPostProcess();
-    const char* modeName = "clamped";
+    int presetCount = postProcess->GetPresetCount();
 
-    switch (postProcessMode)
+    if (presetCount <= 0)
     {
-    case PostProcessMode::Clamped:
-        postProcessMode = PostProcessMode::Tonemap;
-        postProcess->DisableAllEffects();
-        postProcess->GetEffect(CC::PostProcessEffectId::Tonemap).SetEnabled(true);
-        modeName = "tonemap";
-        break;
-
-    case PostProcessMode::Tonemap:
-        postProcessMode = PostProcessMode::Full;
-        postProcess->GetEffect(CC::PostProcessEffectId::Bloom).SetEnabled(true);
-        postProcess->GetEffect(CC::PostProcessEffectId::Vignette).SetEnabled(true);
-        postProcess->ApplyPreset("Warm");
-        modeName = "bloom + vignette + warm grade";
-        break;
-
-    case PostProcessMode::Full:
-        postProcessMode = PostProcessMode::Clamped;
-        postProcess->DisableAllEffects();
-        modeName = "clamped";
-        break;
-
-    default:
-        break;
+        CCPrint(CC::PrintManager::CHANNEL_WARN, "AppStateShowcase: no grade presets to cycle");
     }
+    else
+    {
+        gradePresetIndex = (gradePresetIndex + 1) % presetCount;
 
-    CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateShowcase: post-process %s", modeName);
+        const char* presetName = postProcess->GetPresetName(gradePresetIndex);
+        postProcess->ApplyPreset(presetName);
+
+        CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateShowcase: grade preset '%s'", presetName);
+    }
 }
 
 void AppStateShowcase::UpdateTimerDisplay()

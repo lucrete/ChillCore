@@ -156,7 +156,9 @@ The fused pass runs bloom composite, exposure, vignette, log encode, grade, tone
 
 Grading after the tone curve would be simpler, and it is what a naive reading suggests, but it makes every grade depend on the exposure it was authored at: the same contrast value lands differently once the tone curve has already compressed the highlights. Encoding to log first and grading there is what makes a preset portable between scenes, and it is what both commercial engines do. Vignette runs earlier still, in linear, because it is a lens effect on incoming light rather than a look applied to a finished image.
 
-Tone mapping is a mode rather than a toggle: off clamps rather than doing nothing, so switching it off stays well defined. It is on by default, because the scene carries genuine values above white and a clamp clips them flat — an emissive surface at four times white and one at twelve become the same undifferentiated patch.
+Tone mapping is a mode rather than a toggle: off clamps rather than doing nothing, so switching it off stays well defined. A clamp clips genuine values above white flat — an emissive surface at four times white and one at twelve become the same undifferentiated patch.
+
+Every effect is on by default. The stack is the output transform rather than a set of optional extras: the scene renders in scene-linear light and only this pass encodes it for display, so a frame with the stack switched off is the exception to reach for deliberately, not the state to start from. Each effect's defaults are neutral enough to serve as the baseline look, and the grade starts on the neutral preset.
 
 ### Post-processing is an engine capability, chosen by effect alone
 

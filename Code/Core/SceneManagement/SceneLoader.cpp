@@ -15,6 +15,7 @@
 #include "PrintManager.h"
 #include "GltfLoader.h"
 #include "PlatformFileSystem.h"
+#include "YamlUtils.h"
 
 namespace CC
 {
@@ -22,36 +23,6 @@ namespace CC
     // Helper Functions
     // ========================
 
-    static std::string NodeToString(ryml::ConstNodeRef node)
-    {
-        if (!node.has_val())
-        {
-            return "";
-        }
-        c4::csubstr val = node.val();
-        return std::string(val.data(), val.size());
-    }
-
-    static std::string KeyToString(ryml::ConstNodeRef node)
-    {
-        if (!node.has_key())
-        {
-            return "";
-        }
-        c4::csubstr key = node.key();
-        return std::string(key.data(), key.size());
-    }
-
-    static float NodeToFloat(ryml::ConstNodeRef node)
-    {
-        if (!node.has_val())
-        {
-            return 0.0f;
-        }
-        float value = 0.0f;
-        node >> value;
-        return value;
-    }
 
     // ========================
     // Scene Loading

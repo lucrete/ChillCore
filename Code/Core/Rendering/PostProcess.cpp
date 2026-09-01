@@ -67,6 +67,11 @@ namespace CC
         , bloomWidth(0)
         , bloomHeight(0)
     {
+        // The grade starts at its neutral defaults, which is what the Neutral
+        // preset holds, so naming it here keeps the reported look and the
+        // actual parameter values in step from the first frame.
+        CopyBounded(activePresetName, "Neutral", MAX_PRESET_NAME);
+
         ConfigureEffects();
     }
 
@@ -466,22 +471,28 @@ namespace CC
     // Private
     // ========================
 
+    // Every effect is on by default. The stack is the engine's output
+    // transform, not a set of optional extras: the scene renders in
+    // scene-linear light and only the fused pass encodes it for display, so a
+    // frame with the stack switched off is the exception to reach for
+    // deliberately rather than the state to start from. Each effect's default
+    // parameters are neutral enough to be the baseline look.
     void PostProcess::ConfigureEffects()
     {
         PostProcessEffect& bloom = GetEffect(PostProcessEffectId::Bloom);
-        bloom.Configure(EFFECT_NAME_BLOOM, false);
+        bloom.Configure(EFFECT_NAME_BLOOM, true);
         bloom.AddParam("threshold", 1.0f, 0.0f, 5.0f);
         bloom.AddParam("knee",      0.5f, 0.0f, 1.0f);
         bloom.AddParam("intensity", 0.6f, 0.0f, 3.0f);
 
         PostProcessEffect& vignette = GetEffect(PostProcessEffectId::Vignette);
-        vignette.Configure(EFFECT_NAME_VIGNETTE, false);
+        vignette.Configure(EFFECT_NAME_VIGNETTE, true);
         vignette.AddParam("intensity",  0.5f, 0.0f, 1.0f);
         vignette.AddParam("smoothness", 0.5f, 0.01f, 1.0f);
         vignette.AddParam("roundness",  1.0f, 0.0f, 1.0f);
 
         PostProcessEffect& grade = GetEffect(PostProcessEffectId::ColorGrade);
-        grade.Configure(EFFECT_NAME_COLORGRADE, false);
+        grade.Configure(EFFECT_NAME_COLORGRADE, true);
         grade.AddParam("contrast",    1.0f, 0.0f, 2.0f);
         grade.AddParam("saturation",  1.0f, 0.0f, 2.0f);
         grade.AddParam("temperature", 0.0f, -1.0f, 1.0f);
@@ -500,10 +511,9 @@ namespace CC
         grade.AddParam("blendMode",     0.0f, 0.0f, 3.0f);
         grade.AddParam("blendStrength", 0.0f, 0.0f, 1.0f);
 
-        // On by default. The scene is rendered in scene-linear light, so
-        // values above white are real and need a curve to roll them off.
-        // Switching it off falls back to a hard clamp, which clips an emissive
-        // surface or a bright highlight flat instead.
+        // Switching the tone curve off falls back to a hard clamp, which
+        // clips an emissive surface or a bright highlight flat instead of
+        // rolling it off.
         //
         // Exposure applies either way: it scales the scene before the curve,
         // and is as meaningful when the frame is clamped as when it is
