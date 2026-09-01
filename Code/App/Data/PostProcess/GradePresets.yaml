@@ -63,3 +63,14 @@ presets:
     lift: [-0.0200, -0.0200, -0.0100]
     gamma: [0.9500, 0.9500, 0.9700]
     gain: [1.0000, 1.0000, 1.0200]
+  - name: Juno
+    contrast: 1.1500
+    saturation: 1.3000
+    temperature: 0.2000
+    tint: 0.0600
+    lift: [-0.0200, 0.0000, 0.0200]
+    gamma: [1.0200, 1.0000, 0.9800]
+    gain: [1.0800, 1.0200, 0.9400]
+    blendColor: [0.9000, 0.7000, 0.4500]
+    blendMode: 3.0000
+    blendStrength: 0.1500
