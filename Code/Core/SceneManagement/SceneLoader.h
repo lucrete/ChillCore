@@ -21,6 +21,7 @@ namespace CC
 
     private:
         static bool ProcessMaterials(ryml::ConstNodeRef materials);
+        static void ProcessPostProcess(ryml::ConstNodeRef postProcessNode);
         static SceneObject* ProcessObject(ryml::ConstNodeRef objNode);
     };
 }

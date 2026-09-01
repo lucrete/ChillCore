@@ -1,6 +1,6 @@
 # AGD-0140: Audio Subsystem
 
-- **Scope:** Sound effect and music playback — loading, triggering, controlling, and mixing. Covers the library choice, format support, and the split between fire-and-forget and controlled sounds. Does not cover the tracker built on top of it, which is AGD-0150.
+- **Scope:** Sound effect and music playback — loading, triggering, controlling, and mixing. Covers the library choice, format support, and the split between fire-and-forget and controlled sounds. Does not cover the tracker built on top of it.
 
 ## Overview
 

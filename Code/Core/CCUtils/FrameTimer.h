@@ -50,7 +50,11 @@ namespace CC
         // Profile data
         static const int PROFILE_HISTORY_SIZE = 300;
         static const int PROFILE_CPU_PHASES = 6;
-        static const int PROFILE_MAX_GPU_PHASES = 8;
+        // Headroom over the phases a frame emits. Passes group into far
+        // fewer phases than there are passes, but the raw scope count is what
+        // has to fit while they are being grouped.
+        static const int PROFILE_MAX_GPU_PHASES = 16;
+        static const int PROFILE_GPU_PHASE_NAME_LENGTH = 32;
         static constexpr float MAX_RECORDABLE_FRAME_TIME_MS = 100.0f;
 
         void RecordProfileData();
@@ -68,6 +72,10 @@ namespace CC
         float GetProfileGpuDurationMs(int index) const;
         float GetProfileGpuVsyncMs(int index) const;
         int GetProfileGpuPhaseCount() const;
+
+        // Phase names come from the backend's resolved scopes, so a caller
+        // displaying or recording them never writes the names down itself.
+        const char* GetProfileGpuPhaseName(int phase) const;
 
     private:
         static FrameTimer* instance;
@@ -101,6 +109,13 @@ namespace CC
         int profileWriteIndex = 0;
         int profileSampleCount = 0;
         int profileGpuPhaseCount = 0;
+        char profileGpuPhaseNames[PROFILE_MAX_GPU_PHASES][PROFILE_GPU_PHASE_NAME_LENGTH] = {};
+
+        // A frame whose phase set differs from the stored one cannot be
+        // compared against the history, because phase i would mean two
+        // different things in the same graph. Adopting the new set discards
+        // the history rather than blending them.
+        bool AdoptGpuPhaseNames(const char names[][PROFILE_GPU_PHASE_NAME_LENGTH], int phaseCount);
 
         // Capture state
         bool capturing = false;

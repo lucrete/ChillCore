@@ -53,8 +53,16 @@ namespace CC::Gfx
         // Render pass
         // ========================
 
-        virtual void BeginDefaultRenderPass(const float clearColor[4], float clearDepth) = 0;
-        virtual void BeginRenderPass(RenderTargetHandle target)                          = 0;
+        // scopeName labels the pass on the GPU timeline: the pass opens a
+        // timing scope under that name, so a frame with several passes reads
+        // as several named phases rather than one repeated label.
+        //
+        // A name of the form "Group/Detail" groups the pass with its
+        // neighbours: the profiler folds contiguous passes sharing a group
+        // into one phase, while capture tools keep the full name. That is
+        // what lets a phase stay a fixed part of the frame while the passes
+        // inside it come and go. See the GPU timing section below.
+        virtual void BeginRenderPass(RenderTargetHandle target, const char* scopeName)   = 0;
         virtual void EndRenderPass()                                                     = 0;
 
         // ========================

@@ -1,0 +1,46 @@
+// Conversions between scene-linear light and display-referred sRGB.
+//
+// Lighting, bloom, grading and the tone curve all operate on scene-linear
+// values. The scene target holds linear, and the post-process pass encodes to
+// sRGB as its final step. Anything writing into the scene target must write
+// linear; anything drawn after the pass is already display-referred.
+//
+// Textures carrying colour are decoded by the sampler hardware, which is why
+// there is no decode call here for the common case: hardware decodes before
+// filtering, and a shader-side pow() would filter in the wrong space. These
+// helpers are for shaders that author a colour by hand, and for the encode.
+
+// The piecewise sRGB transfer function rather than a plain 2.2 power. The
+// near-black linear segment is what keeps dark values from crushing.
+vec3 SrgbToLinear(vec3 color)
+{
+    vec3 cutoff    = vec3(lessThanEqual(color, vec3(0.04045)));
+    vec3 linearLow = color / 12.92;
+    vec3 linearHigh = pow((color + vec3(0.055)) / 1.055, vec3(2.4));
+    return mix(linearHigh, linearLow, cutoff);
+}
+
+vec3 LinearToSrgb(vec3 color)
+{
+    vec3 cutoff  = vec3(lessThanEqual(color, vec3(0.0031308)));
+    vec3 srgbLow = color * 12.92;
+    vec3 srgbHigh = 1.055 * pow(color, vec3(1.0 / 2.4)) - vec3(0.055);
+    return mix(srgbHigh, srgbLow, cutoff);
+}
+
+// Rec. 709 luma. Used wherever a single brightness has to stand in for a
+// colour: the bright pass weighting, and desaturation in the grade.
+float Luminance(vec3 color)
+{
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec4 SrgbToLinear(vec4 color)
+{
+    return vec4(SrgbToLinear(color.rgb), color.a);
+}
+
+vec4 LinearToSrgb(vec4 color)
+{
+    return vec4(LinearToSrgb(color.rgb), color.a);
+}

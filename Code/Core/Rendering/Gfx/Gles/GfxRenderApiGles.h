@@ -45,8 +45,7 @@ namespace CC::Gfx
         virtual void EndFrame() override;
 
         // Render pass
-        virtual void BeginDefaultRenderPass(const float clearColor[4], float clearDepth) override;
-        virtual void BeginRenderPass(RenderTargetHandle target) override;
+        virtual void BeginRenderPass(RenderTargetHandle target, const char* scopeName) override;
         virtual void EndRenderPass() override;
 
         // Buffers
@@ -127,6 +126,9 @@ namespace CC::Gfx
             TextureFormat format       = TextureFormat::Unknown;
             int           width        = 0;
             int           height       = 0;
+            // Layers an attachment may select: cubemap faces or array
+            // layers. 1 for a plain 2D texture, where only layer 0 is valid.
+            int           layerCount   = 1;
             bool          isAlive      = false;
         };
 
@@ -153,9 +155,22 @@ namespace CC::Gfx
         struct GlRenderTarget
         {
             GLuint                  fbo                  = 0;
+            // Multisampled storage, used only when sampleCount > 1. Drawing
+            // goes here and is resolved into fbo's textures when the pass
+            // ends, so what the caller samples is always single-sample.
+            GLuint                  msaaFbo              = 0;
+            GLuint                  msaaColorRenderbuffer = 0;
+            GLuint                  msaaDepthRenderbuffer = 0;
+            int                     sampleCount          = 1;
             int                     width                = 0;
             int                     height               = 0;
             RenderTargetDescription description;
+            // The backbuffer occupies a pool slot like any other target so
+            // that a pass names one thing. Its framebuffer is not owned here
+            // — the platform surface and the scene framebuffer are — so the
+            // pass brackets take a different route for it, and destroying it
+            // is refused.
+            bool                    isBackbuffer         = false;
             bool                    isAlive              = false;
         };
 
@@ -177,6 +192,11 @@ namespace CC::Gfx
         std::vector<uint32_t>       freePipelineSlots;
         std::vector<uint32_t>       freeRenderTargetSlots;
 
+        // Pool slot standing for the backbuffer. Reserved on first
+        // configuration and never freed.
+        RenderTargetHandle          backbufferTarget;
+        void                        EnsureBackbufferTarget();
+
         // ========================
         // State tracking
         // ========================
@@ -186,6 +206,12 @@ namespace CC::Gfx
         GfxCapabilities       capabilities;
         BackbufferDescription backbufferDescription;
 
+        // Which target the active render pass is bound to. An invalid handle
+        // means the pass targets the default framebuffer; a valid handle
+        // indexes an offscreen entry in renderTargets.
+        RenderTargetHandle    currentRenderTarget;
+        bool                  currentPassIsOffscreen = false;
+
         // Push-constant UBO. Single GL_DYNAMIC_DRAW buffer reused every draw
         // via glBufferSubData; bound once at slot
         // OBJECT_UNIFORMS_BINDING_SLOT on first use.
@@ -194,6 +220,12 @@ namespace CC::Gfx
         bool renderPassActive = false;
 
         GlCommon::ScopeTimerState scopeTimer;
+
+        // Name of the pass currently open, so the resolve and blit that end
+        // it are charged to the pass that produced them rather than to
+        // whatever runs next.
+        static const int MAX_PASS_SCOPE_NAME = 32;
+        char currentPassScopeName[MAX_PASS_SCOPE_NAME] = {};
 
         void QueryCapabilities();
     };

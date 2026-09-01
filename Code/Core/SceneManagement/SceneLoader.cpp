@@ -9,9 +9,13 @@
 #include "Component.h"
 #include "ComponentFactory.h"
 #include "MaterialManager.h"
+#include "PostProcess.h"
+#include "PostProcessEffect.h"
+#include "RenderManager.h"
 #include "PrintManager.h"
 #include "GltfLoader.h"
 #include "PlatformFileSystem.h"
+#include "YamlUtils.h"
 
 namespace CC
 {
@@ -19,26 +23,6 @@ namespace CC
     // Helper Functions
     // ========================
 
-    static std::string NodeToString(ryml::ConstNodeRef node)
-    {
-        if (!node.has_val())
-        {
-            return "";
-        }
-        c4::csubstr val = node.val();
-        return std::string(val.data(), val.size());
-    }
-
-    static float NodeToFloat(ryml::ConstNodeRef node)
-    {
-        if (!node.has_val())
-        {
-            return 0.0f;
-        }
-        float value = 0.0f;
-        node >> value;
-        return value;
-    }
 
     // ========================
     // Scene Loading
@@ -91,6 +75,14 @@ namespace CC
                     }
                 }
 
+                // Post-process stack before objects: it is frame-wide state
+                // rather than anything an object refers to, so nothing in the
+                // object pass depends on the order.
+                if (root.has_child("postProcess") && root["postProcess"].is_map())
+                {
+                    ProcessPostProcess(root["postProcess"]);
+                }
+
                 // Process objects
                 if (root.has_child("objects") && root["objects"].is_seq())
                 {
@@ -109,6 +101,80 @@ namespace CC
         }
 
         return succeeded;
+    }
+
+    void SceneLoader::ProcessPostProcess(ryml::ConstNodeRef postProcessNode)
+    {
+        PostProcess* postProcess = RenderManager::Get()->GetPostProcess();
+
+        // The block is authoritative for the scene: it loads onto stack
+        // defaults, so a scene cannot inherit an effect left enabled by
+        // whatever ran before it. Defaults rather than all-off, because the
+        // tone curve is part of the output transform and a scene naming only
+        // a vignette should not lose it and start clipping.
+        postProcess->ResetEffectsToDefaults();
+
+        if (postProcessNode.has_child("preset"))
+        {
+            std::string presetName = NodeToString(postProcessNode["preset"]);
+            if (!postProcess->ApplyPreset(presetName.c_str()))
+            {
+                CCPrint(PrintManager::CHANNEL_WARN,
+                    "SceneLoader: Unknown post-process preset '%s'", presetName.c_str());
+            }
+        }
+
+        for (ryml::ConstNodeRef effectNode : postProcessNode.children())
+        {
+            std::string effectName = KeyToString(effectNode);
+
+            if (effectName != "preset")
+            {
+                PostProcessEffect* effect = postProcess->FindEffect(effectName.c_str());
+
+                if (effect == nullptr)
+                {
+                    CCPrint(PrintManager::CHANNEL_WARN,
+                        "SceneLoader: Unknown post-process effect '%s'", effectName.c_str());
+                }
+                else
+                {
+                    for (ryml::ConstNodeRef paramNode : effectNode.children())
+                    {
+                        std::string paramName = KeyToString(paramNode);
+
+                        bool wasApplied = true;
+
+                        if (paramName == "enabled")
+                        {
+                            effect->SetEnabled(NodeToString(paramNode) == "true");
+                        }
+                        else if (paramNode.num_children() >= 3)
+                        {
+                            // Per-channel form, matching what the panel dumps.
+                            Vector3 color(NodeToFloat(paramNode[0]),
+                                          NodeToFloat(paramNode[1]),
+                                          NodeToFloat(paramNode[2]));
+                            wasApplied = effect->SetParamColor(paramName.c_str(), color);
+                        }
+                        else
+                        {
+                            // A single number sets every channel, so a grade
+                            // written before the controls went per channel
+                            // still loads and means the same thing.
+                            wasApplied = effect->SetParamValue(paramName.c_str(), NodeToFloat(paramNode));
+                        }
+
+                        if (!wasApplied)
+                        {
+                            CCPrint(PrintManager::CHANNEL_WARN,
+                                "SceneLoader: Unknown parameter '%s' on post-process effect '%s'",
+                                paramName.c_str(), effectName.c_str());
+                        }
+                    }
+                }
+            }
+        }
     }
 
     bool SceneLoader::ProcessMaterials(ryml::ConstNodeRef materials)
@@ -163,6 +229,29 @@ namespace CC
                 opacity = NodeToFloat(matNode["opacity"]);
             }
 
+            // Light the surface emits, in scene-linear units. Written either
+            // as [r, g, b] or as a single number for a white emission, where
+            // a value above 1.0 puts the surface above display white.
+            bool hasEmissive = false;
+            Vector3 emissive(0.0f, 0.0f, 0.0f);
+            if (matNode.has_child("emissive"))
+            {
+                ryml::ConstNodeRef emissiveNode = matNode["emissive"];
+                hasEmissive = true;
+
+                if (emissiveNode.num_children() >= 3)
+                {
+                    emissive.x = NodeToFloat(emissiveNode[0]);
+                    emissive.y = NodeToFloat(emissiveNode[1]);
+                    emissive.z = NodeToFloat(emissiveNode[2]);
+                }
+                else
+                {
+                    float intensity = NodeToFloat(emissiveNode);
+                    emissive = Vector3(intensity, intensity, intensity);
+                }
+            }
+
             if (matManager->HasMaterial(name))
             {
                 matManager->RemoveMaterial(name);
@@ -173,6 +262,15 @@ namespace CC
                 CCPrint(PrintManager::CHANNEL_ALWAYS, "SceneLoader: Created material '%s'", name.c_str());
             }
             matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
+
+            if (hasEmissive)
+            {
+                Material* material = matManager->GetMaterial(name);
+                if (material != nullptr)
+                {
+                    material->SetEmissive(emissive);
+                }
+            }
         }
 
         return allSucceeded;

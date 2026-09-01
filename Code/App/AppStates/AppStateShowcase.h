@@ -28,11 +28,15 @@ private:
     enum ShowcaseActions
     {
         Pause = CC::InputAction::GameActionStart,
+        CycleGradePreset,
         ShowcaseActionMax
     };
 
     bool isPaused;
     bool pendingTogglePause;
+    // Which grade preset the cycle key last applied. Held as an index because
+    // the presets are loaded from a file and their names are not known here.
+    int gradePresetIndex;
     bool wasMouseLocked;
     float elapsedTime;
 
@@ -45,6 +49,7 @@ private:
     void SceneInit();
     void SceneShutdown();
     void TogglePause();
+    void ApplyNextGradePreset();
     void UpdateTimerDisplay();
 };
 

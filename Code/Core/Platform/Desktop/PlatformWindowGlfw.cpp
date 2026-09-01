@@ -170,4 +170,9 @@ namespace CC
     {
         glfwSetInputMode(window, GLFW_CURSOR, isLocked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
     }
+
+    bool PlatformWindowGlfw::IsFocused() const
+    {
+        return glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+    }
 }

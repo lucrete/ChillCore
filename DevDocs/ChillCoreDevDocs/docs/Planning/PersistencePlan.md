@@ -2,7 +2,6 @@
 
 **Status:** Not started. Nothing exists in the source: no persistable interface, no persistence manager, no application pause or resume hooks, no saved-state plumbing.
 **Blocks:** the Android graphics-context-loss story, which restarts cold on the premise that persistence restores the user's place.
-**Index:** the Platform and build section of `01_TechBacklog.md`.
 
 Nothing below describes existing code. Where interfaces are sketched, this document is the source of truth until the code exists, at which point the design moves into an AGD and the sketches are deleted.
 

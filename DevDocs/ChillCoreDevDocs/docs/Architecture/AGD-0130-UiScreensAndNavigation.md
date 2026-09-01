@@ -1,6 +1,6 @@
 # AGD-0130: UI Screens and Navigation
 
-- **Scope:** How screens are registered, activated, and navigated between, and how application code attaches behaviour to them. Covers the navigation stack, screen fades, cancel handling, and the controller lifecycle. Does not cover how a screen is laid out or drawn, which is AGD-0120.
+- **Scope:** How screens are registered, activated, and navigated between, and how application code attaches behaviour to them. Covers the navigation stack, screen fades, cancel handling, and the controller lifecycle. Does not cover how a screen is laid out or drawn.
 
 ## Overview
 

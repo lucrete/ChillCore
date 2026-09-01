@@ -1,8 +1,19 @@
 # Build Pipeline Plan
 
-**Status:** The pipeline builds a self-contained output directory and runs it. What remains is distribution, automated testing, and Android.
+**Status:** The pipeline builds a self-contained output directory and runs it. What remains in plan is automated testing and packaged distribution.
 **Current state:** AGD-0040 (Build and Targets) describes the pipeline as it exists. This plan covers only what does not.
-**Index:** the Build pipeline section of `01_TechBacklog.md`.
+**Scope:** the pipeline work that is in plan, in the order below. Building Android through the pipeline is not in plan and is not covered here.
+
+---
+
+## Automated testing
+
+**Not started.** Design belongs with this plan because it shares the pipeline's entry-point shape and its report folder.
+
+- `RunTests.sh` alongside `Build.sh` and `Run.sh`: interactive when double-clicked, argument-driven otherwise, same exit-code contract.
+- Results land in the same per-build folder as the build that produced them, in both a machine-readable and a human-readable form, so a build and its test results are one record.
+- The first tests are the cheapest useful ones: the engine starts, loads a scene, and shuts down without faulting. The run-and-capture machinery for that already exists.
+- What a test failure means for the build's exit code is a decision to make when the first test exists, not before.
 
 ---
 
@@ -19,22 +30,3 @@ An archive of the output directory — executable, runtime data, and the build r
 **Later, and out of scope for this:** an installer, code signing, documentation bundling. Each is a separate decision and none blocks the archive.
 
 **Done when:** a labelled build produces an archive that, extracted anywhere on a machine with no development tooling, runs.
-
----
-
-## Automated testing
-
-**Not started.** Design belongs with this plan because it shares the pipeline's entry-point shape and its report folder.
-
-- `RunTests.sh` alongside `Build.sh` and `Run.sh`: interactive when double-clicked, argument-driven otherwise, same exit-code contract.
-- Results land in the same per-build folder as the build that produced them, in both a machine-readable and a human-readable form, so a build and its test results are one record.
-- The first tests are the cheapest useful ones: the engine starts, loads a scene, and shuts down without faulting. The run-and-capture machinery for that already exists.
-- What a test failure means for the build's exit code is a decision to make when the first test exists, not before.
-
----
-
-## Android through the pipeline
-
-**Not started.** The pipeline builds the desktop target only; Android is still built by invoking Gradle directly.
-
-Adding it is a target selection option and a Gradle invocation, reporting into the same folder structure. It is unblocked but low value until something other than a developer's machine builds the Android package.

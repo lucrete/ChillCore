@@ -68,7 +68,8 @@ namespace CC
         , emissiveFactor(0.0f, 0.0f, 0.0f)
         , isPbrMaterial(false)
     {
-        texture = TextureManager::Get()->GetTexture(mainTex.empty() ? "DefaultBase" : mainTex);
+        texture = TextureManager::Get()->GetTexture(mainTex.empty() ? "DefaultBase" : mainTex,
+                                                    TextureColorSpace::Srgb);
 
         samplerHandle = CreateRepeatLinearSampler();
         materialUniformBuffer = CreateMaterialUniformBuffer();
@@ -97,8 +98,11 @@ namespace CC
         , emissiveFactor(_emissiveFactor)
         , isPbrMaterial(true)
     {
-        // Load base color texture
-        texture = TextureManager::Get()->GetTexture(baseColorTex.empty() ? "DefaultBase" : baseColorTex);
+        // Base colour and emissive carry colour and are decoded on sample.
+        // Metallic-roughness, normal and occlusion carry measurements, so they
+        // stay linear — decoding them would corrupt the values they encode.
+        texture = TextureManager::Get()->GetTexture(baseColorTex.empty() ? "DefaultBase" : baseColorTex,
+                                                    TextureColorSpace::Srgb);
 
         // Load PBR textures (use DefaultBase as fallback for missing textures)
         if (!metallicRoughnessTex.empty() && TextureManager::Get()->HasTexture(metallicRoughnessTex))
@@ -116,9 +120,9 @@ namespace CC
             occlusionTexture = TextureManager::Get()->GetTexture(occlusionTex);
         }
 
-        if (!emissiveTex.empty() && TextureManager::Get()->HasTexture(emissiveTex))
+        if (!emissiveTex.empty() && TextureManager::Get()->HasTexture(emissiveTex, TextureColorSpace::Srgb))
         {
-            emissiveTexture = TextureManager::Get()->GetTexture(emissiveTex);
+            emissiveTexture = TextureManager::Get()->GetTexture(emissiveTex, TextureColorSpace::Srgb);
         }
 
         samplerHandle = CreateRepeatLinearSampler();
@@ -210,7 +214,7 @@ namespace CC
             if (isPbrMaterial)
             {
                 // Default fallback texture for missing PBR maps
-                Texture* defaultTex = TextureManager::Get()->GetTexture("DefaultBase");
+                Texture* defaultTex = TextureManager::Get()->GetTexture("DefaultBase", TextureColorSpace::Srgb);
                 Gfx::TextureHandle defaultHandle = defaultTex ? defaultTex->GetTextureHandle() : Gfx::TextureHandle();
 
                 Gfx::TextureHandle mrHandle       = metallicRoughnessTexture ? metallicRoughnessTexture->GetTextureHandle() : defaultHandle;

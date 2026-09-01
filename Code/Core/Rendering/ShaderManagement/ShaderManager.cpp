@@ -80,6 +80,9 @@ namespace CC
         shaderMap["FullScreenBlit"] = new ShaderDefinition(shaderBasePath, "Rendering\\fullScreenBlit.glsl");
         shaderMap["FullScreenFade"] = new ShaderDefinition(shaderBasePath, "Rendering\\fullScreenFade.glsl");
         shaderMap["FullScreenQuad"] = new ShaderDefinition(shaderBasePath, "Rendering\\fullScreenQuad.glsl");
+        shaderMap["PostProcessUber"] = new ShaderDefinition(shaderBasePath, "Rendering\\postProcessUber.glsl");
+        shaderMap["PostProcessBloomPrefilter"] = new ShaderDefinition(shaderBasePath, "Rendering\\postProcessBloomPrefilter.glsl");
+        shaderMap["PostProcessBloomBlur"] = new ShaderDefinition(shaderBasePath, "Rendering\\postProcessBloomBlur.glsl");
         shaderMap["GradientViewer"] = new ShaderDefinition(shaderBasePath, "ProceduralArt\\gradientViewer.glsl");
         shaderMap["UnitCircleRipples"] = new ShaderDefinition(shaderBasePath, "ProceduralArt\\unitCircleRipples.glsl");
         shaderMap["RadialWaves"] = new ShaderDefinition(shaderBasePath, "ProceduralArt\\radialWaves.glsl");

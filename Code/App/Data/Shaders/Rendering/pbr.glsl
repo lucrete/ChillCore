@@ -258,14 +258,9 @@ void main()
     // Ambient lighting (simplified IBL approximation)
     vec3 ambient = ambientLightColor * ambientLightIntensity * albedo * ao;
 
-    // Final color
+    // Final color, scene-linear. The post-process pass owns the tone curve
+    // and the encode to display space; applying either here would do it twice.
     vec3 color = ambient + Lo + emissive;
-
-    // Tone mapping (Reinhard)
-    color = color / (color + vec3(1.0));
-
-    // Gamma correction
-    color = pow(color, vec3(1.0 / 2.2));
 
     // Alpha handling based on material alpha mode
     float alpha = 1.0;

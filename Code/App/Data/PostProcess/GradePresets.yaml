@@ -1,0 +1,76 @@
+# Grade presets. A preset names colour-grade parameters and the
+# values to set them to; anything it does not name is left alone.
+presets:
+  - name: Neutral
+    contrast: 1.0000
+    saturation: 1.0000
+    temperature: 0.0000
+    tint: 0.0000
+    lift: [0.0000, 0.0000, 0.0000]
+    gamma: [1.0000, 1.0000, 1.0000]
+    gain: [1.0000, 1.0000, 1.0000]
+  - name: Warm
+    contrast: 1.0500
+    saturation: 1.1000
+    temperature: 0.2500
+    tint: 0.0500
+    lift: [0.0300, 0.0100, -0.0100]
+    gamma: [1.0000, 1.0000, 1.0200]
+    gain: [1.0600, 1.0200, 0.9600]
+  - name: Cool
+    contrast: 1.0500
+    saturation: 0.9500
+    temperature: -0.2500
+    tint: -0.0500
+    lift: [-0.0100, 0.0000, 0.0300]
+    gamma: [1.0200, 1.0000, 1.0000]
+    gain: [0.9600, 1.0000, 1.0600]
+  - name: Faded
+    contrast: 0.8500
+    saturation: 0.8000
+    temperature: 0.0500
+    tint: 0.0200
+    lift: [0.0700, 0.0600, 0.0500]
+    gamma: [1.1000, 1.1000, 1.0800]
+    gain: [0.9400, 0.9500, 0.9700]
+  - name: X-Pro II
+    contrast: 1.3000
+    saturation: 1.1500
+    temperature: 0.1500
+    tint: -0.0500
+    lift: [-0.0300, 0.0100, 0.0000]
+    gamma: [1.0000, 0.9800, 1.0500]
+    gain: [1.1000, 1.0200, 0.8500]
+    blendColor: [0.8500, 0.8000, 0.4500]
+    blendMode: 2.0000
+    blendStrength: 0.2500
+  - name: Lo-Fi
+    contrast: 1.4000
+    saturation: 1.3000
+    temperature: 0.1200
+    tint: 0.0200
+    lift: [-0.0200, -0.0300, -0.0400]
+    gamma: [0.9500, 0.9500, 0.9200]
+    gain: [1.0500, 1.0000, 0.9200]
+    blendColor: [0.7500, 0.6200, 0.4200]
+    blendMode: 0.0000
+    blendStrength: 0.1800
+  - name: Noir
+    contrast: 1.3000
+    saturation: 0.0000
+    temperature: 0.0000
+    tint: 0.0000
+    lift: [-0.0200, -0.0200, -0.0100]
+    gamma: [0.9500, 0.9500, 0.9700]
+    gain: [1.0000, 1.0000, 1.0200]
+  - name: Juno
+    contrast: 1.1500
+    saturation: 1.3000
+    temperature: 0.2000
+    tint: 0.0600
+    lift: [-0.0200, 0.0000, 0.0200]
+    gamma: [1.0200, 1.0000, 0.9800]
+    gain: [1.0800, 1.0200, 0.9400]
+    blendColor: [0.9000, 0.7000, 0.4500]
+    blendMode: 3.0000
+    blendStrength: 0.1500

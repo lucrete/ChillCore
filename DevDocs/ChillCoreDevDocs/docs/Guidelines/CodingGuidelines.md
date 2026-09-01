@@ -25,6 +25,7 @@ These are guidelines, not rules, where if followed will result in an easier to u
 * Prefer self-commenting-code through descriptive naming. 
 * Use comments to provide context and justification.
 * Avoid Todo comments. Capture future work in a dev issue or tech backlog to surface it for project management. Use Todo only for work-in-progress that spans multiple Pull Requests.
+* Do not cite documents from code comments. No AGD numbers, no planning-doc names, no file paths into `DevDocs`. A comment must stand on its own: state the constraint or the reason directly rather than pointing at where it is written up. Docs are renumbered, merged, and retired, and a citation left behind in code becomes a dangling reference that nothing checks. The documentation references the code, not the other way round.
 * Do not add xml code instrumentation comments unless the intent of function is not obvious.
 * Use Comment header blocks to organize code and assist in visual scanning:
 ~~~csharp

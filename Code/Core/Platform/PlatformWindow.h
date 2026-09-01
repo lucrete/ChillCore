@@ -45,6 +45,8 @@ namespace CC
 
         virtual void LockMouseCursor(bool isLocked) = 0;
 
+        virtual bool IsFocused() const = 0;
+
         // Registers a callback invoked when the OS delivers a drag-and-drop
         // payload of one or more file paths onto the window. Pass an empty
         // std::function (default-constructed) to clear. Only one consumer

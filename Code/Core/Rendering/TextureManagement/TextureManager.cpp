@@ -13,8 +13,9 @@ namespace CC
         CC_ASSERT(instance == NULL, "TextureManager already created");
         instance = this;
 
-        AddTexture("TestPattern", "TestPattern.png");
-        AddTexture("DefaultBase", "DefaultBase.png");
+        // Both are base-colour textures, so they are decoded on sample.
+        AddTexture("TestPattern", "TestPattern.png", TextureColorSpace::Srgb);
+        AddTexture("DefaultBase", "DefaultBase.png", TextureColorSpace::Srgb);
     }
 
     TextureManager::~TextureManager()
@@ -29,12 +30,19 @@ namespace CC
         return instance;
     }
 
-    Texture* TextureManager::GetTexture(const std::string& name)
+    std::string TextureManager::MakeKey(const std::string& name, TextureColorSpace colorSpace)
     {
+        return colorSpace == TextureColorSpace::Srgb ? name + "#srgb" : name;
+    }
+
+    Texture* TextureManager::GetTexture(const std::string& name, TextureColorSpace colorSpace)
+    {
+        std::string key = MakeKey(name, colorSpace);
+
         // Check if texture exists
-        if (textureMap.find(name) != textureMap.end())
+        if (textureMap.find(key) != textureMap.end())
         {
-            return textureMap[name].get();
+            return textureMap[key].get();
         }
 
         // If not found, try to load it assuming the name is also the filename
@@ -47,8 +55,8 @@ namespace CC
 
         try
         {
-            textureMap[name] = std::make_unique<Texture>(filePath);
-            return textureMap[name].get();
+            textureMap[key] = std::make_unique<Texture>(filePath, true, colorSpace);
+            return textureMap[key].get();
         }
         catch (const std::exception& e)
         {
@@ -59,26 +67,28 @@ namespace CC
         }
     }
 
-    void TextureManager::AddTexture(const std::string& name, const std::string& filePath)
+    void TextureManager::AddTexture(const std::string& name, const std::string& filePath, TextureColorSpace colorSpace)
     {
         // Construct the full file path
         std::string fullPath = texturePath + filePath;
-        AddTextureWithFullPath(name, fullPath);
+        AddTextureWithFullPath(name, fullPath, colorSpace);
     }
 
-    void TextureManager::AddTextureWithFullPath(const std::string& name, const std::string& fullPath)
+    void TextureManager::AddTextureWithFullPath(const std::string& name, const std::string& fullPath, TextureColorSpace colorSpace)
     {
+        std::string key = MakeKey(name, colorSpace);
+
         // Check if texture already exists
-        if (textureMap.find(name) != textureMap.end())
+        if (textureMap.find(key) != textureMap.end())
         {
             CCPrint(PrintManager::CHANNEL_WARN, "Texture already exists: %s. Overwriting.", name.c_str());
-            textureMap.erase(name);
+            textureMap.erase(key);
         }
 
         // Create and store the texture
         try
         {
-            textureMap[name] = std::make_unique<Texture>(fullPath);
+            textureMap[key] = std::make_unique<Texture>(fullPath, true, colorSpace);
             CCPrint(PrintManager::CHANNEL_RENDER, "Added texture: %s -> %s", name.c_str(), fullPath.c_str());
         }
         catch (const std::exception& e)
@@ -87,19 +97,21 @@ namespace CC
         }
     }
 
-    void TextureManager::AddTextureFromMemory(const std::string& name, const unsigned char* data, int dataSize)
+    void TextureManager::AddTextureFromMemory(const std::string& name, const unsigned char* data, int dataSize, TextureColorSpace colorSpace)
     {
+        std::string key = MakeKey(name, colorSpace);
+
         // Check if texture already exists
-        if (textureMap.find(name) != textureMap.end())
+        if (textureMap.find(key) != textureMap.end())
         {
             CCPrint(PrintManager::CHANNEL_WARN, "Texture already exists: %s. Overwriting.", name.c_str());
-            textureMap.erase(name);
+            textureMap.erase(key);
         }
 
         // Create and store the texture from memory
         try
         {
-            textureMap[name] = std::make_unique<Texture>(data, dataSize, name);
+            textureMap[key] = std::make_unique<Texture>(data, dataSize, name, colorSpace);
         }
         catch (const std::exception& e)
         {
@@ -107,12 +119,12 @@ namespace CC
         }
     }
 
-    bool TextureManager::HasTexture(const std::string& name) const
+    bool TextureManager::HasTexture(const std::string& name, TextureColorSpace colorSpace) const
     {
-        return textureMap.find(name) != textureMap.end();
+        return textureMap.find(MakeKey(name, colorSpace)) != textureMap.end();
     }
 
-    void TextureManager::RemoveTexture(const std::string& name)
+    void TextureManager::RemoveTexture(const std::string& name, TextureColorSpace colorSpace)
     {
         // Do not allow removing the default error texture
         if (name == "default_error")
@@ -121,7 +133,7 @@ namespace CC
             return;
         }
 
-        auto it = textureMap.find(name);
+        auto it = textureMap.find(MakeKey(name, colorSpace));
         if (it != textureMap.end())
         {
             textureMap.erase(it);

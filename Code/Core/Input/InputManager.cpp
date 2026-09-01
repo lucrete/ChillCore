@@ -20,6 +20,7 @@ namespace CC
         : analogStickRightX(0.0f)
         , analogStickRightY(0.0f)
         , useMouseAsRightStick(true)
+        , wasWindowFocused(false)
     {
         CC_ASSERT(instance == nullptr, "InputManager already created");
         instance = this;
@@ -95,10 +96,23 @@ namespace CC
         mouseButtonCurrent[0] = physicalInput->IsMouseButtonDown(MouseButton::Left);
         mouseButtonCurrent[1] = physicalInput->IsMouseButtonDown(MouseButton::Right);
 
-        if (physicalInput->IsMouseCursorLocked())
+        // An unfocused window cannot re-centre the cursor, so sampling its offset would spin the camera on a stale deflection.
+        bool isWindowFocused = PlatformWindow::Get()->IsFocused();
+        if (physicalInput->IsMouseCursorLocked() && isWindowFocused && wasWindowFocused)
         {
             UpdateMouseAsAnalogStick();
         }
+        else
+        {
+            analogStickRightX = 0.0f;
+            analogStickRightY = 0.0f;
+
+            if (physicalInput->IsMouseCursorLocked() && isWindowFocused)
+            {
+                ResetMouseToCenter();
+            }
+        }
+        wasWindowFocused = isWindowFocused;
     }
 
     bool InputManager::IsPressed(int inputAction)

@@ -4,6 +4,7 @@
 #include "PrintManager.h"
 #include "CameraManager.h"
 #include "MaterialManager.h"
+#include "PostProcess.h"
 #include "RenderManager.h"
 #include "SceneHierarchy.h"
 #include "RenderableSphere.h"
@@ -23,6 +24,7 @@ AppStateShowcase::AppStateShowcase()
     : currentMode(InWorld)
     , isPaused(false)
     , pendingTogglePause(false)
+    , gradePresetIndex(0)
     , wasMouseLocked(false)
     , elapsedTime(0.0f)
     , procArtController(nullptr)
@@ -51,6 +53,7 @@ void AppStateShowcase::Init()
     CC::InputActionMap& actionMap = CC::InputManager::Get()->GetActionMap();
     actionMap.CreateContext("AppStateShowcase");
     actionMap.RegisterAction(CC::ActionDef(Pause, "Pause", CC::InputTrigger::GamepadStart));
+    actionMap.RegisterAction(CC::ActionDef(CycleGradePreset, "CycleGradePreset", CC::InputTrigger::GamepadFaceRight));
 
     CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
     screens->RegisterScreen("ShowcaseHud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
@@ -73,6 +76,7 @@ void AppStateShowcase::Init()
     pendingTogglePause = false;
     currentMode = InWorld;
     elapsedTime = 0.0f;
+    gradePresetIndex = 0;
 }
 
 void AppStateShowcase::SceneInit()
@@ -116,6 +120,11 @@ void AppStateShowcase::Update()
     if (CC::InputManager::Get()->EdgePositive(Pause))
     {
         TogglePause();
+    }
+
+    if (CC::InputManager::Get()->EdgePositive(CycleGradePreset))
+    {
+        ApplyNextGradePreset();
     }
 
     if (CC::InputManager::Get()->EdgePositive(CC::InputAction::DevReloadScene))
@@ -202,6 +211,26 @@ void AppStateShowcase::TogglePause()
     }
 }
 
+void AppStateShowcase::ApplyNextGradePreset()
+{
+    CC::PostProcess* postProcess = CC::RenderManager::Get()->GetPostProcess();
+    int presetCount = postProcess->GetPresetCount();
+
+    if (presetCount <= 0)
+    {
+        CCPrint(CC::PrintManager::CHANNEL_WARN, "AppStateShowcase: no grade presets to cycle");
+    }
+    else
+    {
+        gradePresetIndex = (gradePresetIndex + 1) % presetCount;
+
+        const char* presetName = postProcess->GetPresetName(gradePresetIndex);
+        postProcess->ApplyPreset(presetName);
+
+        CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateShowcase: grade preset '%s'", presetName);
+    }
+}
+
 void AppStateShowcase::UpdateTimerDisplay()
 {
     CC::UiElement* timerElement = CC::UiManager::Get()->GetElementById("timer");
@@ -219,6 +248,8 @@ void AppStateShowcase::UpdateTimerDisplay()
 
 void AppStateShowcase::Shutdown()
 {
+    CC::RenderManager::Get()->GetPostProcess()->DisableAllEffects();
+
     CC::UiScreenSystem::Get()->ClearAllScreens();
 
     CC::SceneHierarchy::Get()->SetPaused(false);

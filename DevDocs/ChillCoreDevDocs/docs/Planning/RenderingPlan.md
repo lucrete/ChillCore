@@ -1,18 +1,24 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two unimplemented capabilities, an unrun acceptance pass, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, one unimplemented optimisation, and the compute feature.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
-**Index:** the Rendering section of `01_TechBacklog.md`.
+**Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — photometric light units, specular antialiasing, camera registration, the open design questions — is not covered here.
 
 ---
 
-## Offscreen render targets
+## Frame-rate dependent camera control
 
-Render target creation and destruction assert and fail in both backends. The descriptor and handle types exist; the implementation does not. Only the implicit backbuffer works.
+`CameraFree::UpdateTransform` paces itself per frame rather than per second, in three separate ways.
 
-**Why it matters.** This is the largest capability gap in the abstraction, and it blocks a class of features rather than one feature: shadow maps, reflection probes, and any post-process chain beyond the fixed resolve. The render-pass bracket was designed for it and already accepts a render target handle, so the frontend needs no change — the work is confined to the two backends.
+- **Movement uses a hardcoded step.** `deltaSeconds` is the literal `0.016f`, so the free camera travels at its nominal speed only at 62.5 FPS and is wrong everywhere else. `FrameTimer::Get()->DeltaTime()` is what the rest of the engine already uses.
+- **Rotation is not time-scaled at all.** Yaw and pitch accumulate the raw stick value times a velocity constant every frame. A gamepad or touch stick is a *rate* input — held deflection should mean a constant turn per second — so the same stick position turns twenty times faster at 1200 FPS than at 60. The showcase scene runs at four-figure frame rates in a Debug build, so this is the common case, not the corner.
+- **The mouse ceiling moves with the frame rate.** The mouse is a *displacement* input, not a rate one: `InputManager` re-centres the cursor each frame, so the value the camera reads is already the distance moved since the last frame. Summed over a gesture it is frame-rate independent, and multiplying it by delta time would be wrong. What is frame-rate dependent is the clamp — the offset saturates at `MAX_MOUSE_DEFLECTION` pixels *per frame*, so a fast flick loses motion at low frame rates and loses none at high ones.
 
-**Done when:** a demo state renders to an offscreen target and samples it in a later pass, on both desktop and Android.
+**Why it matters.** Look sensitivity is the most immediately felt property of a 3D camera, and it currently changes with scene complexity, build configuration, and vsync. It also makes any tuning of the velocity constants meaningless, since the value that feels right on one machine is wrong on another.
+
+**Watch out.** The rate/displacement split is the substance of the work: scaling every input by delta time uniformly would fix the sticks and break the mouse. The two paths meet in `CameraFree::UpdateTransform` because `InputManager` presents the mouse as a virtual right stick, so whatever separates them has to survive that. Clamping the mouse per second rather than per frame is one option; another is to leave the mouse path alone and scale only the true rate inputs.
+
+**Done when:** the free camera moves and turns at the same speed per second across frame rates, verified by comparing a vsync-limited run against an uncapped one, and a mouse gesture of a given physical distance turns the camera by the same angle in both.
 
 ---
 
@@ -28,37 +34,23 @@ Binding a pipeline compares against the last one bound and returns early. Bindin
 
 ---
 
-## Acceptance measurements
-
-The abstraction work defined quantitative gates. No run is recorded against any of them.
-
-- Per-frame graphics call count before and after, on a multi-object scene. The target was roughly 280 uniform and bind calls down to under 40 for ten physically-based spheres.
-- Frame duration stable or improved — the rework must not have regressed frame time.
-- A capture showing the labelled scope hierarchy on a debug build.
-- Visual parity across the showcase, boot, procedural art, and physically-based scenes.
-- Multisampling still taking effect when the sample count is changed through the backbuffer descriptor.
-
-**Why it matters.** Draw-call reduction was half the justification for the whole abstraction, and it is currently an assumption. If the numbers do not show the expected drop, something in the update-frequency grouping or the sort is not doing its job, and that is worth knowing before more work is built on top. The measurement is also the only remaining check on whether the migration regressed rendering behaviour anywhere.
-
----
-
 ## Compute shaders
 
-The backend surface is built. `Gfx::RenderApi` provides compute dispatch, indirect dispatch, storage-buffer and image binding, and memory barriers; shader creation accepts a compute stage; both backends implement all of it and report compute and storage buffers as available. Nothing above the backend can reach it.
+The backend surface is built and implemented for both backends: `DispatchCompute`, `DispatchComputeIndirect`, `BindStorageBuffer`, `BindImage`, `MemoryBarrier`, and `CreateShader` accepting `description.computeSource`. `supportsComputeShaders` / `supportsStorageBuffers` report true on both, GLES 3.1 included. Nothing above the backend can reach any of it.
 
 ### What is missing
 
-**Shader authoring.** Shader compilation does not recognise a compute stage. This is the single blocking change — until it lands, no compute shader can exist.
+**Shader authoring.** `ShaderManager` does not parse a `#shader compute` section. This is the single blocking change — until it lands, no compute shader can exist.
 
-- A compute shader definition type, parallel to the existing one but with a single source stream and no vertex or fragment split.
+- `CC::ComputeShaderDefinition` — a compute shader definition type, parallel to the existing one but with a single source stream and no vertex or fragment split.
 - A compute entry in the shader manager, with its own lookup and compile path routing through the existing backend shader creation.
 - Include resolution is unchanged and reuses the existing mechanism.
 - Shader parsing gains a third stream. A file declaring only a compute stage registers as compute; a file declaring vertex and fragment stages registers as raster. No file mixes all three.
 - Hot reload extends to compute shader files, and anything caching a compiled handle re-fetches on reload.
 
-**Storage buffer wrapper.** A typed wrapper over a buffer used for compute input and output, covering allocation, upload, and readback. The underlying buffer usage and binding already exist in the abstraction.
+**Storage buffer wrapper (`CC::ComputeBuffer`).** A typed wrapper over an SSBO used for compute input and output, covering allocation, upload, and readback. The underlying buffer usage and binding already exist in the abstraction.
 
-**Dispatch unit.** The compute-side analogue of a renderable: it holds a compute shader reference, its bound buffers and images, and dispatches. It should offer dispatch by total thread count as well as by workgroup count, rounding up internally, so callers think in the terms the problem is stated in rather than in workgroup arithmetic.
+**Dispatch unit (`CC::ComputePass`).** The compute-side analogue of a renderable: it holds a compute shader reference, its bound buffers and images, and dispatches. It should offer dispatch by total thread count as well as by workgroup count, rounding up internally, so callers think in the terms the problem is stated in rather than in workgroup arithmetic.
 
 ### Capability gating
 

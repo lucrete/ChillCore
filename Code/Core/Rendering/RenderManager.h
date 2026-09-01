@@ -11,6 +11,7 @@
 #include "GfxHandles.h"
 #include "GfxDescriptions.h"
 #include "PipelineCache.h"
+#include "PostProcess.h"
 #include "CCVector4.h"
 
 namespace CC
@@ -35,6 +36,10 @@ namespace CC
         void ToggleFullscreen();
         bool IsFullscreen() const;
 
+        // Both take effect at the start of the next frame: rebuilding the
+        // backbuffer mid-frame would pull the framebuffer out from under an
+        // open render pass. The getters report the requested value straight
+        // away, so a caller reads back what it just asked for.
         void SetAntialiasingEnabled(bool isEnabled);
         bool IsAntialiasingEnabled() const;
 
@@ -55,6 +60,28 @@ namespace CC
 
         PipelineCache* GetPipelineCache() const { return pipelineCache; }
 
+        // ========================
+        // Post-processing
+        // ========================
+        //
+        // The opaque and transparent passes render into an offscreen colour
+        // target, which the stack then resolves into the backbuffer. This
+        // happens every frame, not only when an effect is enabled: the scene
+        // is rendered in scene-linear light, and the stack's final pass is
+        // what encodes it to display space. Individual effects still switch
+        // on and off independently.
+        //
+        // The target belongs to RenderManager: created on demand at
+        // framebuffer resolution, rebuilt when that or the sample count
+        // changes. It is half-float where the backend can render to one, so
+        // tone mapping and bloom have range above white to work with, and it
+        // carries the backbuffer's sample count so antialiasing survives.
+        PostProcess* GetPostProcess() const { return postProcess; }
+
+        // Whether the offscreen target stands. False only where none could be
+        // built, such as a zero-sized framebuffer.
+        bool IsPostProcessEnabled() const;
+
     private:
         static RenderManager* instance;
         Gfx::RenderApi* gfxApi;
@@ -70,10 +97,33 @@ namespace CC
 
         Gfx::BufferHandle     frameUniformBuffer;
         Gfx::BackbufferDescription backbufferDescription;
+        bool                       isBackbufferReconfigurePending;
+
+        PostProcess*              postProcess;
+        Gfx::SamplerHandle        postProcessSampler;
+        Gfx::RenderTargetHandle   postProcessTarget;
+        Gfx::TextureHandle        postProcessColorTexture;
+        Gfx::TextureHandle        postProcessDepthTexture;
+        int                       postProcessTargetWidth;
+        int                       postProcessTargetHeight;
+        int                       postProcessTargetSamples;
 
         void SortTransparentRenderables();
         void SortOpaqueRenderables();
         void UploadFrameUniforms();
+
+        // Creates the offscreen scene target, or rebuilds it at the new
+        // resolution if the framebuffer has resized since it was created.
+        void EnsurePostProcessSampler();
+        void EnsurePostProcessTarget(int width, int height);
+        void DestroyPostProcessTarget();
+
+        // Resolve half of the frame: hands the offscreen colour texture to
+        // the effect stack, which applies any enabled effects, encodes to
+        // display space and draws into the backbuffer. Called from Render
+        // after the scene passes end.
+        void DrawPostProcessPass();
+        Gfx::RenderTargetHandle SceneTargetForFrame() const;
 
         static const int MAX_RENDERABLES = 1024;
         Renderable** renderables;

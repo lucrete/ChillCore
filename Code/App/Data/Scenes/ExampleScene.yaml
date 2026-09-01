@@ -19,6 +19,25 @@ materials:
     baseColor: [0.3, 0.5, 1.0]
     opacity: 0.5
 
+  # Emissive ladder. Scene-linear units, so 1.0 is display white: the first
+  # sits below it, the second and third above. Only the two above white have
+  # anything for bloom to find or for the tone curve to roll off — with the
+  # tone map switched off they clip flat instead.
+  - name: EmissiveDim
+    shader: LitColour
+    baseColor: [0.0, 0.0, 0.0]
+    emissive: [0.5, 0.15, 0.05]
+
+  - name: EmissiveBright
+    shader: LitColour
+    baseColor: [0.0, 0.0, 0.0]
+    emissive: [3.0, 0.9, 0.3]
+
+  - name: EmissiveIntense
+    shader: LitColour
+    baseColor: [0.0, 0.0, 0.0]
+    emissive: [12.0, 3.6, 1.2]
+
 objects:
   - name: Ground
     transform:
@@ -126,3 +145,27 @@ objects:
         components:
           - type: RenderableSphere
             material: TransparentBlue
+  - name: EmissiveSphereDim
+    transform:
+      position: [-2.2, 0.6, -4.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    components:
+      - type: RenderableSphere
+        material: EmissiveDim
+  - name: EmissiveSphereBright
+    transform:
+      position: [0.0, 0.6, -4.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    components:
+      - type: RenderableSphere
+        material: EmissiveBright
+  - name: EmissiveSphereIntense
+    transform:
+      position: [2.2, 0.6, -4.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    components:
+      - type: RenderableSphere
+        material: EmissiveIntense

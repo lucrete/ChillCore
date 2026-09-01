@@ -65,7 +65,7 @@ See [AGD-0040: Build and Targets](Architecture/AGD-0040-BuildAndTargets.md) for 
 * **Architecture** — one Architectural Guide Doc per engine system, numbered `AGD-NNNN`. Each is a starting guide to that system, followed by the reasoning behind its current shape. They describe the engine as it is, and are updated when the architecture changes. Start here to understand how something works, or why it works that way.
 * **Guidelines** — normative rules for contributors. How to write code, how to write documentation, and the AGD template that governs the Architecture folder.
 * **KnowledgeBase** — reference material about external tools and platforms. True regardless of ChillCore, and kept separate so engine documentation does not fill up with third-party setup notes.
-* **Planning** — outstanding work only. `01_TechBacklog.md` indexes it, `02_Roadmap.md` gives the implementation order, and a plan per workstream carries the detail. When work lands it moves into an Architecture doc and leaves the plan, so a plan never describes what already exists.
+* **Planning** — outstanding work only. `01_DevProcess.md` defines how the docs relate, `02_Roadmap.md` is the ordered table of work in plan, `03_TechBacklog.md` summarises work not yet in plan, and a plan per workstream carries the detail. When work lands it moves into an Architecture doc and leaves the plan, so a plan never describes what already exists.
 
 ## Project Structure
 * Build

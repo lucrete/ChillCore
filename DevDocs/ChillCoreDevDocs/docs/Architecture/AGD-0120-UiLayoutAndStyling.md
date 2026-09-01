@@ -1,6 +1,6 @@
 # AGD-0120: UI Layout and Styling
 
-- **Scope:** How interface screens are authored, laid out, styled, and drawn. Covers the markup and stylesheet subset, the layout algorithm, text rendering, batching, resolution scaling, and interaction. Does not cover navigation between screens, which is AGD-0130.
+- **Scope:** How interface screens are authored, laid out, styled, and drawn. Covers the markup and stylesheet subset, the layout algorithm, text rendering, batching, resolution scaling, and interaction. Does not cover navigation between screens.
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # AGD-0150: AudioTracker
 
-- **Scope:** The pattern-based music tool — its engine, timing model, threading, sample library, synthesis, undo, and storage. Covers how sound is scheduled and mixed sample-accurately. Does not cover general playback, which is AGD-0140.
+- **Scope:** The pattern-based music tool — its engine, timing model, threading, sample library, synthesis, undo, and storage. Covers how sound is scheduled and mixed sample-accurately. Does not cover general playback.
 
 ## Overview
 

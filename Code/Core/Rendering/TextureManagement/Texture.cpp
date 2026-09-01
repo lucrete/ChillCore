@@ -14,6 +14,13 @@ namespace CC
     // Helpers
     // ========================
 
+    static Gfx::TextureFormat FormatForColorSpace(TextureColorSpace colorSpace)
+    {
+        return colorSpace == TextureColorSpace::Srgb
+            ? Gfx::TextureFormat::Rgba8Srgb
+            : Gfx::TextureFormat::Rgba8Unorm;
+    }
+
     static int ComputeMipLevelCount(int width, int height)
     {
         int maxDimension = (width > height) ? width : height;
@@ -30,7 +37,7 @@ namespace CC
     // Texture
     // ========================
 
-    Texture::Texture(const std::string& filePath, bool generateMipmaps)
+    Texture::Texture(const std::string& filePath, bool generateMipmaps, TextureColorSpace colorSpace)
         : textureHandle(), filePath(filePath), width(0), height(0), bitsPerPixel(0)
     {
         try
@@ -46,7 +53,7 @@ namespace CC
             description.width       = width;
             description.height      = height;
             description.mipLevels   = generateMipmaps ? ComputeMipLevelCount(width, height) : 1;
-            description.format      = Gfx::TextureFormat::Rgba8Unorm;
+            description.format      = FormatForColorSpace(colorSpace);
             description.initialData = pngData.imageData.data();
             description.debugName   = filePath.c_str();
 
@@ -60,7 +67,7 @@ namespace CC
         }
     }
 
-    Texture::Texture(const unsigned char* data, int dataSize, const std::string& debugName)
+    Texture::Texture(const unsigned char* data, int dataSize, const std::string& debugName, TextureColorSpace colorSpace)
         : textureHandle(), filePath(debugName), width(0), height(0), bitsPerPixel(0)
     {
         int channels = 0;
@@ -80,7 +87,7 @@ namespace CC
             description.width       = width;
             description.height      = height;
             description.mipLevels   = ComputeMipLevelCount(width, height);
-            description.format      = Gfx::TextureFormat::Rgba8Unorm;
+            description.format      = FormatForColorSpace(colorSpace);
             description.initialData = imageData;
             description.debugName   = debugName.c_str();
 

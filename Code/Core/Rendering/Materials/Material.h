@@ -69,6 +69,13 @@ namespace CC
         void SetTextureTiling(const Vector2& tiling) { textureTiling = tiling; materialUniformsDirty = true; }
         Vector2 GetTextureTiling() const { return textureTiling; }
 
+        // Light the surface emits regardless of scene lighting, in
+        // scene-linear units. Values above 1.0 put the surface above display
+        // white, which is what gives bloom something to find and the tone
+        // curve something to roll off. Below 1.0 it is just an unlit tint.
+        void SetEmissive(const Vector3& value) { emissiveFactor = value; materialUniformsDirty = true; }
+        const Vector3& GetEmissive() const { return emissiveFactor; }
+
         void SetOpacity(float value) { opacity = value; materialUniformsDirty = true; }
         float GetOpacity() const { return opacity; }
         bool IsTransparent() const { return opacity < 1.0f || alphaMode == AlphaBlendMode::Blend; }
