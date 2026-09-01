@@ -24,7 +24,7 @@ AppStateShowcase::AppStateShowcase()
     : currentMode(InWorld)
     , isPaused(false)
     , pendingTogglePause(false)
-    , postProcessMode(PostProcessMode::Off)
+    , postProcessMode(PostProcessMode::Tonemap)
     , wasMouseLocked(false)
     , elapsedTime(0.0f)
     , procArtController(nullptr)
@@ -76,7 +76,7 @@ void AppStateShowcase::Init()
     pendingTogglePause = false;
     currentMode = InWorld;
     elapsedTime = 0.0f;
-    postProcessMode = PostProcessMode::Off;
+    postProcessMode = PostProcessMode::Tonemap;
 }
 
 void AppStateShowcase::SceneInit()
@@ -214,11 +214,11 @@ void AppStateShowcase::TogglePause()
 void AppStateShowcase::CyclePostProcessMode()
 {
     CC::PostProcess* postProcess = CC::RenderManager::Get()->GetPostProcess();
-    const char* modeName = "off";
+    const char* modeName = "clamped";
 
     switch (postProcessMode)
     {
-    case PostProcessMode::Off:
+    case PostProcessMode::Clamped:
         postProcessMode = PostProcessMode::Tonemap;
         postProcess->DisableAllEffects();
         postProcess->GetEffect(CC::PostProcessEffectId::Tonemap).SetEnabled(true);
@@ -234,9 +234,9 @@ void AppStateShowcase::CyclePostProcessMode()
         break;
 
     case PostProcessMode::Full:
-        postProcessMode = PostProcessMode::Off;
+        postProcessMode = PostProcessMode::Clamped;
         postProcess->DisableAllEffects();
-        modeName = "off";
+        modeName = "clamped";
         break;
 
     default:

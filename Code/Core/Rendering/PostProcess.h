@@ -66,6 +66,13 @@ namespace CC
         bool IsAnyEffectEnabled() const;
         void DisableAllEffects();
 
+        // Every effect back to the enable state and parameter values the stack
+        // configures itself with. This is what a scene loads onto, rather than
+        // an all-off stack: the tone curve is part of the output transform, so
+        // a scene that names only a vignette should not lose it and start
+        // clipping its highlights.
+        void ResetEffectsToDefaults();
+
         // ========================
         // Grade presets
         // ========================

@@ -102,8 +102,11 @@ namespace CC
         }
     }
 
+    // colorSpace follows the glTF slot: base colour and emissive are colour
+    // and are decoded on sample; normal, metallic-roughness and occlusion
+    // carry measurements and stay linear.
     static bool ExtractAndRegisterTexture(cgltf_texture_view* textureView, const std::string& directory,
-        const std::string& textureName)
+        const std::string& textureName, TextureColorSpace colorSpace)
     {
         if (textureView == nullptr || textureView->texture == nullptr)
         {
@@ -117,7 +120,7 @@ namespace CC
         }
 
         // Skip if already loaded
-        if (TextureManager::Get()->HasTexture(textureName))
+        if (TextureManager::Get()->HasTexture(textureName, colorSpace))
         {
             return true;
         }
@@ -129,7 +132,7 @@ namespace CC
             if (imageData != nullptr)
             {
                 int dataSize = (int)image->buffer_view->size;
-                TextureManager::Get()->AddTextureFromMemory(textureName, imageData, dataSize);
+                TextureManager::Get()->AddTextureFromMemory(textureName, imageData, dataSize, colorSpace);
                 CCPrint(PrintManager::CHANNEL_ALWAYS, "GltfLoader: Loaded embedded texture '%s' (%d bytes)",
                     textureName.c_str(), dataSize);
                 return true;
@@ -147,7 +150,7 @@ namespace CC
             }
 
             std::string texturePath = directory + image->uri;
-            TextureManager::Get()->AddTextureWithFullPath(textureName, texturePath);
+            TextureManager::Get()->AddTextureWithFullPath(textureName, texturePath, colorSpace);
             CCPrint(PrintManager::CHANNEL_ALWAYS, "GltfLoader: Loaded texture '%s'", textureName.c_str());
             return true;
         }
@@ -394,7 +397,7 @@ namespace CC
                         if (pbr->base_color_texture.texture != nullptr)
                         {
                             std::string texName = pbrData.name + "_baseColor";
-                            if (ExtractAndRegisterTexture(&pbr->base_color_texture, directory, texName))
+                            if (ExtractAndRegisterTexture(&pbr->base_color_texture, directory, texName, TextureColorSpace::Srgb))
                             {
                                 pbrData.baseColorTexture = texName;
                             }
@@ -404,7 +407,7 @@ namespace CC
                         if (pbr->metallic_roughness_texture.texture != nullptr)
                         {
                             std::string texName = pbrData.name + "_metallicRoughness";
-                            if (ExtractAndRegisterTexture(&pbr->metallic_roughness_texture, directory, texName))
+                            if (ExtractAndRegisterTexture(&pbr->metallic_roughness_texture, directory, texName, TextureColorSpace::Linear))
                             {
                                 pbrData.metallicRoughnessTexture = texName;
                             }
@@ -415,7 +418,7 @@ namespace CC
                     if (mat->normal_texture.texture != nullptr)
                     {
                         std::string texName = pbrData.name + "_normal";
-                        if (ExtractAndRegisterTexture(&mat->normal_texture, directory, texName))
+                        if (ExtractAndRegisterTexture(&mat->normal_texture, directory, texName, TextureColorSpace::Linear))
                         {
                             pbrData.normalTexture = texName;
                         }
@@ -425,7 +428,7 @@ namespace CC
                     if (mat->occlusion_texture.texture != nullptr)
                     {
                         std::string texName = pbrData.name + "_occlusion";
-                        if (ExtractAndRegisterTexture(&mat->occlusion_texture, directory, texName))
+                        if (ExtractAndRegisterTexture(&mat->occlusion_texture, directory, texName, TextureColorSpace::Linear))
                         {
                             pbrData.occlusionTexture = texName;
                         }
@@ -435,7 +438,7 @@ namespace CC
                     if (mat->emissive_texture.texture != nullptr)
                     {
                         std::string texName = pbrData.name + "_emissive";
-                        if (ExtractAndRegisterTexture(&mat->emissive_texture, directory, texName))
+                        if (ExtractAndRegisterTexture(&mat->emissive_texture, directory, texName, TextureColorSpace::Srgb))
                         {
                             pbrData.emissiveTexture = texName;
                         }

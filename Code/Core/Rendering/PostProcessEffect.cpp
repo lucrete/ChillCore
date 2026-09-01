@@ -9,6 +9,7 @@ namespace CC
     PostProcessEffect::PostProcessEffect()
         : name("")
         , isEnabled(false)
+        , isEnabledByDefault(false)
         , paramCount(0)
     {
     }
@@ -17,11 +18,17 @@ namespace CC
     {
     }
 
-    void PostProcessEffect::Configure(const char* effectName, bool isEnabledByDefault)
+    void PostProcessEffect::Configure(const char* effectName, bool _isEnabledByDefault)
     {
         name = effectName;
-        isEnabled = isEnabledByDefault;
+        isEnabled = _isEnabledByDefault;
+        isEnabledByDefault = _isEnabledByDefault;
         paramCount = 0;
+    }
+
+    void PostProcessEffect::ResetEnabledToDefault()
+    {
+        isEnabled = isEnabledByDefault;
     }
 
     void PostProcessEffect::AddParam(const char* paramName, float defaultValue, float minValue, float maxValue)

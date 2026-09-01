@@ -173,6 +173,17 @@ namespace CC
     // Grade presets
     // ========================
 
+    void PostProcess::ResetEffectsToDefaults()
+    {
+        for (int i = 0; i < static_cast<int>(PostProcessEffectId::Max); i++)
+        {
+            effects[i].ResetEnabledToDefault();
+            effects[i].ResetToDefaults();
+        }
+
+        activePresetName = "Neutral";
+    }
+
     bool PostProcess::ApplyPreset(const char* presetName)
     {
         bool result = false;
@@ -304,12 +315,16 @@ namespace CC
         grade.AddParam("gamma",       1.0f, 0.1f, 3.0f);
         grade.AddParam("gain",        1.0f, 0.0f, 2.0f);
 
-        // Off by default. The renderer is not linear end to end — lit shaders
-        // write display-referred values with no output transform — so a tone
-        // curve here is a deliberate look change rather than a correction, and
-        // turning it on silently would restyle every existing scene.
+        // On by default. The scene is rendered in scene-linear light, so
+        // values above white are real and need a curve to roll them off.
+        // Switching it off falls back to a hard clamp, which clips an emissive
+        // surface or a bright highlight flat instead.
+        //
+        // Exposure applies either way: it scales the scene before the curve,
+        // and is as meaningful when the frame is clamped as when it is
+        // tone mapped.
         PostProcessEffect& tonemap = GetEffect(PostProcessEffectId::Tonemap);
-        tonemap.Configure(EFFECT_NAME_TONEMAP, false);
+        tonemap.Configure(EFFECT_NAME_TONEMAP, true);
         tonemap.AddParam("exposure", 1.0f, 0.0f, 8.0f);
     }
 

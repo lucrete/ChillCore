@@ -40,9 +40,11 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 **Transparent pass.** The list is sorted back to front by distance from the camera. Blending is on and depth writing is off — both baked into the pipelines rather than toggled around the pass.
 
-**Post-process stack (optional).** The scene target carries the backbuffer's sample count and is resolved before any effect samples it, so antialiasing survives post-processing. Enabling any effect redirects the opaque and transparent passes into an offscreen colour target the renderer owns. Bloom then runs its own half-resolution passes, and a single fused pass applies every other enabled effect while resolving that target into the backbuffer. With every effect off the scene renders straight to the backbuffer, as before, and the target is released.
+**Post-process stack.** The opaque and transparent passes render into an offscreen colour target the renderer owns, holding scene-linear light. The target carries the backbuffer's sample count and is resolved before any effect samples it, so antialiasing survives post-processing. Bloom then runs its own half-resolution passes, and a single fused pass applies every other enabled effect, encodes to display space, and draws into the backbuffer.
 
-**End of frame.** UI and text draw, then the developer overlay, then the fade overlay if it is not fully transparent, then the frame is presented. These follow the post pass, so UI is never subject to a scene post-process effect.
+This runs every frame, not only when an effect is enabled: the encode is the pass's own job, so the scene cannot be presented without it. Individual effects still switch on and off independently.
+
+**End of frame.** UI and text draw, then the developer overlay, then the fade overlay if it is not fully transparent, then the frame is presented. These follow the post pass, so UI is never subject to a scene post-process effect — and, since the encode has already happened, they are authored and drawn in display space.
 
 Between these, named timing markers are emitted at each pass boundary, which is what produces the profiler's per-pass breakdown.
 
@@ -61,6 +63,12 @@ Texture units are declared by the shader rather than assigned at runtime, so bin
 **Add a renderable type.** Derive from the renderable base, describe the vertex layout, create the geometry buffers, and submit during update. The pipeline is obtained from the cache; nothing needs to create one directly.
 
 **Author a shader.** One file holds vertex and fragment sections. Shared declarations, including the uniform blocks, are pulled in by include. All shaders target one language version, which is what allows shader-declared texture units and shared include files to work everywhere.
+
+**Add a texture.** Decide its role, not its file format. Base colour and emissive are colour and are requested as sRGB so the sampler decodes them; normal, metallic-roughness and occlusion are data and are requested linear. Getting this wrong is not a subtle error — a decoded normal map bends light in the wrong direction.
+
+**Make a surface emit light.** Set the material's emissive factor, or write an `emissive` key on the material in a scene file, as `[r, g, b]` or a single number for a white emission. The units are scene-linear, so 1.0 is display white and anything above it is above white: that is the range bloom's threshold discriminates on and the tone curve rolls off.
+
+**Author a shader that picks colours by hand.** Anything drawn during the scene passes writes into a linear target, so a hand-picked display colour is converted on output with the shared colour-space include. Anything drawn after the post pass — UI, text, overlays — is already in display space and converts nothing.
 
 **Add a material parameter.** If it belongs to every material, it goes in the material block and its shared shader include. If it belongs to one shader, declare it in that shader's own parameter block and set it by name on the material; the engine places it in the block by the standard layout rules and uploads the block when a value changes.
 
@@ -116,6 +124,18 @@ This removes an entire category of bug, where state is left enabled by an early 
 
 The cost is that changing a material's transparency after creation requires recreating its pipeline rather than flipping a flag.
 
+### The renderer works in scene-linear light
+
+Lighting, bloom, grading and the tone curve all operate on scene-linear values. Two rules follow, and everything else about colour in the renderer is a consequence of them: anything written into the scene target is scene-linear, and anything drawn after the post-process pass is display-referred.
+
+Light adds and scales linearly; sRGB does not. An sRGB-encoded texture treated as if it were linear is roughly twice its true mid-tone value before a single light touches it, so every lighting term downstream is computed on the wrong numbers. Decoding on read is what makes the arithmetic mean what it says.
+
+Colour textures are decoded by the sampler rather than by a `pow()` in the shader. Hardware decodes before filtering; a shader-side decode filters first and decodes the average, which is not the same value. The distinction that matters at authoring time is not the file but the role: base colour and emissive carry colour and are decoded, while normal, metallic-roughness and occlusion carry measurements and are not. Because the role belongs to the slot rather than the image, the colour space is part of a texture's cache identity, and one file used in both roles yields two textures.
+
+The encode back to display space happens once, at the end of the post-process pass. That is what makes the pass mandatory: it runs every frame whether or not any effect is enabled, because the scene cannot otherwise be presented. The alternative — an sRGB backbuffer with a hardware encode — was rejected because UI and text draw after the pass with sRGB-authored colours, and a hardware encode would apply to them too.
+
+Two consequences are worth stating plainly. Emissive values above 1.0 are now real rather than clamped on the way out, which is what gives bloom's threshold something to discriminate on and the tone curve something to roll off. And a shader that authors display-referred colour by hand — the procedural art — must convert on output, because it is writing into a linear target; with the tone map off that round trip is exact, and with it on the art passes through the curve like any other scene content.
+
 ### Effects fuse into one pass rather than chaining
 
 Vignette, colour grading and tone mapping are uniform-gated blocks inside a single fragment shader. Only bloom gets passes of its own.
@@ -132,7 +152,7 @@ The fused pass runs bloom composite, exposure, vignette, log encode, grade, tone
 
 Grading after the tone curve would be simpler, and it is what a naive reading suggests, but it makes every grade depend on the exposure it was authored at: the same contrast value lands differently once the tone curve has already compressed the highlights. Encoding to log first and grading there is what makes a preset portable between scenes, and it is what both commercial engines do. Vignette runs earlier still, in linear, because it is a lens effect on incoming light rather than a look applied to a finished image.
 
-Tone mapping is a mode rather than a toggle: off clamps, which is exactly what the direct-to-backbuffer path does, so switching it off stays well defined instead of blowing out everything above white.
+Tone mapping is a mode rather than a toggle: off clamps rather than doing nothing, so switching it off stays well defined. It is on by default, because the scene carries genuine values above white and a clamp clips them flat — an emissive surface at four times white and one at twelve become the same undifferentiated patch.
 
 ### Post-processing is an engine capability, chosen by effect alone
 
@@ -165,8 +185,8 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
 - Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
 - Effect order in the fused pass is fixed by the shader. A caller cannot reorder effects or insert one of its own.
-- The renderer is not linear end to end: lit shaders write display-referred values with no output transform. Tone mapping therefore operates on values that are not scene-linear, which is why it is off by default and is a look choice rather than a correction.
-- Bloom has nothing to act on in a scene whose brightest value is white. Its threshold must be dropped below 1 to show anything until content carries values above white.
+- Procedural art authors display-referred colour and converts on output, so with the tone map on it passes through the curve and reads softer than it was picked. Switching the tone map off makes the round trip exact.
+- Lighting is linear but the light values themselves are not physical: intensities are authored numbers, not photometric units, so a scene is still tuned by eye rather than by measurement.
 - Where the backend cannot render to a half-float target the scene target falls back to 8-bit, so tone mapping and bloom keep working but have no range above white to use.
 - Shadow maps and reflection probes are not built. Render targets make them possible; nothing in the frontend produces or consumes one yet.
 - A shader's own parameter block is parsed from its fragment source, not queried from the graphics interface. A block declared in a vertex section is not seen. Only scalar, vector, and 4x4 matrix members are placed; anything else drops the whole block rather than risk offsets that disagree with the driver.

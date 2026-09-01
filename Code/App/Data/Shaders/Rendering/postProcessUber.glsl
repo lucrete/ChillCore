@@ -13,6 +13,8 @@ void main()
 
 #shader fragment
 #version 430 core
+#include "Include/colorSpace.glinc"
+
 out vec4 FragColor;
 
 in vec2 TexCoords;
@@ -161,9 +163,14 @@ void main()
         color = mix(vec3(luminance), color, saturation);
     }
 
-    // ---- Output transform. With the tone map off, the frame is clamped
-    // instead, which is what the direct-to-backbuffer path does.
+    // ---- Output transform. With the tone map off the frame is clamped
+    // instead, which hard-clips anything above white rather than rolling it
+    // off — visible wherever an emissive surface or a specular highlight
+    // exceeds 1.0.
     color = bloomAndExposure.w > 0.5 ? AcesTonemap(color) : clamp(color, 0.0, 1.0);
 
-    FragColor = vec4(color, 1.0);
+    // ---- Encode to display space. This pass is the single point where the
+    // frame stops being scene-linear, which is why it runs every frame even
+    // with every effect switched off.
+    FragColor = vec4(LinearToSrgb(color), 1.0);
 }

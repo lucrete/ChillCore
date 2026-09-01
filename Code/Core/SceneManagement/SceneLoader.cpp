@@ -136,10 +136,12 @@ namespace CC
     {
         PostProcess* postProcess = RenderManager::Get()->GetPostProcess();
 
-        // The block is authoritative for the scene: anything it does not name
-        // is off, so a scene cannot inherit an effect left enabled by whatever
-        // ran before it.
-        postProcess->DisableAllEffects();
+        // The block is authoritative for the scene: it loads onto stack
+        // defaults, so a scene cannot inherit an effect left enabled by
+        // whatever ran before it. Defaults rather than all-off, because the
+        // tone curve is part of the output transform and a scene naming only
+        // a vignette should not lose it and start clipping.
+        postProcess->ResetEffectsToDefaults();
 
         if (postProcessNode.has_child("preset"))
         {
@@ -238,6 +240,29 @@ namespace CC
                 opacity = NodeToFloat(matNode["opacity"]);
             }
 
+            // Light the surface emits, in scene-linear units. Written either
+            // as [r, g, b] or as a single number for a white emission, where
+            // a value above 1.0 puts the surface above display white.
+            bool hasEmissive = false;
+            Vector3 emissive(0.0f, 0.0f, 0.0f);
+            if (matNode.has_child("emissive"))
+            {
+                ryml::ConstNodeRef emissiveNode = matNode["emissive"];
+                hasEmissive = true;
+
+                if (emissiveNode.num_children() >= 3)
+                {
+                    emissive.x = NodeToFloat(emissiveNode[0]);
+                    emissive.y = NodeToFloat(emissiveNode[1]);
+                    emissive.z = NodeToFloat(emissiveNode[2]);
+                }
+                else
+                {
+                    float intensity = NodeToFloat(emissiveNode);
+                    emissive = Vector3(intensity, intensity, intensity);
+                }
+            }
+
             if (matManager->HasMaterial(name))
             {
                 matManager->RemoveMaterial(name);
@@ -248,6 +273,15 @@ namespace CC
                 CCPrint(PrintManager::CHANNEL_ALWAYS, "SceneLoader: Created material '%s'", name.c_str());
             }
             matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
+
+            if (hasEmissive)
+            {
+                Material* material = matManager->GetMaterial(name);
+                if (material != nullptr)
+                {
+                    material->SetEmissive(emissive);
+                }
+            }
         }
 
         return allSucceeded;

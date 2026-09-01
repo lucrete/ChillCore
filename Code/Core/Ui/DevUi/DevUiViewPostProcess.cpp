@@ -18,9 +18,9 @@ namespace CC
             if (!postProcess->IsAnyEffectEnabled())
             {
                 ImGui::TextWrapped(
-                    "Every effect is off, so the scene renders straight to the backbuffer "
-                    "and keeps its multisampling. Enabling any effect routes the frame "
-                    "through the offscreen target.");
+                    "Every effect is off. The pass still runs: it encodes the scene from "
+                    "linear light to display space, which is not optional. With the tone "
+                    "map off the frame is clamped instead of rolled off.");
                 ImGui::Separator();
             }
 

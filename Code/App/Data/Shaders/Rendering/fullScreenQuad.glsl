@@ -12,6 +12,7 @@ void main() {
 
 #shader fragment
 #version 430 core
+#include "Include/colorSpace.glinc"
 out vec4 FragColor;
 
 in vec2 uv;
@@ -62,7 +63,10 @@ vec4 circle(vec2 uv, vec2 pos, float radius, float radiusOffset)
 void main() {
     vec2 uvAdjust = aspectAdjustUv(uv);
 
-    FragColor = circle(uvAdjust, vec2(0.0, 0.0), 0.5 + 0.3*sin(iTime), 0.0);
+    // Authored in display space, but the scene target holds scene-linear
+    // light. Converting on output keeps the picked colours looking as
+    // they were chosen once the post-process pass encodes back to sRGB.
+    FragColor = SrgbToLinear(circle(uvAdjust, vec2(0.0, 0.0), 0.5 + 0.3*sin(iTime), 0.0));
     
     
     //FragColor = vec4(palette(cos(50*uvAdjust.x *uvAdjust.y + 6*sin(iTime*2))), 1.0);

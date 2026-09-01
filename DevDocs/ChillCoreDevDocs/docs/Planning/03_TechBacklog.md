@@ -2,7 +2,7 @@
 
 Work identified but not yet in plan. Summaries only. When an item is picked up it moves to `02_Roadmap.md` and gets a section in its workstream planning doc — see `01_DevProcess.md`. Per `Guidelines/CodingGuidelines.md`, future work is captured here rather than in `// Todo` comments.
 
-Last reviewed against the source: 2026-08-29.
+Last reviewed against the source: 2026-09-01.
 
 ---
 
@@ -19,10 +19,11 @@ Gaps left open by the offscreen render-target work (AGD-0080 Limitations). None 
 
 Gaps left open by the post-process stack (AGD-0070 Limitations). None blocking:
 
-- A linear rendering workflow. Lit shaders write display-referred values with no output transform, so tone mapping operates on values that are not scene-linear and bloom has nothing above white to find. This is what would make the tone map a correction rather than a look, and it is the largest of these.
 - Baking grade and tone map into a 3D LUT, as both commercial engines do. Needs render-to-3D-texture or the 2D strip fallback mobile paths use; the array-layer attachment gap above blocks the first.
 - A caller-defined post-process chain. Effects fuse into one pass in a fixed order; a caller cannot reorder them or insert its own.
 - Colour grading works on scalar parameters. Per-channel lift, gamma and gain are what a real grade needs, and would want a colour picker in the panel rather than three sliders each.
+- Procedural art passes through the tone curve. It authors display-referred colour, converts to linear on output, and the curve then compresses it, so it reads softer than it was picked. Either the art retunes against the curve or the path opts out of it; the second needs a way to mark content as already display-referred, which the stack has no concept of.
+- Scene lighting is authored in arbitrary intensities rather than photometric units. Linear lighting makes physical units possible; nothing yet requires them.
 
 ### Camera registration by name
 

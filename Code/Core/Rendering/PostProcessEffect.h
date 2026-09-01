@@ -52,13 +52,21 @@ namespace CC
         PostProcessParam& GetParam(int index);
         const PostProcessParam& GetParam(int index) const;
 
+        // Parameters only. The developer panel's per-effect Reset uses this,
+        // where also flipping the enable flag would collapse the very effect
+        // the developer is tuning.
         void ResetToDefaults();
+
+        // The enable flag on its own, for a caller restoring a whole stack to
+        // the state it configures itself with.
+        void ResetEnabledToDefault();
 
     private:
         int FindParamIndex(const char* paramName) const;
 
         const char*      name;
         bool             isEnabled;
+        bool             isEnabledByDefault;
         PostProcessParam params[MAX_POST_PROCESS_PARAMS];
         int              paramCount;
     };

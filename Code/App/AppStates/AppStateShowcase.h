@@ -35,9 +35,13 @@ private:
     // Off renders straight to the backbuffer. Tonemap is the cheapest stack
     // that still routes through the offscreen target, so it is the A/B against
     // the direct path. Full turns on everything the stack can do at once.
+    // Cycles the demo through the stack. Clamped is not "post-processing
+    // off" — the pass always runs to encode the frame to display space — it
+    // is the tone curve replaced by a hard clip, which is what makes the
+    // emissive ladder in the scene worth looking at.
     enum class PostProcessMode
     {
-        Off,
+        Clamped,
         Tonemap,
         Full
     };

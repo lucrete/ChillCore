@@ -95,9 +95,10 @@ namespace CC
                         textureName = selectedMaterial->diffuseTexture;
                         std::string textureFilePath = objDirectory + selectedMaterial->diffuseTexture;
 
-                        if (!TextureManager::Get()->HasTexture(textureName))
+                        // Diffuse is colour, so it is decoded on sample.
+                        if (!TextureManager::Get()->HasTexture(textureName, TextureColorSpace::Srgb))
                         {
-                            TextureManager::Get()->AddTextureWithFullPath(textureName, textureFilePath);
+                            TextureManager::Get()->AddTextureWithFullPath(textureName, textureFilePath, TextureColorSpace::Srgb);
                             CCPrint(PrintManager::CHANNEL_ALWAYS, "ObjLoader: Loaded texture '%s'", textureName.c_str());
                         }
                     }

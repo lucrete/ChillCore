@@ -177,18 +177,16 @@ namespace CC
         PlatformWindow::Get()->GetFramebufferSize(width, height);
         TextRenderer::Get()->BeginFrame(width, height);
 
-        if (postProcess->IsAnyEffectEnabled())
-        {
-            EnsurePostProcessTarget(width, height);
-        }
-        else
-        {
-            DestroyPostProcessTarget();
-        }
+        // The offscreen target is not optional. The scene is rendered in
+        // scene-linear light and the post-process pass is what encodes it to
+        // display space, so the pass runs every frame whether or not any
+        // effect is enabled. Rendering the scene straight to the backbuffer
+        // would present linear values as if they were sRGB.
+        EnsurePostProcessTarget(width, height);
 
-        // Begin the scene render pass. Normally the backbuffer path (MSAA
-        // scene FB + resolve/blit in EndRenderPass); an active post-process
-        // effect redirects it into the offscreen target instead.
+        // Begin the scene render pass, into the offscreen target whenever one
+        // could be built. The backbuffer is the fallback for a zero-sized
+        // framebuffer (a minimised window), where there is nothing to present.
         gfxApi->BeginRenderPass(SceneTargetForFrame());
 
         shaderManager->Update();
@@ -278,7 +276,7 @@ namespace CC
 
     bool RenderManager::IsPostProcessEnabled() const
     {
-        return postProcess->IsAnyEffectEnabled() && postProcessTarget.IsValid();
+        return postProcessTarget.IsValid();
     }
 
     void RenderManager::EnsurePostProcessSampler()
