@@ -21,6 +21,7 @@ It describes the system as it is now, and is updated whenever the architecture c
 * No dates, and no change log. Git owns both.
 * Decisions are unnumbered. State the decision and the reasoning.
 * Verify every claim against the current source code before writing it. Nothing inside an AGD can signal that it has gone stale, so accuracy depends entirely on this step.
+* Never cite another AGD, by number or by title. Restate the part that matters in one sentence instead — see `Planning/01_DevProcess.md`.
 * Apply `TechnicalWritingStyleGuide.md`. Scannable first, readable second.
 
 ## Scale

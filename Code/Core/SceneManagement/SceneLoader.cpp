@@ -172,11 +172,29 @@ namespace CC
                     {
                         std::string paramName = KeyToString(paramNode);
 
+                        bool wasApplied = true;
+
                         if (paramName == "enabled")
                         {
                             effect->SetEnabled(NodeToString(paramNode) == "true");
                         }
-                        else if (!effect->SetParamValue(paramName.c_str(), NodeToFloat(paramNode)))
+                        else if (paramNode.num_children() >= 3)
+                        {
+                            // Per-channel form, matching what the panel dumps.
+                            Vector3 color(NodeToFloat(paramNode[0]),
+                                          NodeToFloat(paramNode[1]),
+                                          NodeToFloat(paramNode[2]));
+                            wasApplied = effect->SetParamColor(paramName.c_str(), color);
+                        }
+                        else
+                        {
+                            // A single number sets every channel, so a grade
+                            // written before the controls went per channel
+                            // still loads and means the same thing.
+                            wasApplied = effect->SetParamValue(paramName.c_str(), NodeToFloat(paramNode));
+                        }
+
+                        if (!wasApplied)
                         {
                             CCPrint(PrintManager::CHANNEL_WARN,
                                 "SceneLoader: Unknown parameter '%s' on post-process effect '%s'",

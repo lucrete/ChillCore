@@ -10,17 +10,7 @@
 
 Gaps left open when the post-process stack landed. Ordered by what they unlock, not by cost.
 
-### Per-channel colour grading
-
-Lift, gamma and gain are scalars. A grade needs them per channel — that is what makes a preset a look rather than a brightness adjustment.
-
-**Why it matters.** It is the difference between the grade being usable and being a demonstration. Every reference grade in the presets is currently approximated with a single number where a colour is wanted.
-
-**Shape of the work.** Each of the three becomes a colour. The packed parameter block grows accordingly, and the developer panel wants a colour picker per control rather than three sliders each — the panel builds itself from the parameter description, so the description has to gain a colour type first.
-
-**Watch out.** The parameter block has a fixed capacity, and three colours cost more slots than three scalars. Check the budget before designing the layout, not after.
-
-**Done when:** lift, gamma and gain are per channel, the panel edits them as colours, and the presets are re-authored against the new controls.
+The effect chain and the procedural-art question each need a decision recorded before code is written; the notes below say which.
 
 ### A caller-defined effect chain
 

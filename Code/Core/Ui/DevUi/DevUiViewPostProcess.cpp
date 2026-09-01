@@ -42,7 +42,19 @@ namespace CC
                     for (int p = 0; p < effect.GetParamCount(); p++)
                     {
                         PostProcessParam& param = effect.GetParam(p);
-                        ImGui::SliderFloat(param.name, &param.value, param.minValue, param.maxValue);
+
+                        if (param.type == PostProcessParamType::Color)
+                        {
+                            // Edited as three numbers rather than through a
+                            // colour picker: these run outside 0..1 — gain and
+                            // gamma sit around 1.0 and lift goes negative —
+                            // and a picker clamps.
+                            ImGui::SliderFloat3(param.name, &param.value.x, param.minValue, param.maxValue);
+                        }
+                        else
+                        {
+                            ImGui::SliderFloat(param.name, &param.value.x, param.minValue, param.maxValue);
+                        }
                     }
 
                     if (ImGui::SmallButton("Reset"))

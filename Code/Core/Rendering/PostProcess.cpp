@@ -43,9 +43,9 @@ namespace
         float       saturation;
         float       temperature;
         float       tint;
-        float       lift;
-        float       gamma;
-        float       gain;
+        CC::Vector3 lift;
+        CC::Vector3 gamma;
+        CC::Vector3 gain;
     };
 
     // Descriptive rather than branded: these are ordinary grade bundles, and
@@ -53,12 +53,18 @@ namespace
     // a third party's product.
     const GradePreset GRADE_PRESETS[] =
     {
-        //  name       contrast  satur.  temp.   tint    lift    gamma   gain
-        {  "Neutral",   1.00f,   1.00f,  0.00f,  0.00f,  0.00f,  1.00f,  1.00f },
-        {  "Warm",      1.05f,   1.10f,  0.25f,  0.05f,  0.02f,  1.00f,  1.05f },
-        {  "Cool",      1.05f,   0.95f, -0.25f, -0.05f,  0.00f,  1.00f,  1.00f },
-        {  "Faded",     0.85f,   0.80f,  0.05f,  0.02f,  0.06f,  1.10f,  0.95f },
-        {  "Noir",      1.30f,   0.00f,  0.00f,  0.00f, -0.02f,  0.95f,  1.00f },
+        //  name       contrast satur.  temp.   tint         lift (r,g,b)                  gamma (r,g,b)                 gain (r,g,b)
+        {  "Neutral",   1.00f,   1.00f,  0.00f,  0.00f, { 0.00f,  0.00f,  0.00f}, {1.00f, 1.00f, 1.00f}, {1.00f, 1.00f, 1.00f} },
+        // Warm lifts the shadows towards amber and gains the highlights
+        // towards straw, which is the split a warm grade actually makes.
+        {  "Warm",      1.05f,   1.10f,  0.25f,  0.05f, { 0.03f,  0.01f, -0.01f}, {1.00f, 1.00f, 1.02f}, {1.06f, 1.02f, 0.96f} },
+        // Cool is the mirror: shadows towards blue, highlights cooled.
+        {  "Cool",      1.05f,   0.95f, -0.25f, -0.05f, {-0.01f,  0.00f,  0.03f}, {1.02f, 1.00f, 1.00f}, {0.96f, 1.00f, 1.06f} },
+        // Faded is the film look: shadows lifted off black, highlights pulled
+        // down, so the image never reaches either end of the range.
+        {  "Faded",     0.85f,   0.80f,  0.05f,  0.02f, { 0.07f,  0.06f,  0.05f}, {1.10f, 1.10f, 1.08f}, {0.94f, 0.95f, 0.97f} },
+        // Noir removes colour, then leans the remaining grey slightly cold.
+        {  "Noir",      1.30f,   0.00f,  0.00f,  0.00f, {-0.02f, -0.02f, -0.01f}, {0.95f, 0.95f, 0.97f}, {1.00f, 1.00f, 1.02f} },
     };
 }
 
@@ -199,9 +205,9 @@ namespace CC
                 grade.SetParamValue("saturation",  preset.saturation);
                 grade.SetParamValue("temperature", preset.temperature);
                 grade.SetParamValue("tint",        preset.tint);
-                grade.SetParamValue("lift",        preset.lift);
-                grade.SetParamValue("gamma",       preset.gamma);
-                grade.SetParamValue("gain",        preset.gain);
+                grade.SetParamColor("lift",        preset.lift);
+                grade.SetParamColor("gamma",       preset.gamma);
+                grade.SetParamColor("gain",        preset.gain);
                 grade.SetEnabled(true);
 
                 activePresetName = preset.name;
@@ -245,7 +251,16 @@ namespace CC
             for (int p = 0; p < effect.GetParamCount(); p++)
             {
                 const PostProcessParam& param = effect.GetParam(p);
-                CCPrint(PrintManager::CHANNEL_ALWAYS, "    %s: %.3f", param.name, param.value);
+
+                if (param.type == PostProcessParamType::Color)
+                {
+                    CCPrint(PrintManager::CHANNEL_ALWAYS, "    %s: [%.3f, %.3f, %.3f]",
+                            param.name, param.value.x, param.value.y, param.value.z);
+                }
+                else
+                {
+                    CCPrint(PrintManager::CHANNEL_ALWAYS, "    %s: %.3f", param.name, param.value.x);
+                }
             }
         }
     }
@@ -310,9 +325,12 @@ namespace CC
         grade.AddParam("saturation",  1.0f, 0.0f, 2.0f);
         grade.AddParam("temperature", 0.0f, -1.0f, 1.0f);
         grade.AddParam("tint",        0.0f, -1.0f, 1.0f);
-        grade.AddParam("lift",        0.0f, -0.5f, 0.5f);
-        grade.AddParam("gamma",       1.0f, 0.1f, 3.0f);
-        grade.AddParam("gain",        1.0f, 0.0f, 2.0f);
+        // Per channel: lift moves the shadows, gamma the mid-tones, gain the
+        // highlights, and a grade tints each of the three differently. A
+        // single number per control can only brighten or darken.
+        grade.AddColorParam("lift",   Vector3(0.0f, 0.0f, 0.0f), -0.5f, 0.5f);
+        grade.AddColorParam("gamma",  Vector3(1.0f, 1.0f, 1.0f),  0.1f, 3.0f);
+        grade.AddColorParam("gain",   Vector3(1.0f, 1.0f, 1.0f),  0.0f, 2.0f);
 
         // On by default. The scene is rendered in scene-linear light, so
         // values above white are real and need a curve to roll them off.
@@ -356,10 +374,17 @@ namespace CC
             grade.GetParamValue("temperature")));
 
         uberMaterial->SetUniform("gradeParamsB", Vector4(
-            grade.GetParamValue("tint"),
-            grade.GetParamValue("lift"),
-            grade.GetParamValue("gamma"),
-            grade.GetParamValue("gain")));
+            grade.GetParamValue("tint"), 0.0f, 0.0f, 0.0f));
+
+        // One vec4 each: std140 pads a vec3 to 16 bytes anyway, so nothing is
+        // saved by packing them together and the w stays free for later use.
+        Vector3 lift  = grade.GetParamColor("lift");
+        Vector3 gamma = grade.GetParamColor("gamma");
+        Vector3 gain  = grade.GetParamColor("gain");
+
+        uberMaterial->SetUniform("gradeLift",  Vector4(lift.x,  lift.y,  lift.z,  0.0f));
+        uberMaterial->SetUniform("gradeGamma", Vector4(gamma.x, gamma.y, gamma.z, 0.0f));
+        uberMaterial->SetUniform("gradeGain",  Vector4(gain.x,  gain.y,  gain.z,  0.0f));
     }
 
     void PostProcess::RunBloomPasses(Gfx::TextureHandle sceneColorTexture, Gfx::SamplerHandle sampler,

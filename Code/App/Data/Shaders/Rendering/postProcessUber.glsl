@@ -33,7 +33,10 @@ layout(std140, binding = 5) uniform CustomParams
     vec4 bloomAndExposure;  // x: bloom on, y: bloom intensity, z: exposure, w: tonemap on
     vec4 vignetteParams;    // x: intensity (0 disables), y: smoothness, z: roundness
     vec4 gradeParamsA;      // x: grade on, y: contrast, z: saturation, w: temperature
-    vec4 gradeParamsB;      // x: tint, y: lift, z: gamma, w: gain
+    vec4 gradeParamsB;      // x: tint
+    vec4 gradeLift;         // xyz: per-channel lift, moves the shadows
+    vec4 gradeGamma;        // xyz: per-channel gamma, moves the mid-tones
+    vec4 gradeGain;         // xyz: per-channel gain, moves the highlights
 };
 
 // ========================
@@ -141,9 +144,9 @@ void main()
         float saturation  = gradeParamsA.z;
         float temperature = gradeParamsA.w;
         float tint        = gradeParamsB.x;
-        float lift        = gradeParamsB.y;
-        float gammaValue  = gradeParamsB.z;
-        float gain        = gradeParamsB.w;
+        vec3  lift        = gradeLift.xyz;
+        vec3  gammaValue  = gradeGamma.xyz;
+        vec3  gain        = gradeGain.xyz;
 
         color = ApplyWhiteBalance(color, temperature, tint);
 
@@ -152,7 +155,7 @@ void main()
         color = LogCToLinear(logColor);
 
         color = color * gain + lift;
-        color = pow(max(color, vec3(0.0)), vec3(1.0 / max(gammaValue, 0.001)));
+        color = pow(max(color, vec3(0.0)), vec3(1.0) / max(gammaValue, vec3(0.001)));
 
         float luminance = Luminance(color);
         color = mix(vec3(luminance), color, saturation);

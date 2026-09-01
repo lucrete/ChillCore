@@ -1,6 +1,8 @@
 #ifndef POSTPROCESSEFFECT_H
 #define POSTPROCESSEFFECT_H
 
+#include "CCVector3.h"
+
 namespace CC
 {
     // ========================
@@ -18,13 +20,24 @@ namespace CC
 
     static const int MAX_POST_PROCESS_PARAMS = 12;
 
+    // A colour counts as one parameter rather than three, which is what keeps
+    // a per-channel grade inside the parameter budget, and what lets the
+    // developer panel offer a colour picker instead of three sliders.
+    enum class PostProcessParamType
+    {
+        Scalar,
+        Color
+    };
+
     struct PostProcessParam
     {
-        const char* name         = nullptr;
-        float       value        = 0.0f;
-        float       defaultValue = 0.0f;
-        float       minValue     = 0.0f;
-        float       maxValue     = 1.0f;
+        const char*          name         = nullptr;
+        PostProcessParamType type         = PostProcessParamType::Scalar;
+        // A scalar uses x alone. Range applies per channel for a colour.
+        Vector3              value        = Vector3(0.0f, 0.0f, 0.0f);
+        Vector3              defaultValue = Vector3(0.0f, 0.0f, 0.0f);
+        float                minValue     = 0.0f;
+        float                maxValue     = 1.0f;
     };
 
     class PostProcessEffect
@@ -35,6 +48,7 @@ namespace CC
 
         void Configure(const char* effectName, bool isEnabledByDefault);
         void AddParam(const char* paramName, float defaultValue, float minValue, float maxValue);
+        void AddColorParam(const char* paramName, const Vector3& defaultValue, float minValue, float maxValue);
 
         const char* GetName() const;
 
@@ -47,6 +61,12 @@ namespace CC
         // nothing.
         bool SetParamValue(const char* paramName, float value);
         float GetParamValue(const char* paramName) const;
+
+        // A colour read as a scalar returns its red channel, and a scalar
+        // written as a colour takes the red channel, so a caller that does not
+        // care about the distinction still gets something sensible.
+        bool SetParamColor(const char* paramName, const Vector3& value);
+        Vector3 GetParamColor(const char* paramName) const;
 
         int GetParamCount() const;
         PostProcessParam& GetParam(int index);

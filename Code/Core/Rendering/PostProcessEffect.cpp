@@ -33,10 +33,17 @@ namespace CC
 
     void PostProcessEffect::AddParam(const char* paramName, float defaultValue, float minValue, float maxValue)
     {
+        AddColorParam(paramName, Vector3(defaultValue, defaultValue, defaultValue), minValue, maxValue);
+        params[paramCount - 1].type = PostProcessParamType::Scalar;
+    }
+
+    void PostProcessEffect::AddColorParam(const char* paramName, const Vector3& defaultValue, float minValue, float maxValue)
+    {
         CC_ASSERT(paramCount < MAX_POST_PROCESS_PARAMS, "Too many post-process parameters for one effect");
 
         PostProcessParam& param = params[paramCount];
         param.name         = paramName;
+        param.type         = PostProcessParamType::Color;
         param.value        = defaultValue;
         param.defaultValue = defaultValue;
         param.minValue     = minValue;
@@ -61,6 +68,16 @@ namespace CC
 
     bool PostProcessEffect::SetParamValue(const char* paramName, float value)
     {
+        return SetParamColor(paramName, Vector3(value, value, value));
+    }
+
+    float PostProcessEffect::GetParamValue(const char* paramName) const
+    {
+        return GetParamColor(paramName).x;
+    }
+
+    bool PostProcessEffect::SetParamColor(const char* paramName, const Vector3& value)
+    {
         bool result = false;
         int index = FindParamIndex(paramName);
 
@@ -73,9 +90,9 @@ namespace CC
         return result;
     }
 
-    float PostProcessEffect::GetParamValue(const char* paramName) const
+    Vector3 PostProcessEffect::GetParamColor(const char* paramName) const
     {
-        float result = 0.0f;
+        Vector3 result(0.0f, 0.0f, 0.0f);
         int index = FindParamIndex(paramName);
 
         if (index >= 0)
