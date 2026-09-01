@@ -24,7 +24,28 @@ Gaps left open by the post-process stack (AGD-0070 Limitations). None blocking:
 - Colour grading works on scalar parameters. Per-channel lift, gamma and gain are what a real grade needs, and would want a colour picker in the panel rather than three sliders each.
 - Procedural art passes through the tone curve. It authors display-referred colour, converts to linear on output, and the curve then compresses it, so it reads softer than it was picked. Either the art retunes against the curve or the path opts out of it; the second needs a way to mark content as already display-referred, which the stack has no concept of.
 - Scene lighting is authored in arbitrary intensities rather than photometric units. Linear lighting makes physical units possible; nothing yet requires them.
-- Specular antialiasing. A highlight smaller than a pixel shimmers under motion, measurably and independently of bloom, because multisampling addresses geometry edges and not shading within a triangle. The usual answer is roughness regularisation from normal-map variance; temporal antialiasing would also cover it and is the larger piece of work.
+
+### Specular antialiasing
+
+Specular highlights shimmer under motion. Measured on the helmet model over a rotation sweep of 0.35 degrees per step: peak per-pixel change of 219 of 255 between adjacent steps, with bloom disabled.
+
+**Cause.** A pixel covers a footprint of the surface, not a point. The normal varies across that footprint — from curvature, and from normal-map detail finer than a pixel. A GGX lobe is narrow at low roughness, so specular is strongly non-linear in the normal, and shading once at the average normal is not the average of shading over the footprint. The result is a spike when the sampled normal aligns with the half-vector and nothing when it does not.
+
+Multisampling does not address it. Multisampling stores several coverage and depth samples per pixel but runs the fragment shader once per pixel per triangle, so it antialiases where triangles end. This aliasing is entirely within a triangle. Supersampling would fix it by shading every pixel several times, which is why nobody ships it.
+
+**Approach.** Widen the lobe to match the footprint rather than sampling it more. A narrow GGX lobe convolved with a spread of normals is approximately a wider GGX lobe, so the variance of normals within a pixel can be folded into roughness and the surface shaded once — roughly `alpha_filtered = alpha + 2 * variance`. Three sources of that variance, in increasing cost:
+
+- **Geometric specular antialiasing** — screen-space derivatives of the shading normal. Estimate variance from `dFdx(N)` and `dFdy(N)`. No new resources, under a dozen lines in the fragment shader, captures curvature. The first move. Kaplanyan and others, *Filtering Distributions of Normals for Shading Antialiasing*; refined by Tokuyoshi and Kaplanyan, *Improved Geometric Specular Antialiasing*.
+- **Toksvig** — normal-map mip variance. Mipmap normal maps without renormalising, then use the length of the averaged normal as the spread: a length below one means the normals disagreed. Catches sub-pixel normal-map detail that derivatives miss. Requires the texture pipeline to stop renormalising. Toksvig, *Mipmapping Normal Maps*.
+- **LEAN mapping** — first and second moments of the normal distribution stored per texel, which handles anisotropic spread properly. More storage and more machinery; not worth it before the other two are exhausted. Olano and Baker, *LEAN Mapping*.
+
+Implementation sits in `Code/App/Data/Shaders/Rendering/pbr.glsl`: the shading normal is already resolved there before the BRDF, so the first approach needs no new inputs. It composes with the minimum-roughness clamp already in that shader, because it only ever raises effective roughness.
+
+**Cost.** Tight highlights read slightly duller where the surface curves fast or the normal map is busy. That is the trade: a physically correct highlight that cannot be sampled, exchanged for a slightly soft one that is stable.
+
+**Alternative.** Temporal antialiasing covers all shading aliasing rather than specular alone, by jittering the sub-pixel sample position per frame and accumulating with reprojection. It needs motion vectors, a history buffer, and neighbourhood clamping against ghosting, none of which exist. Larger piece of work, and it would supersede this one.
+
+**Done when:** the peak per-pixel change over the same rotation sweep drops substantially with bloom disabled, and tight highlights on low-roughness surfaces remain recognisably tight.
 
 ### Camera registration by name
 
