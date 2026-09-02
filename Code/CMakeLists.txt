@@ -48,13 +48,10 @@ file(GLOB_RECURSE CC_ENGINE_HEADERS CONFIGURE_DEPENDS
     "${CC_APP}/*.h"
 )
 
-# Shaders are not compiled by the build, but they are edited constantly. They
-# are attached to the target so the Solution Explorer lists them alongside the
-# code that binds them.
-file(GLOB_RECURSE CC_SHADER_FILES CONFIGURE_DEPENDS
-    "${CC_APP}/Data/Shaders/*.glsl"
-    "${CC_APP}/Data/Shaders/*.glinc"
-)
+# Assets are not compiled by the build, but they are edited alongside the code
+# that loads them. The whole tree is attached to the target so the Solution
+# Explorer lists it — shaders, scenes, UI markup, grade presets and all.
+file(GLOB_RECURSE CC_DATA_FILES CONFIGURE_DEPENDS "${CC_APP}/Data/*")
 
 if(CC_GFX_BACKEND_GLES)
     list(FILTER CC_ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Desktop/.*")
@@ -114,12 +111,15 @@ add_library(ChillCoreEngine OBJECT
     ${CC_ENGINE_SOURCES}
     ${CC_ENGINE_HEADERS}
     ${CC_THIRD_PARTY_SOURCES}
-    ${CC_SHADER_FILES}
+    ${CC_DATA_FILES}
 )
 
-# Listed only. Without this the generator hands them to a compiler.
-set_source_files_properties(${CC_SHADER_FILES} PROPERTIES
+# Listed only. Without this the generator hands them to a compiler, and
+# EXTERNAL_OBJECT specifically stops the .obj meshes under Data/Meshes from
+# being mistaken for compiled objects and passed to the linker.
+set_source_files_properties(${CC_DATA_FILES} PROPERTIES
     HEADER_FILE_ONLY TRUE
+    EXTERNAL_OBJECT FALSE
     VS_TOOL_OVERRIDE "None"
 )
 
@@ -131,7 +131,7 @@ source_group(TREE "${CC_CODE_ROOT}" FILES
     ${CC_ENGINE_SOURCES}
     ${CC_ENGINE_HEADERS}
     ${CC_THIRD_PARTY_SOURCES}
-    ${CC_SHADER_FILES}
+    ${CC_DATA_FILES}
 )
 
 target_include_directories(ChillCoreEngine PUBLIC
