@@ -216,6 +216,18 @@ objects:
         material: EmissiveVeins
       - type: RotateRandom
 
+  # A flat quad rather than a sphere: the shader shades across UVs, and a
+  # UV-sphere pinches at the poles and seams at the wrap. The material is
+  # built in MaterialManager, so it is only referenced by name here.
+  - name: ProceduralVeinsPanel
+    transform:
+      position: [-2.0, 2.0, -6.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [3.0, 3.0, 1.0]
+    components:
+      - type: RenderableQuad
+        material: ProceduralVeins
+
   - name: RockSlabAngled
     transform:
       position: [-4.5, 1.5, 0.0]
@@ -228,7 +240,8 @@ objects:
 
   # RenderableMesh rather than RenderableSphere: the sphere component bakes a
   # vertex layout without a tangent, and normal mapping has no frame without
-  # one. The OBJ path derives tangents when the material is PBR.  - name: PbrSphereAllMaps
+  # one. The OBJ path derives tangents when the material is PBR.  
+  - name: PbrSphereAllMaps
     transform:
       position: [6.6, 0.6, -4.0]
       rotation: [0.0, 0.0, 0.0]

@@ -1,5 +1,7 @@
 #shader vertex
 #version 430 core
+#include "Include/objectUniforms.glinc"
+
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec2 aTexCoord;
 
@@ -7,7 +9,9 @@ out vec2 uv;
 
 void main() 
 {
-    gl_Position = vec4(aPos.x, aPos.y, 0.0, 1.0); 
+    // Identity on the fullscreen quad, whose vertices are already in clip
+    // space; a real transform when the same shader is used in-world.
+    gl_Position = objectUniforms.mvp * vec4(aPos, 1.0);
     uv = aTexCoord;
 }
 
