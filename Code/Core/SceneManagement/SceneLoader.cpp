@@ -234,6 +234,12 @@ namespace CC
             // a value above 1.0 puts the surface above display white.
             bool hasEmissive = false;
             Vector3 emissive(0.0f, 0.0f, 0.0f);
+            std::string emissiveTexture = "";
+
+            if (matNode.has_child("emissiveTexture"))
+            {
+                emissiveTexture = NodeToString(matNode["emissiveTexture"]);
+            }
             if (matNode.has_child("emissive"))
             {
                 ryml::ConstNodeRef emissiveNode = matNode["emissive"];
@@ -252,6 +258,46 @@ namespace CC
                 }
             }
 
+            // The PBR shader takes a whole texture set and its own factors,
+            // so it is built through a different path than the single-texture
+            // materials. Selected by shader name, since that is what decides
+            // which uniforms and samplers the material has to satisfy.
+            bool isPbr = (shader == "Pbr");
+
+            std::string metallicRoughnessTexture = "";
+            std::string normalTexture = "";
+            std::string occlusionTexture = "";
+            float metallic = 1.0f;
+            float roughness = 1.0f;
+
+            if (isPbr)
+            {
+                if (matNode.has_child("metallicRoughnessTexture"))
+                {
+                    metallicRoughnessTexture = NodeToString(matNode["metallicRoughnessTexture"]);
+                }
+
+                if (matNode.has_child("normalTexture"))
+                {
+                    normalTexture = NodeToString(matNode["normalTexture"]);
+                }
+
+                if (matNode.has_child("occlusionTexture"))
+                {
+                    occlusionTexture = NodeToString(matNode["occlusionTexture"]);
+                }
+
+                if (matNode.has_child("metallic"))
+                {
+                    metallic = NodeToFloat(matNode["metallic"]);
+                }
+
+                if (matNode.has_child("roughness"))
+                {
+                    roughness = NodeToFloat(matNode["roughness"]);
+                }
+            }
+
             if (matManager->HasMaterial(name))
             {
                 matManager->RemoveMaterial(name);
@@ -261,14 +307,44 @@ namespace CC
             {
                 CCPrint(PrintManager::CHANNEL_ALWAYS, "SceneLoader: Created material '%s'", name.c_str());
             }
-            matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
 
-            if (hasEmissive)
+            if (isPbr)
+            {
+                // A map written without a factor beside it would be scaled by
+                // zero and never show, so the factor stands in as white. With
+                // no map there is nothing to scale, and an absent factor has
+                // to mean no emission rather than a surface of solid white.
+                Vector3 pbrEmissive = emissive;
+                if (!hasEmissive && !emissiveTexture.empty())
+                {
+                    pbrEmissive = Vector3(1.0f, 1.0f, 1.0f);
+                }
+
+                matManager->CreatePbrMaterial(name, texture, metallicRoughnessTexture,
+                    normalTexture, occlusionTexture, emissiveTexture,
+                    baseColor, metallic, roughness, pbrEmissive, opacity);
+
+                matManager->GetMaterial(name)->SetTextureTiling(tiling);
+            }
+            else
+            {
+                matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
+            }
+
+            if (!isPbr && (hasEmissive || !emissiveTexture.empty()))
             {
                 Material* material = matManager->GetMaterial(name);
                 if (material != nullptr)
                 {
-                    material->SetEmissive(emissive);
+                    // A map with no factor written alongside it would be
+                    // multiplied by the default of zero and never show, so an
+                    // unwritten factor stands in as white.
+                    material->SetEmissive(hasEmissive ? emissive : Vector3(1.0f, 1.0f, 1.0f));
+
+                    if (!emissiveTexture.empty())
+                    {
+                        material->SetEmissiveTexture(emissiveTexture);
+                    }
                 }
             }
         }

@@ -26,6 +26,14 @@ namespace CC
         CreateMaterial("ProcArt_UnitCircleRipples", "UnitCircleRipples");
         CreateMaterial("ProcArt_RadialWaves", "RadialWaves");
         CreateMaterial("ProcArt_TrigWaves", "TrigWaves");
+
+        // One shader, two materials. The shader generates every pixel from
+        // its UVs and does no lighting, so the only thing separating the two
+        // uses is the parameters each carries: the fullscreen one is given a
+        // real aspect ratio by RenderableFullscreenQuad, the in-world one
+        // leaves it at 1 so the pattern follows the surface.
+        CreateMaterial("ProcArt_Veins", "ProceduralVeins");
+        CreateMaterial("ProceduralVeins", "ProceduralVeins");
         CreateMaterial("InWorldQuad", "TextureShader", "TestPattern");
         CreateMaterial("BlueTestPattern", "LitColour", "TestPattern", Vector3(1.0f, 1.0f, 1.0f), Vector2(5, 5));
         CreateMaterial("DevYellow", "LitColour", "", Vector3(1.0f, 1.0f, 0.0f));

@@ -19,13 +19,15 @@ namespace CC
         Gfx::BufferHandle   vertexBuffer;
         Gfx::BufferHandle   indexBuffer;
 
-        // Quad definition
-        float vertices[4 * 8] = {
-            // positions          // texture coords  // normals
-            -0.5f, -0.5f, 0.0f,   0.0f, 0.0f,        0.0f, 0.0f, 1.0f,
-             0.5f, -0.5f, 0.0f,   1.0f, 0.0f,        0.0f, 0.0f, 1.0f,
-             0.5f,  0.5f, 0.0f,   1.0f, 1.0f,        0.0f, 0.0f, 1.0f,
-            -0.5f,  0.5f, 0.0f,   0.0f, 1.0f,        0.0f, 0.0f, 1.0f
+        // Quad definition. The tangent is constant: the quad is flat in its
+        // local XY plane with u along +X, so no derivation is needed. Shaders
+        // that declare no tangent attribute simply ignore it.
+        float vertices[4 * 12] = {
+            // positions          // texture coords  // normals         // tangents
+            -0.5f, -0.5f, 0.0f,   0.0f, 0.0f,        0.0f, 0.0f, 1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+             0.5f, -0.5f, 0.0f,   1.0f, 0.0f,        0.0f, 0.0f, 1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+             0.5f,  0.5f, 0.0f,   1.0f, 1.0f,        0.0f, 0.0f, 1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -0.5f,  0.5f, 0.0f,   0.0f, 1.0f,        0.0f, 0.0f, 1.0f,  1.0f, 0.0f, 0.0f, 1.0f
         };
 
         unsigned int indices[6] = {

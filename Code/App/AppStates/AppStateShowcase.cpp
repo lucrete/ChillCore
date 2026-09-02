@@ -4,6 +4,7 @@
 #include "PrintManager.h"
 #include "CameraManager.h"
 #include "MaterialManager.h"
+#include "Material.h"
 #include "PostProcess.h"
 #include "RenderManager.h"
 #include "SceneHierarchy.h"
@@ -90,6 +91,17 @@ void AppStateShowcase::SceneInit()
     cube01Object->AddComponent(new CC::RotateRandom());
     cube01Object->GetTransform().SetPosition(CC::Vector3(2, 4, -5));
     CC::SceneHierarchy::Get()->AddRootObject(cube01Object);
+
+    // The procedural material is built in MaterialManager and referenced by
+    // name from the scene, so its parameters are set here rather than loaded.
+    // Aspect stays at 1 for an in-world surface: the pattern follows the UVs,
+    // not the window. RenderableFullscreenQuad overrides it for its own copy.
+    CC::Material* proceduralVeins = CC::MaterialManager::Get()->GetMaterial("ProceduralVeins");
+    proceduralVeins->SetUniform("aspectRatio", 1.0f);
+    proceduralVeins->SetUniform("patternScale", 6.0f);
+    proceduralVeins->SetUniform("pulseSpeed", 0.8f);
+    proceduralVeins->SetUniform("veinSharpness", 7.0f);
+    proceduralVeins->SetUniform("glowColour", CC::Vector3(4.0f, 1.4f, 0.5f));
 
     CC::SceneHierarchy::Get()->Init();
     CC::SceneHierarchy::Get()->SetEnabled(true);

@@ -90,6 +90,7 @@ namespace CC
         shaderMap["Fractal2d"] = new ShaderDefinition(shaderBasePath, "ProceduralArt\\mandelbrot2d.glsl");
         shaderMap["TextureShader"] = new ShaderDefinition(shaderBasePath, "Rendering\\texture.glsl");
         shaderMap["LitColour"] = new ShaderDefinition(shaderBasePath, "Rendering\\litColour.glsl");
+        shaderMap["ProceduralVeins"] = new ShaderDefinition(shaderBasePath, "Rendering\\proceduralVeins.glsl");
         shaderMap["Pbr"] = new ShaderDefinition(shaderBasePath, "Rendering\\pbr.glsl");
         shaderMap["MsdfText"] = new ShaderDefinition(shaderBasePath, "Ui\\msdfText.glsl");
         shaderMap["UiQuad"] = new ShaderDefinition(shaderBasePath, "Ui\\uiQuad.glsl");

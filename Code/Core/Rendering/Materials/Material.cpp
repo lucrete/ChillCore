@@ -104,29 +104,43 @@ namespace CC
         texture = TextureManager::Get()->GetTexture(baseColorTex.empty() ? "DefaultBase" : baseColorTex,
                                                     TextureColorSpace::Srgb);
 
-        // Load PBR textures (use DefaultBase as fallback for missing textures)
-        if (!metallicRoughnessTex.empty() && TextureManager::Get()->HasTexture(metallicRoughnessTex))
+        // An unnamed slot is absent, and the shader falls back to its factor.
+        // A named one is fetched rather than merely looked up: glTF registers
+        // its embedded images before building the material, so those are
+        // cache hits, while a scene-authored material names a file that
+        // nothing has loaded yet.
+        if (!metallicRoughnessTex.empty())
         {
             metallicRoughnessTexture = TextureManager::Get()->GetTexture(metallicRoughnessTex);
         }
 
-        if (!normalTex.empty() && TextureManager::Get()->HasTexture(normalTex))
+        if (!normalTex.empty())
         {
             normalTexture = TextureManager::Get()->GetTexture(normalTex);
         }
 
-        if (!occlusionTex.empty() && TextureManager::Get()->HasTexture(occlusionTex))
+        if (!occlusionTex.empty())
         {
             occlusionTexture = TextureManager::Get()->GetTexture(occlusionTex);
         }
 
-        if (!emissiveTex.empty() && TextureManager::Get()->HasTexture(emissiveTex, TextureColorSpace::Srgb))
+        if (!emissiveTex.empty())
         {
             emissiveTexture = TextureManager::Get()->GetTexture(emissiveTex, TextureColorSpace::Srgb);
         }
 
         samplerHandle = CreateRepeatLinearSampler();
         materialUniformBuffer = CreateMaterialUniformBuffer();
+    }
+
+    void Material::SetEmissiveTexture(const std::string& textureName)
+    {
+        // Emissive carries colour, so it is decoded on sample.
+        emissiveTexture = textureName.empty()
+            ? nullptr
+            : TextureManager::Get()->GetTexture(textureName, TextureColorSpace::Srgb);
+
+        materialUniformsDirty = true;
     }
 
     void Material::UploadMaterialUniforms()
@@ -226,6 +240,12 @@ namespace CC
                 if (normalHandle.IsValid())    { gfxApi->BindTexture(2, normalHandle,    samplerHandle); }
                 if (occlusionHandle.IsValid()) { gfxApi->BindTexture(3, occlusionHandle, samplerHandle); }
                 if (emissiveHandle.IsValid())  { gfxApi->BindTexture(4, emissiveHandle,  samplerHandle); }
+            }
+            else if (emissiveTexture != nullptr && emissiveTexture->GetTextureHandle().IsValid())
+            {
+                // The lit shader declares only units 0 and 4, so the emissive
+                // map binds without the rest of the PBR set.
+                gfxApi->BindTexture(4, emissiveTexture->GetTextureHandle(), samplerHandle);
             }
         }
     }

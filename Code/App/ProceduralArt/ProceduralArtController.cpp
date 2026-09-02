@@ -38,6 +38,7 @@ void ProceduralArtController::InitEffects()
     effects.emplace_back(matMgr->GetMaterial("ProcArt_UnitCircleRipples"), "UnitCircleRipples", false);
     effects.emplace_back(matMgr->GetMaterial("ProcArt_RadialWaves"), "RadialWaves", false);
     effects.emplace_back(matMgr->GetMaterial("ProcArt_TrigWaves"), "TrigWaves", false);
+    effects.emplace_back(matMgr->GetMaterial("ProcArt_Veins"), "ProceduralVeins", false);
 
     // Set initial material
     if (!effects.empty())

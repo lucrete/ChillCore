@@ -76,6 +76,12 @@ namespace CC
         void SetEmissive(const Vector3& value) { emissiveFactor = value; materialUniformsDirty = true; }
         const Vector3& GetEmissive() const { return emissiveFactor; }
 
+        // Emissive map, modulated by the emissive factor. A material without
+        // one behaves as though the map were white, so the factor alone drives
+        // the emission.
+        void SetEmissiveTexture(const std::string& textureName);
+        bool HasEmissiveTexture() const { return emissiveTexture != nullptr; }
+
         void SetOpacity(float value) { opacity = value; materialUniformsDirty = true; }
         float GetOpacity() const { return opacity; }
         bool IsTransparent() const { return opacity < 1.0f || alphaMode == AlphaBlendMode::Blend; }
