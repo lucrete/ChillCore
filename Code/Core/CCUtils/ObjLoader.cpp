@@ -1,4 +1,5 @@
 #include "ObjLoader.h"
+#include "TangentGenerator.h"
 #include <sstream>
 #include <iostream>
 #include <unordered_map>
@@ -33,11 +34,7 @@ namespace CC
 
         ProcessMeshData(positions, texCoords, normals, faces, vertices, indices);
 
-        RenderableMesh* mesh = new RenderableMesh(material);
-        mesh->Initialize(vertices.data(), indices.data(),
-            (int)(vertices.size() * sizeof(float)),
-            (int)(indices.size() * sizeof(unsigned int)));
-        mesh->SetIndexCount((int)indices.size());
+        RenderableMesh* mesh = CreateMesh(material, vertices, indices);
 
         return mesh;
     }
@@ -133,11 +130,7 @@ namespace CC
 
         ProcessMeshData(positions, texCoords, normals, faces, vertices, indices);
 
-        RenderableMesh* mesh = new RenderableMesh(material);
-        mesh->Initialize(vertices.data(), indices.data(),
-            (int)(vertices.size() * sizeof(float)),
-            (int)(indices.size() * sizeof(unsigned int)));
-        mesh->SetIndexCount((int)indices.size());
+        RenderableMesh* mesh = CreateMesh(material, vertices, indices);
 
         return mesh;
     }
@@ -276,6 +269,85 @@ namespace CC
         }
 
         return succeeded;
+    }
+
+    RenderableMesh* ObjLoader::CreateMesh(Material* material,
+        const std::vector<float>& vertices,
+        const std::vector<unsigned int>& indices)
+    {
+        RenderableMesh* mesh = new RenderableMesh(material);
+
+        // Tangents exist only to build the TBN frame for normal mapping, and
+        // the PBR shader is the only one declaring the attribute. A mesh on
+        // any other shader keeps the narrower vertex.
+        if (material != nullptr && material->GetShaderName() == "Pbr")
+        {
+            std::vector<float> tangentVertices;
+            BuildTangentVertices(vertices, indices, tangentVertices);
+            mesh->InitializeWithTangents(tangentVertices.data(), indices.data(),
+                (int)(tangentVertices.size() * sizeof(float)),
+                (int)(indices.size() * sizeof(unsigned int)));
+        }
+        else
+        {
+            mesh->Initialize(vertices.data(), indices.data(),
+                (int)(vertices.size() * sizeof(float)),
+                (int)(indices.size() * sizeof(unsigned int)));
+        }
+
+        mesh->SetIndexCount((int)indices.size());
+
+        return mesh;
+    }
+
+    void ObjLoader::BuildTangentVertices(const std::vector<float>& vertices,
+        const std::vector<unsigned int>& indices,
+        std::vector<float>& tangentVertices)
+    {
+        static const int SOURCE_FLOATS_PER_VERTEX = 8;
+        static const int RESULT_FLOATS_PER_VERTEX = 12;
+
+        size_t vertexCount = vertices.size() / SOURCE_FLOATS_PER_VERTEX;
+
+        std::vector<float> positions;
+        std::vector<float> texCoords;
+        std::vector<float> normals;
+        positions.reserve(vertexCount * 3);
+        texCoords.reserve(vertexCount * 2);
+        normals.reserve(vertexCount * 3);
+
+        for (size_t i = 0; i < vertexCount; i++)
+        {
+            const float* vertex = &vertices[i * SOURCE_FLOATS_PER_VERTEX];
+            positions.push_back(vertex[0]);
+            positions.push_back(vertex[1]);
+            positions.push_back(vertex[2]);
+            texCoords.push_back(vertex[3]);
+            texCoords.push_back(vertex[4]);
+            normals.push_back(vertex[5]);
+            normals.push_back(vertex[6]);
+            normals.push_back(vertex[7]);
+        }
+
+        std::vector<float> tangents;
+        TangentGenerator::Compute(positions, texCoords, normals, indices, tangents);
+
+        tangentVertices.clear();
+        tangentVertices.reserve(vertexCount * RESULT_FLOATS_PER_VERTEX);
+
+        for (size_t i = 0; i < vertexCount; i++)
+        {
+            const float* vertex = &vertices[i * SOURCE_FLOATS_PER_VERTEX];
+            for (int component = 0; component < SOURCE_FLOATS_PER_VERTEX; component++)
+            {
+                tangentVertices.push_back(vertex[component]);
+            }
+
+            tangentVertices.push_back(tangents[i * 4]);
+            tangentVertices.push_back(tangents[i * 4 + 1]);
+            tangentVertices.push_back(tangents[i * 4 + 2]);
+            tangentVertices.push_back(tangents[i * 4 + 3]);
+        }
     }
 
     void ObjLoader::ProcessMeshData(const std::vector<float>& positions,

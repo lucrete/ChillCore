@@ -258,6 +258,46 @@ namespace CC
                 }
             }
 
+            // The PBR shader takes a whole texture set and its own factors,
+            // so it is built through a different path than the single-texture
+            // materials. Selected by shader name, since that is what decides
+            // which uniforms and samplers the material has to satisfy.
+            bool isPbr = (shader == "Pbr");
+
+            std::string metallicRoughnessTexture = "";
+            std::string normalTexture = "";
+            std::string occlusionTexture = "";
+            float metallic = 1.0f;
+            float roughness = 1.0f;
+
+            if (isPbr)
+            {
+                if (matNode.has_child("metallicRoughnessTexture"))
+                {
+                    metallicRoughnessTexture = NodeToString(matNode["metallicRoughnessTexture"]);
+                }
+
+                if (matNode.has_child("normalTexture"))
+                {
+                    normalTexture = NodeToString(matNode["normalTexture"]);
+                }
+
+                if (matNode.has_child("occlusionTexture"))
+                {
+                    occlusionTexture = NodeToString(matNode["occlusionTexture"]);
+                }
+
+                if (matNode.has_child("metallic"))
+                {
+                    metallic = NodeToFloat(matNode["metallic"]);
+                }
+
+                if (matNode.has_child("roughness"))
+                {
+                    roughness = NodeToFloat(matNode["roughness"]);
+                }
+            }
+
             if (matManager->HasMaterial(name))
             {
                 matManager->RemoveMaterial(name);
@@ -267,9 +307,25 @@ namespace CC
             {
                 CCPrint(PrintManager::CHANNEL_ALWAYS, "SceneLoader: Created material '%s'", name.c_str());
             }
-            matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
 
-            if (hasEmissive || !emissiveTexture.empty())
+            if (isPbr)
+            {
+                // The emissive factor defaults to white here rather than to
+                // black, so an emissive map written without one still shows.
+                Vector3 pbrEmissive = hasEmissive ? emissive : Vector3(1.0f, 1.0f, 1.0f);
+
+                matManager->CreatePbrMaterial(name, texture, metallicRoughnessTexture,
+                    normalTexture, occlusionTexture, emissiveTexture,
+                    baseColor, metallic, roughness, pbrEmissive, opacity);
+
+                matManager->GetMaterial(name)->SetTextureTiling(tiling);
+            }
+            else
+            {
+                matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
+            }
+
+            if (!isPbr && (hasEmissive || !emissiveTexture.empty()))
             {
                 Material* material = matManager->GetMaterial(name);
                 if (material != nullptr)

@@ -47,6 +47,21 @@ materials:
     emissiveTexture: EmissiveVeins.png
     emissive: [5.0, 5.0, 5.0]
 
+  # Every PBR slot filled at once. The maps share one noise field, so the
+  # veins the emissive lights up are the same ones the normal map cuts as
+  # grooves, the occlusion darkens and the roughness polishes smooth.
+  - name: VeinedRock
+    shader: Pbr
+    texture: RockBase.png
+    metallicRoughnessTexture: RockMetallicRoughness.png
+    normalTexture: RockNormal.png
+    occlusionTexture: RockOcclusion.png
+    emissiveTexture: EmissiveVeins.png
+    baseColor: [1.0, 1.0, 1.0]
+    metallic: 1.0
+    roughness: 1.0
+    emissive: [4.0, 4.0, 4.0]
+
 objects:
   - name: Ground
     transform:
@@ -186,4 +201,17 @@ objects:
     components:
       - type: RenderableSphere
         material: EmissiveVeins
+      - type: RotateRandom
+  # RenderableMesh rather than RenderableSphere: the sphere component bakes a
+  # vertex layout without a tangent, and normal mapping has no frame without
+  # one. The OBJ path derives tangents when the material is PBR.
+  - name: PbrSphereAllMaps
+    transform:
+      position: [6.6, 0.6, -4.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    components:
+      - type: RenderableMesh
+        mesh: Data/Meshes/Primitives/sphere.obj
+        material: VeinedRock
       - type: RotateRandom

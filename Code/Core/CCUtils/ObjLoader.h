@@ -50,6 +50,18 @@ namespace CC
         static bool ParseMtlFile(const std::string& filePath,
             std::vector<MtlMaterial>& materials);
 
+        // Builds the mesh from an 8-float pos3+uv2+normal3 stream, widening
+        // it to carry a tangent when the material's shader declares one.
+        static RenderableMesh* CreateMesh(Material* material,
+            const std::vector<float>& vertices,
+            const std::vector<unsigned int>& indices);
+
+        // OBJ carries no tangent, so it is derived from the UVs and appended,
+        // giving the 12-float pos3+uv2+normal3+tangent4 stream.
+        static void BuildTangentVertices(const std::vector<float>& vertices,
+            const std::vector<unsigned int>& indices,
+            std::vector<float>& tangentVertices);
+
         static void ProcessMeshData(const std::vector<float>& positions,
             const std::vector<float>& texCoords,
             const std::vector<float>& normals,
