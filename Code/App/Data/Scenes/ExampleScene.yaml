@@ -38,6 +38,15 @@ materials:
     baseColor: [0.0, 0.0, 0.0]
     emissive: [12.0, 3.6, 1.2]
 
+  # Emissive map rather than a flat factor. The map is modulated by the
+  # factor, so the black rock between the veins stays dark while the vein
+  # cores land well above display white and bloom.
+  - name: EmissiveVeins
+    shader: LitColour
+    baseColor: [0.04, 0.035, 0.03]
+    emissiveTexture: EmissiveVeins.png
+    emissive: [5.0, 5.0, 5.0]
+
 objects:
   - name: Ground
     transform:
@@ -169,3 +178,12 @@ objects:
     components:
       - type: RenderableSphere
         material: EmissiveIntense
+  - name: EmissiveSphereVeins
+    transform:
+      position: [4.4, 0.6, -4.0]
+      rotation: [0.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+    components:
+      - type: RenderableSphere
+        material: EmissiveVeins
+      - type: RotateRandom

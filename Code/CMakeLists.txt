@@ -48,6 +48,14 @@ file(GLOB_RECURSE CC_ENGINE_HEADERS CONFIGURE_DEPENDS
     "${CC_APP}/*.h"
 )
 
+# Shaders are not compiled by the build, but they are edited constantly. They
+# are attached to the target so the Solution Explorer lists them alongside the
+# code that binds them.
+file(GLOB_RECURSE CC_SHADER_FILES CONFIGURE_DEPENDS
+    "${CC_APP}/Data/Shaders/*.glsl"
+    "${CC_APP}/Data/Shaders/*.glinc"
+)
+
 if(CC_GFX_BACKEND_GLES)
     list(FILTER CC_ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Desktop/.*")
     list(FILTER CC_ENGINE_SOURCES EXCLUDE REGEX ".*/Rendering/Gfx/OpenGl/.*")
@@ -106,6 +114,13 @@ add_library(ChillCoreEngine OBJECT
     ${CC_ENGINE_SOURCES}
     ${CC_ENGINE_HEADERS}
     ${CC_THIRD_PARTY_SOURCES}
+    ${CC_SHADER_FILES}
+)
+
+# Listed only. Without this the generator hands them to a compiler.
+set_source_files_properties(${CC_SHADER_FILES} PROPERTIES
+    HEADER_FILE_ONLY TRUE
+    VS_TOOL_OVERRIDE "None"
 )
 
 target_compile_features(ChillCoreEngine PUBLIC cxx_std_17)
@@ -116,6 +131,7 @@ source_group(TREE "${CC_CODE_ROOT}" FILES
     ${CC_ENGINE_SOURCES}
     ${CC_ENGINE_HEADERS}
     ${CC_THIRD_PARTY_SOURCES}
+    ${CC_SHADER_FILES}
 )
 
 target_include_directories(ChillCoreEngine PUBLIC

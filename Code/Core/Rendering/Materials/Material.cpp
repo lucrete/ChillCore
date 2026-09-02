@@ -129,6 +129,16 @@ namespace CC
         materialUniformBuffer = CreateMaterialUniformBuffer();
     }
 
+    void Material::SetEmissiveTexture(const std::string& textureName)
+    {
+        // Emissive carries colour, so it is decoded on sample.
+        emissiveTexture = textureName.empty()
+            ? nullptr
+            : TextureManager::Get()->GetTexture(textureName, TextureColorSpace::Srgb);
+
+        materialUniformsDirty = true;
+    }
+
     void Material::UploadMaterialUniforms()
     {
         MaterialUniforms data = {};
@@ -226,6 +236,12 @@ namespace CC
                 if (normalHandle.IsValid())    { gfxApi->BindTexture(2, normalHandle,    samplerHandle); }
                 if (occlusionHandle.IsValid()) { gfxApi->BindTexture(3, occlusionHandle, samplerHandle); }
                 if (emissiveHandle.IsValid())  { gfxApi->BindTexture(4, emissiveHandle,  samplerHandle); }
+            }
+            else if (emissiveTexture != nullptr && emissiveTexture->GetTextureHandle().IsValid())
+            {
+                // The lit shader declares only units 0 and 4, so the emissive
+                // map binds without the rest of the PBR set.
+                gfxApi->BindTexture(4, emissiveTexture->GetTextureHandle(), samplerHandle);
             }
         }
     }

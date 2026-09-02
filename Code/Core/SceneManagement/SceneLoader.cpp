@@ -234,6 +234,12 @@ namespace CC
             // a value above 1.0 puts the surface above display white.
             bool hasEmissive = false;
             Vector3 emissive(0.0f, 0.0f, 0.0f);
+            std::string emissiveTexture = "";
+
+            if (matNode.has_child("emissiveTexture"))
+            {
+                emissiveTexture = NodeToString(matNode["emissiveTexture"]);
+            }
             if (matNode.has_child("emissive"))
             {
                 ryml::ConstNodeRef emissiveNode = matNode["emissive"];
@@ -263,12 +269,20 @@ namespace CC
             }
             matManager->CreateMaterial(name, shader, texture, baseColor, tiling, opacity);
 
-            if (hasEmissive)
+            if (hasEmissive || !emissiveTexture.empty())
             {
                 Material* material = matManager->GetMaterial(name);
                 if (material != nullptr)
                 {
-                    material->SetEmissive(emissive);
+                    // A map with no factor written alongside it would be
+                    // multiplied by the default of zero and never show, so an
+                    // unwritten factor stands in as white.
+                    material->SetEmissive(hasEmissive ? emissive : Vector3(1.0f, 1.0f, 1.0f));
+
+                    if (!emissiveTexture.empty())
+                    {
+                        material->SetEmissiveTexture(emissiveTexture);
+                    }
                 }
             }
         }

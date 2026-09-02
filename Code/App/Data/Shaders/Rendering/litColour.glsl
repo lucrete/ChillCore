@@ -34,6 +34,7 @@ in vec2 texCoord;
 const float shininess = 16.0;
 const float specularStrength = 3.0;
 layout(binding = 0) uniform sampler2D mainTex;
+layout(binding = 4) uniform sampler2D emissiveTex;
 
 void main()
 {
@@ -46,6 +47,7 @@ void main()
     vec3  baseColor             = material.baseColorAndOpacity.xyz;
     float opacity               = material.baseColorAndOpacity.w;
     vec3  emissiveFactor        = material.emissiveFactorPadded.xyz;
+    int   hasEmissiveTex        = material.textureFlags.w;
 
     vec3 norm = normalize(normal);
     vec3 lightDirection = normalize(-lightDir);
@@ -73,10 +75,18 @@ void main()
         discard;
     }
     
+    // Emissive map modulated by the factor. A material without a map behaves
+    // as though the map were white, so the factor alone drives the emission.
+    vec3 emissive = emissiveFactor;
+    if (hasEmissiveTex != 0)
+    {
+        emissive = texture(emissiveTex, texCoord).rgb * emissiveFactor;
+    }
+
     // Combine all lighting components. Emissive is added after the lit
     // terms because it is light the surface produces, not light it reflects,
     // so it is unaffected by the scene's lighting.
-    vec3 result = (ambient + diffuse + specular) * objectColor + emissiveFactor;
+    vec3 result = (ambient + diffuse + specular) * objectColor + emissive;
 
     // Scene-linear output. The post-process pass owns the tone curve and the
     // encode to display space; applying either here would do it twice.
