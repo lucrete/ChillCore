@@ -12,13 +12,14 @@ namespace CC
     RenderableQuad::RenderableQuad(Material* material)
         : Renderable(material)
     {
-        // 8-float interleaved layout: pos3 + uv2 + normal3
+        // 12-float interleaved layout: pos3 + uv2 + normal3 + tangent4
         Gfx::VertexLayout layout;
-        layout.strideBytes    = 8 * sizeof(float);
-        layout.attributeCount = 3;
+        layout.strideBytes    = 12 * sizeof(float);
+        layout.attributeCount = 4;
         layout.attributes[0]  = { 0, 0                 , Gfx::VertexAttribType::Float32, 3 };
         layout.attributes[1]  = { 1, 3 * sizeof(float) , Gfx::VertexAttribType::Float32, 2 };
         layout.attributes[2]  = { 2, 5 * sizeof(float) , Gfx::VertexAttribType::Float32, 3 };
+        layout.attributes[3]  = { 3, 8 * sizeof(float) , Gfx::VertexAttribType::Float32, 4 };
 
         pipelineHandle = CreatePipelineForMaterial(material, layout);
 
@@ -50,7 +51,7 @@ namespace CC
     int RenderableQuad::Render(void* renderInfo)
     {
         Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
-        gfxApi->BindVertexBuffer(0, vertexBuffer, 0, 8 * sizeof(float));
+        gfxApi->BindVertexBuffer(0, vertexBuffer, 0, 12 * sizeof(float));
         gfxApi->BindIndexBuffer(indexBuffer, Gfx::IndexType::Uint32);
         gfxApi->DrawIndexed(6, 1, 0, 0);
         return 0;

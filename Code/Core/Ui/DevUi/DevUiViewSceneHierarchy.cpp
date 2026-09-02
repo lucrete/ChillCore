@@ -32,7 +32,7 @@ namespace CC
         ImGui::SetNextWindowPos(ImVec2(370, 10), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSize(ImVec2(550, 500), ImGuiCond_FirstUseEver);
 
-        if (!ImGui::Begin("Scene Hierarchy", nullptr, ImGuiWindowFlags_NoFocusOnAppearing))
+        if (!ImGui::Begin("Scene Hierarchy", &isVisible, ImGuiWindowFlags_NoFocusOnAppearing))
         {
             ImGui::End();
             return;

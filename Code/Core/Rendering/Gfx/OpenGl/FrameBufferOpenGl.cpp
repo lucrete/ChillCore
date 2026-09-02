@@ -4,9 +4,19 @@
 
 namespace CC
 {
+    // A minimised or hidden window reports a zero-sized framebuffer. Sized to
+    // that, the attachments make the framebuffer incomplete, and every clear,
+    // draw and blit against it fails for as long as the window stays away.
+    // One pixel is the smallest size that stays complete, and nothing is
+    // presented from it either way.
+    static int ClampToMinimumExtent(int extent)
+    {
+        return extent > 0 ? extent : 1;
+    }
+
     FrameBufferOpenGl::FrameBufferOpenGl(int initialWidth, int initialHeight, int msaaSamples)
-        : width(initialWidth)
-        , height(initialHeight)
+        : width(ClampToMinimumExtent(initialWidth))
+        , height(ClampToMinimumExtent(initialHeight))
         , samples(msaaSamples)
     {
         Create();
@@ -81,8 +91,8 @@ namespace CC
 
     void FrameBufferOpenGl::Resize(int newWidth, int newHeight)
     {
-        width = newWidth;
-        height = newHeight;
+        width = ClampToMinimumExtent(newWidth);
+        height = ClampToMinimumExtent(newHeight);
 
         glBindTexture(GL_TEXTURE_2D, colorbuffer);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
@@ -101,7 +111,9 @@ namespace CC
 
     void FrameBufferOpenGl::Bind(int _width, int _height)
     {
-        if (width != _width || height != _height)
+        // Compared against the clamped extents, so a run of zero-sized frames
+        // resizes once rather than reallocating the attachments every frame.
+        if (width != ClampToMinimumExtent(_width) || height != ClampToMinimumExtent(_height))
         {
             Resize(_width, _height);
         }

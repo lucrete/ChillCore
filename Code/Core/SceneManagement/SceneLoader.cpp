@@ -310,9 +310,15 @@ namespace CC
 
             if (isPbr)
             {
-                // The emissive factor defaults to white here rather than to
-                // black, so an emissive map written without one still shows.
-                Vector3 pbrEmissive = hasEmissive ? emissive : Vector3(1.0f, 1.0f, 1.0f);
+                // A map written without a factor beside it would be scaled by
+                // zero and never show, so the factor stands in as white. With
+                // no map there is nothing to scale, and an absent factor has
+                // to mean no emission rather than a surface of solid white.
+                Vector3 pbrEmissive = emissive;
+                if (!hasEmissive && !emissiveTexture.empty())
+                {
+                    pbrEmissive = Vector3(1.0f, 1.0f, 1.0f);
+                }
 
                 matManager->CreatePbrMaterial(name, texture, metallicRoughnessTexture,
                     normalTexture, occlusionTexture, emissiveTexture,

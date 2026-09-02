@@ -50,6 +50,19 @@ materials:
   # Every PBR slot filled at once. The maps share one noise field, so the
   # veins the emissive lights up are the same ones the normal map cuts as
   # grooves, the occlusion darkens and the roughness polishes smooth.
+  # The same rock without the emission: a dead slab rather than a lit one.
+  # The roughness factor scales the map down so the surface takes a tighter
+  # specular lobe and actually catches the directional light.
+  - name: RockSlab
+    shader: Pbr
+    texture: RockBase.png
+    metallicRoughnessTexture: RockMetallicRoughness.png
+    normalTexture: RockNormal.png
+    occlusionTexture: RockOcclusion.png
+    baseColor: [1.0, 1.0, 1.0]
+    metallic: 1.0
+    roughness: 0.45
+
   - name: VeinedRock
     shader: Pbr
     texture: RockBase.png
@@ -75,8 +88,8 @@ objects:
   - name: AlphaBlendTest
     gltf: Data/Meshes/AlphaBlendModeTest.glb
     transform:
-      position: [0.0, 1.0, 0.0]
-      rotation: [0.0, 0.0, 0.0]
+      position: [12.0, 0.0, 0.0]
+      rotation: [0.0, -45.0, 0.0]
       scale: [1.0, 1.0, 1.0]
 
   - name: SampleObjectGroup
@@ -202,10 +215,20 @@ objects:
       - type: RenderableSphere
         material: EmissiveVeins
       - type: RotateRandom
+
+  - name: RockSlabAngled
+    transform:
+      position: [-4.5, 1.5, 0.0]
+      rotation: [-20.0, 65.0, 0.0]
+      scale: [4.0, 4.0, 1.0]
+    components:
+      - type: RenderableQuad
+        material: RockSlab
+
+
   # RenderableMesh rather than RenderableSphere: the sphere component bakes a
   # vertex layout without a tangent, and normal mapping has no frame without
-  # one. The OBJ path derives tangents when the material is PBR.
-  - name: PbrSphereAllMaps
+  # one. The OBJ path derives tangents when the material is PBR.  - name: PbrSphereAllMaps
     transform:
       position: [6.6, 0.6, -4.0]
       rotation: [0.0, 0.0, 0.0]
