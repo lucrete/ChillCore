@@ -83,7 +83,7 @@ namespace CC
         char line[256];
         std::string result;
 
-        float totalMs = FrameTimer::Get()->DeltaTime() * 1000.0f;
+        float totalMs = FrameTimer::Get()->DeltaTimeUnclamped() * 1000.0f;
         result += "=== Frame Timing Snapshot ===\n";
         snprintf(line, sizeof(line), "Total Frame Time: %.3f ms\n", totalMs);
         result += line;

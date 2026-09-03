@@ -1,6 +1,7 @@
 #include "CameraFree.h"
 #include "CCMath.h"
 #include <iostream>
+#include "FrameTimer.h"
 #include "InputManager.h"
 
 namespace CC
@@ -9,8 +10,8 @@ namespace CC
         : velocityMove(10.0f)
         , velocityMoveTouch(5.0f)
         , velocityRotateMouse(0.2f)
-        , velocityRotateGamepad(0.05f)
-        , velocityRotateTouch(0.025f)
+        , velocityRotateGamepad(3.0f)
+        , velocityRotateTouch(1.5f)
         , maxAngleUpDown(0.7f)
         , angleLeftRight(0.0f)
         , angleUpDown(0.0f)
@@ -40,7 +41,7 @@ namespace CC
 
     void CameraFree::UpdateTransform()
     {
-        float deltaSeconds = 0.016f;
+        float deltaSeconds = FrameTimer::Get()->DeltaTime();
 
         // Find the vector that is normal to both the up and the
         // direction the camera is pointing.
@@ -126,7 +127,10 @@ namespace CC
         float rightStickY = 0.0f;
         input->GetAnalogStickValues(CC::InputManager::STICK_RIGHT, rightStickX, rightStickY);
 
-        float velocityRotate;
+        // A stick is a rate input, so it scales by frame time. The mouse is a
+        // displacement and is already frame-rate independent.
+        float velocityRotate = 0.0f;
+        float rotateScale = 1.0f;
         if (inputType == ActiveInputType::KeyboardMouse)
         {
             velocityRotate = velocityRotateMouse;
@@ -134,15 +138,18 @@ namespace CC
         else if (inputType == ActiveInputType::Touch)
         {
             velocityRotate = -velocityRotateTouch;
+            rotateScale = deltaSeconds;
         }
         else
         {
             velocityRotate = -velocityRotateGamepad;
+            rotateScale = deltaSeconds;
         }
-        float deltaAngleLeftRight = rightStickX * velocityRotate;
+
+        float deltaAngleLeftRight = rightStickX * velocityRotate * rotateScale;
         angleLeftRight += deltaAngleLeftRight;
 
-        float deltaAngleUpDown = rightStickY * velocityRotate;
+        float deltaAngleUpDown = rightStickY * velocityRotate * rotateScale;
         angleUpDown += deltaAngleUpDown;
         angleUpDown = Math::Clamp(-maxAngleUpDown, maxAngleUpDown, angleUpDown);
 

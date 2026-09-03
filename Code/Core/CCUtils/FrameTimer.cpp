@@ -1,6 +1,7 @@
 #include "FrameTimer.h"
 #include <string.h>
 #include "CCAssert.h"
+#include "CCMath.h"
 #include "GfxRenderApi.h"
 #include "PlatformFileSystem.h"
 #include "PlatformWindow.h"
@@ -47,6 +48,7 @@ namespace CC
         previousTime = currentTime;
         currentTime = GetCurrentTime();
         deltaTime = currentTime - previousTime;
+        deltaTimeClamped = Math::Clamp(0.0f, MAX_DELTA_TIME_SECONDS, deltaTime);
 
         // Cache previous frame timestamps before reset
         memcpy(previousFrameTimestamps, timestamps, sizeof(Timestamp) * timestampCount);
@@ -70,6 +72,11 @@ namespace CC
     }
 
     float FrameTimer::DeltaTime() const
+    {
+        return deltaTimeClamped;
+    }
+
+    float FrameTimer::DeltaTimeUnclamped() const
     {
         return deltaTime;
     }

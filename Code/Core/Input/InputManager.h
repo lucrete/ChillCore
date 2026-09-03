@@ -87,7 +87,12 @@ namespace CC
         bool mouseButtonCurrent[2];
         bool mouseButtonPrevious[2];
 
+        // Mouse deflection is a displacement, not a stick position: pixels
+        // moved since the last frame, capped per second so the total is
+        // frame-rate independent. It can exceed 1.0 on a long frame.
         static constexpr int MAX_MOUSE_DEFLECTION = 100;
+        static constexpr float MAX_MOUSE_DEFLECTION_PER_SECOND = 6000.0f;
+
         static constexpr float STICK_DEADZONE = 0.15f;
 
         float analogStickRightX;
