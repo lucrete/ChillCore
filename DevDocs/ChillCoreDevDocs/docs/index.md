@@ -80,6 +80,9 @@ See [AGD-0040: Build and Targets](Architecture/AGD-0040-BuildAndTargets.md) for 
 
 ## Coding
 * Set Find-all file types to cpp
+* Map shader files to the C++ editor for syntax colouring: 
+  * Tools > Options > Text Editor > File Extension
+  * add glsl and glinc with editor Microsoft Visual C++.
 
 ## Project Setup
 Nothing to configure by hand. The build description sets the preprocessor defines, the output directories, the debugger's working directory, and the Solution Explorer tree, which is derived from the folders on disk. Adding a source file to disk is enough; re-run the build to pick it up.

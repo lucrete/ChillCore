@@ -3,6 +3,7 @@
 #include "DevUi.h"
 #include "CCAssert.h"
 #include "CCMath.h"
+#include "FrameTimer.h"
 #include <memory.h>
 #include <cmath>
 
@@ -269,8 +270,13 @@ namespace CC
             int offsetX = centerX - currentX;
             int offsetY = centerY - currentY;
 
-            analogStickRightX = Math::Clamp(-1.0f, 1.0f, static_cast<float>(offsetX) / MAX_MOUSE_DEFLECTION);
-            analogStickRightY = Math::Clamp(-1.0f, 1.0f, static_cast<float>(offsetY) / MAX_MOUSE_DEFLECTION);
+            float maxOffset = MAX_MOUSE_DEFLECTION_PER_SECOND * FrameTimer::Get()->DeltaTime();
+
+            float clampedOffsetX = Math::Clamp(-maxOffset, maxOffset, static_cast<float>(offsetX));
+            float clampedOffsetY = Math::Clamp(-maxOffset, maxOffset, static_cast<float>(offsetY));
+
+            analogStickRightX = clampedOffsetX / MAX_MOUSE_DEFLECTION;
+            analogStickRightY = clampedOffsetY / MAX_MOUSE_DEFLECTION;
 
             physicalInput->SetMousePosition(centerX, centerY);
         }

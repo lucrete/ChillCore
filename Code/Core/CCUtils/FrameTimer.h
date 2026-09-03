@@ -37,6 +37,7 @@ namespace CC
 
         void FrameStart();
         float DeltaTime() const;
+        float DeltaTimeUnclamped() const;
         float TimeSinceStartup() const;
         float GetFramesPerSecond() const;
 
@@ -80,9 +81,12 @@ namespace CC
     private:
         static FrameTimer* instance;
 
+        static constexpr float MAX_DELTA_TIME_SECONDS = 0.1f;
+
         float currentTime = 0.0f;
         float previousTime = 0.0f;
         float deltaTime = 0.0f;
+        float deltaTimeClamped = 0.0f;
         float framesPerSecond = 0.0f;
 
         int frameCount = 0;
