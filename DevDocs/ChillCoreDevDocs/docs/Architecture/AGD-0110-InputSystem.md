@@ -8,6 +8,7 @@
 - Triggers are gamepad-shaped even when driven by a keyboard, so application code never encounters a device-specific concept.
 - Actions are grouped into contexts. Switching context re-points every action at different triggers without the querying code changing.
 - An interaction mode decides whether the world, the interface, or neither is currently accepting input.
+- Continuous input is either a rate or a displacement, and the two are paced differently against frame time. Both are presented through the same stick surface.
 - Developer bindings are keyboard-driven and separate from application bindings.
 
 ## Concepts
@@ -18,6 +19,8 @@
 - **Context** — a named set of action-to-trigger bindings. One is active at a time.
 - **Interaction mode** — whether input is currently directed at the interface or at the world.
 - **Edge** — the transition into or out of a pressed state, as distinct from the state itself.
+- **Rate input** — a held position standing for a speed: a stick's deflection, or a touch drag treated as one.
+- **Displacement input** — a reading standing for a distance already travelled: the mouse's movement since the previous frame.
 
 ## Architecture
 
@@ -96,6 +99,18 @@ Where a query would be denied, it returns false as part of evaluating its expres
 
 The reason is uniformity: every query answers the same question — is this action active for this caller right now — and blocking is one term in that answer rather than a separate control path. It also means adding a new condition changes one expression instead of adding a branch to every query.
 
+### Rate and displacement inputs are paced differently against frame time
+
+A stick reports a position that is held. Deflection means a speed, so what it contributes has to be multiplied by the elapsed time of the frame, or the same physical stick position turns the view twenty times faster at 1200 frames per second than at 60.
+
+A mouse reports movement. The cursor is re-centred every frame, so the offset read is already the distance travelled since the previous frame and is frame-rate independent by construction. Multiplying it by elapsed time would be a second scaling of a value that has one, making a gesture of a given physical distance mean less on a fast machine — the opposite of the intent.
+
+The two meet in one surface because the mouse is presented as a virtual right stick, which is the gamepad-first rule applied to look input: a consumer reads one stick regardless of device. Nothing in the value distinguishes them, so the consumer scales by elapsed time on the paths it knows are rates and leaves the mouse path alone. This is the one place where the layered model's device-independence is deliberately incomplete, and it is incomplete because the distinction is real rather than presentational.
+
+What is frame-rate dependent about the mouse is its ceiling. The offset is clamped so that one erratic reading cannot whip the view around, and a clamp stated per frame is a different physical limit at every frame rate — a fast flick loses motion at 60 frames per second and loses none at 1200. The limit is therefore stated as a speed and multiplied by the frame's elapsed time, so the cap is the same physical distance per second everywhere.
+
+Two costs follow. Deflection derived from the mouse is no longer bounded to the stick range: a long frame legitimately yields a value above one, standing for more distance covered rather than a stick pushed past its limit, and a consumer that treats it as a stick position will overshoot. And the rate constants are now expressed per second rather than per frame, so any value tuned against the old per-frame pacing means something different and has to be re-tuned rather than carried across.
+
 ### Developer bindings are keyboard-based and separate
 
 Free camera, cursor release, and similar affordances are bound to keys and registered separately from application bindings, automatically when a context is created.
@@ -112,3 +127,5 @@ The cost is that they occupy keys applications might otherwise want, and nothing
 - Multiple touch pointers are captured but only the first is consumed, so gestures are unavailable.
 - Text entry does not fit the trigger model and has no first-class path.
 - Developer bindings are always registered, including in builds where they are not wanted.
+- Mouse-derived stick deflection can exceed the nominal stick range on a long frame, so a consumer assuming a bounded stick position is wrong for the mouse.
+- Whether a stick is carrying a rate or a displacement is not expressed in the surface. The consumer has to know from the active input type, and getting it wrong is a pacing bug rather than an error.

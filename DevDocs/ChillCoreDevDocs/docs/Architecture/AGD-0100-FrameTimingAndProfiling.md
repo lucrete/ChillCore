@@ -5,13 +5,15 @@
 ## Overview
 
 - One clock reading per frame produces the delta time every other system uses. Nothing else queries the clock for frame timing.
+- That shared figure is capped, so a stalled frame cannot be integrated against. The true elapsed time stays available for measurement.
 - Named timestamps at phase boundaries produce the processor-side breakdown. The frame loop's structure and the profiler's breakdown are the same thing.
 - Graphics-side timing comes from the graphics abstraction as an ordered sequence of named spans, read back some frames later.
 - A rolling history of recent frames feeds the on-screen graphs; a capture writes a span of frames out for offline analysis.
 
 ## Concepts
 
-- **Delta time** — seconds elapsed since the previous frame, sampled once and reused by everything.
+- **Delta time** — seconds elapsed since the previous frame, sampled once and reused by everything. Capped before it is handed out.
+- **Unclamped delta time** — the same measurement without the cap, for anything reporting on time rather than advancing with it.
 - **Timestamp** — a labelled instant recorded during the frame. The span between consecutive timestamps is one phase.
 - **Standard phase** — one of a fixed set of timestamps identified by an enumerator rather than only by label, so its duration can be looked up directly.
 - **Profile history** — a fixed-size ring of recent frames' phase durations.
@@ -57,6 +59,16 @@ Before this existed, components queried the clock independently and derived thei
 
 Beyond removing redundant work, this makes the frame coherent: every system sees exactly the same elapsed time, so two components animating at the same rate stay in step. Independent clock reads within a frame drift apart by however long the work between them took.
 
+### Delta time is capped, and the raw measurement stays reachable
+
+The shared delta time is limited to a ceiling. Consumers that report on time rather than advance with it — the frame-rate figure and the profiler — read the uncapped value instead.
+
+A frame can take arbitrarily long for reasons that have nothing to do with the simulation: a breakpoint, a dragged window, a resource load, a device resuming. Anything integrating against that delta moves by however long the interruption lasted, so a camera teleports and anything moving passes through what should have stopped it. Capping it turns the worst case into a slow frame rather than a discontinuity.
+
+The cap belongs at the source rather than at each consumer. Every system already agrees on one figure for the frame, and a consumer clamping privately would break that agreement precisely on the frames where drift is most visible — two things animating at the same rate would step by different amounts across the same stall.
+
+The cost is that time in the world falls behind wall-clock across a stall, by the difference between the real frame and the ceiling. That is the intended trade for simulation, and it is why measurement reads the other accessor: a profiler showing a capped figure would under-report exactly the spikes it exists to find.
+
 ### Timestamps go into a fixed pre-allocated array
 
 The array is sized at compile time and never grows. Recording a timestamp cannot allocate.
@@ -98,6 +110,7 @@ The measurement is an approximation. Where in the frame this stall lands is driv
 ## Limitations
 
 - The frame-rate figure reads zero until the first averaging window completes.
+- The shared delta time is capped, so across a stall world time falls behind wall-clock rather than catching up. The cap is a fixed compile-time value, not derived from the frame rate in use.
 - Graphics timing results lag by a few frames, so processor and graphics figures in the same row are not from the same frame.
 - The presentation wait measurement is an approximation whose accuracy depends on driver behaviour.
 - Timestamps per frame, history length, and phase counts are all fixed at compile time. Exceeding any is silent truncation.
