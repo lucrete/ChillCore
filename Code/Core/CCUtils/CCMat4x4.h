@@ -173,6 +173,39 @@ public:
 	}
 
 	///////////////////////////////////
+	// Create an asymmetric perspective projection matrix from frustum edges
+	// measured on the near plane. Perspective() is the symmetric special
+	// case. A head-mounted display gives four separate half-angles per eye
+	// whose frustum is off-centre, which Perspective() cannot express.
+	///////////////////////////////////
+	void Frustum(float left, float right, float bottom, float top, float nearDistance, float farDistance)
+	{
+		float inverseWidth = 1.0f / (right - left);
+		float inverseHeight = 1.0f / (top - bottom);
+		float inverseDepth = 1.0f / (nearDistance - farDistance);
+
+		m[0][0] = 2.0f * nearDistance * inverseWidth;
+		m[0][1] = 0.0f;
+		m[0][2] = 0.0f;
+		m[0][3] = 0.0f;
+
+		m[1][0] = 0.0f;
+		m[1][1] = 2.0f * nearDistance * inverseHeight;
+		m[1][2] = 0.0f;
+		m[1][3] = 0.0f;
+
+		m[2][0] = (right + left) * inverseWidth;
+		m[2][1] = (top + bottom) * inverseHeight;
+		m[2][2] = (farDistance + nearDistance) * inverseDepth;
+		m[2][3] = -1.0f;
+
+		m[3][0] = 0.0f;
+		m[3][1] = 0.0f;
+		m[3][2] = 2.0f * farDistance * nearDistance * inverseDepth;
+		m[3][3] = 0.0f;
+	}
+
+	///////////////////////////////////
 	// Create an orthographic projection matrix
 	///////////////////////////////////
 	void Orthographic(float left, float right, float bottom, float top, float nearDist, float farDist)

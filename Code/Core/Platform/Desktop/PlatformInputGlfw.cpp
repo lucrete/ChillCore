@@ -1,4 +1,5 @@
 #include "PlatformInputGlfw.h"
+#include "CCAssert.h"
 
 namespace CC
 {
@@ -78,43 +79,45 @@ namespace CC
     }
 
     PlatformInputGlfw::PlatformInputGlfw()
-        : activeGamepadIndex(-1)
+        : window(glfwGetCurrentContext())
+        , activeGamepadIndex(-1)
     {
+        CC_ASSERT(window != nullptr, "PlatformInputGlfw created before the window context was current");
     }
 
     bool PlatformInputGlfw::IsKeyDown(KeyCode::Key key) const
     {
         int glfwKey = TranslateKeyCode(key);
-        return glfwGetKey(glfwGetCurrentContext(), glfwKey) == GLFW_PRESS;
+        return glfwGetKey(window, glfwKey) == GLFW_PRESS;
     }
 
     void PlatformInputGlfw::GetMousePosition(int& x, int& y) const
     {
         double mx, my;
-        glfwGetCursorPos(glfwGetCurrentContext(), &mx, &my);
+        glfwGetCursorPos(window, &mx, &my);
         x = static_cast<int>(mx);
         y = static_cast<int>(my);
     }
 
     void PlatformInputGlfw::SetMousePosition(int x, int y)
     {
-        glfwSetCursorPos(glfwGetCurrentContext(), x, y);
+        glfwSetCursorPos(window, x, y);
     }
 
     bool PlatformInputGlfw::IsMouseButtonDown(MouseButton::Button button) const
     {
         int glfwButton = TranslateMouseButton(button);
-        return glfwGetMouseButton(glfwGetCurrentContext(), glfwButton) == GLFW_PRESS;
+        return glfwGetMouseButton(window, glfwButton) == GLFW_PRESS;
     }
 
     void PlatformInputGlfw::SetMouseCursorLocked(bool locked)
     {
-        glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        glfwSetInputMode(window, GLFW_CURSOR, locked ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
     }
 
     bool PlatformInputGlfw::IsMouseCursorLocked() const
     {
-        return glfwGetInputMode(glfwGetCurrentContext(), GLFW_CURSOR) != GLFW_CURSOR_NORMAL;
+        return glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_NORMAL;
     }
 
     void PlatformInputGlfw::UpdateGamepadState()

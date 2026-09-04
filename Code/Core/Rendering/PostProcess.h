@@ -116,12 +116,15 @@ namespace CC
         // Frame
         // ========================
 
-        // Runs bloom's passes if it is enabled, then the fused pass into the
-        // backbuffer. sceneColorTexture is the offscreen scene target.
+        // Runs bloom's passes if it is enabled, then the fused pass into
+        // destinationTarget. sceneColorTexture is the offscreen scene target.
+        // The destination is the backbuffer for a flat frame and an eye
+        // target where a frame renders more than one view.
         void Execute(Gfx::TextureHandle sceneColorTexture,
                      Gfx::SamplerHandle sampler,
                      int width,
-                     int height);
+                     int height,
+                     Gfx::RenderTargetHandle destinationTarget);
 
     private:
         void ConfigureEffects();

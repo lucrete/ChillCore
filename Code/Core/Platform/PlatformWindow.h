@@ -18,13 +18,29 @@ namespace CC
     class PlatformWindow
     {
     public:
+        // Handles the graphics context was created against, for an API that
+        // has to bind to an existing context rather than make its own — an
+        // XR runtime being the case that needs it. Opaque on purpose: the
+        // members are HDC and HGLRC on Windows and EGLDisplay and
+        // EGLContext on Android, and neither type belongs in this header.
+        struct NativeGraphicsBinding
+        {
+            void* displayOrDeviceContext = nullptr;
+            void* renderContext          = nullptr;
+        };
+
         struct Config
         {
             int         width          = 800;
             int         height         = 600;
             const char* title          = "ChillCore";
-            int         glMajor        = 2;
-            int         glMinor        = 0;
+            // The desktop backend targets GL 4.3. The request was left at
+            // 2.0 and relied on the driver handing back something newer,
+            // which an XR runtime's graphics-requirements check does not
+            // accept. Profile is left unhinted so the driver still returns a
+            // compatibility context, which the developer overlay needs.
+            int         glMajor        = 4;
+            int         glMinor        = 3;
             bool        vsync          = true;
             bool        preferSecondaryMonitor = true;
         };
@@ -46,6 +62,11 @@ namespace CC
         virtual void LockMouseCursor(bool isLocked) = 0;
 
         virtual bool IsFocused() const = 0;
+
+        // Fills outBinding with the handles the graphics context was created
+        // against. Returns false where the platform cannot supply them, which
+        // is the default: a platform opts in by overriding.
+        virtual bool GetNativeGraphicsBinding(NativeGraphicsBinding& outBinding) const { (void)outBinding; return false; }
 
         // Registers a callback invoked when the OS delivers a drag-and-drop
         // payload of one or more file paths onto the window. Pass an empty

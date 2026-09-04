@@ -445,6 +445,7 @@ namespace CC::Gfx
         capabilities.supportsAstcTextureFormats    = false;
         capabilities.supportsAnisotropicFiltering  = true;
         capabilities.supportsHalfFloatRenderTargets = true;
+        capabilities.supportsExternalTextures       = true;
         capabilities.supportsDebugMarkers          = true;
         capabilities.supportsGpuTimestamps         = (GLAD_GL_ARB_timer_query != 0);
 
@@ -554,6 +555,10 @@ namespace CC::Gfx
         }
 
         EnsureBackbufferTarget();
+
+        // Creating or reconfiguring the scene framebuffer binds textures and
+        // framebuffers directly.
+        InvalidateCachedState();
     }
 
     void RenderApiOpenGl::EnsureBackbufferTarget()
@@ -798,6 +803,9 @@ namespace CC::Gfx
             glBindSampler(0, 0);
 
             Draw(CC::QUAD_VERTEX_COUNT, 1, 0);
+
+            // The colorbuffer and sampler above were bound raw at unit 0.
+            InvalidateCachedState();
         }
 
         renderPassActive = false;
@@ -851,6 +859,10 @@ namespace CC::Gfx
                 glDeleteBuffers(1, &entry.glHandle);
                 entry = GlBuffer();
                 freeBufferSlots.push_back(slotIndex);
+
+                // The next create can be handed the GL name just released, and
+                // a cached bind would match it as though nothing had changed.
+                InvalidateCachedState();
             }
         }
     }
@@ -975,6 +987,47 @@ namespace CC::Gfx
 
         glBindTexture(entry.target, 0);
 
+        // The binds above landed on whichever texture unit was active, so what
+        // the cache records for that unit is no longer what is bound there.
+        InvalidateCachedState();
+
+        uint32_t slotIndex = GlCommon::AcquireSlot(freeTextureSlots, static_cast<uint32_t>(textures.size()));
+        if (slotIndex == textures.size())
+        {
+            textures.push_back(entry);
+        }
+        else
+        {
+            textures[slotIndex] = entry;
+        }
+
+        TextureHandle handle;
+        handle.id = slotIndex;
+        return handle;
+    }
+
+    TextureHandle RenderApiOpenGl::RegisterExternalTexture(const ExternalTextureDescription& description)
+    {
+        CC_ASSERT(description.nativeHandle != 0, "ExternalTextureDescription: nativeHandle must be set");
+        CC_ASSERT(description.width > 0 && description.height > 0,
+                  "ExternalTextureDescription: width/height must be > 0");
+        // A multisampled external image would need a different GL target and
+        // a resolve on the way out. The scene is antialiased in the engine's
+        // own target and resolved into this one, so it is always single
+        // sample.
+        CC_ASSERT(description.sampleCount == 1,
+                  "ExternalTextureDescription: multisampled external textures are not supported");
+
+        GlTexture entry;
+        entry.glHandle     = static_cast<GLuint>(description.nativeHandle);
+        entry.format       = description.format;
+        entry.width        = description.width;
+        entry.height       = description.height;
+        entry.layerCount   = description.arrayLayers;
+        entry.target       = (description.arrayLayers > 1) ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+        entry.isAlive      = true;
+        entry.ownsGlHandle = false;
+
         uint32_t slotIndex = GlCommon::AcquireSlot(freeTextureSlots, static_cast<uint32_t>(textures.size()));
         if (slotIndex == textures.size())
         {
@@ -999,9 +1052,16 @@ namespace CC::Gfx
             GlTexture& entry = textures[slotIndex];
             if (entry.isAlive)
             {
-                glDeleteTextures(1, &entry.glHandle);
+                if (entry.ownsGlHandle)
+                {
+                    glDeleteTextures(1, &entry.glHandle);
+                }
                 entry = GlTexture();
                 freeTextureSlots.push_back(slotIndex);
+
+                // The next create can be handed the GL name just released, and
+                // a cached bind would match it as though nothing had changed.
+                InvalidateCachedState();
             }
         }
     }
@@ -1020,6 +1080,10 @@ namespace CC::Gfx
         glTexSubImage2D(entry.target, mipLevel, x, y, width, height,
                         formatInfo.pixelFormat, formatInfo.pixelType, data);
         glBindTexture(entry.target, 0);
+
+        // The binds above landed on whichever texture unit was active, so what
+        // the cache records for that unit is no longer what is bound there.
+        InvalidateCachedState();
     }
 
     // ========================
@@ -1070,6 +1134,10 @@ namespace CC::Gfx
                 glDeleteSamplers(1, &entry.glHandle);
                 entry = GlSampler();
                 freeSamplerSlots.push_back(slotIndex);
+
+                // The next create can be handed the GL name just released, and
+                // a cached bind would match it as though nothing had changed.
+                InvalidateCachedState();
             }
         }
     }
@@ -1260,6 +1328,10 @@ namespace CC::Gfx
             glBindVertexArray(0);
         }
 
+        // Building the vertex array object left it unbound, dropping the
+        // vertex buffer bindings any currently bound pipeline relies on.
+        InvalidateCachedState();
+
         uint32_t slotIndex = GlCommon::AcquireSlot(freePipelineSlots, static_cast<uint32_t>(pipelines.size()));
         if (slotIndex == pipelines.size())
         {
@@ -1293,7 +1365,7 @@ namespace CC::Gfx
             }
             if (currentPipeline.id == slotIndex)
             {
-                currentPipeline = PipelineHandle();
+                InvalidateCachedState();
             }
         }
     }
@@ -1495,10 +1567,17 @@ namespace CC::Gfx
             uint32_t shaderSlot = desc.shader.id;
             glUseProgram(shaders[shaderSlot].program);
 
-            // VAO (graphics pipelines only)
+            // VAO (graphics pipelines only). Vertex buffer bindings belong to
+            // the vertex array object, so the cached ones stop describing what
+            // is in force the moment a different object is bound.
             if (entry.vao != 0)
             {
                 glBindVertexArray(entry.vao);
+                if (entry.vao != bindCache.vertexArrayObject)
+                {
+                    bindCache.ResetVertexBuffers();
+                    bindCache.vertexArrayObject = entry.vao;
+                }
             }
 
             // Rasterizer
@@ -1547,12 +1626,23 @@ namespace CC::Gfx
     void RenderApiOpenGl::BindVertexBuffer(int slot, BufferHandle buffer, int offsetBytes, int strideBytes)
     {
         CC_ASSERT(buffer.IsValid(), "BindVertexBuffer: invalid handle");
+        CC_ASSERT(slot >= 0 && slot < MAX_BOUND_VERTEX_BUFFERS, "BindVertexBuffer: slot out of range");
         uint32_t slotIndex = buffer.id;
         CC_ASSERT(slotIndex < buffers.size(), "BufferHandle out of range");
         GlBuffer& entry = buffers[slotIndex];
         CC_ASSERT(entry.isAlive, "BindVertexBuffer: buffer destroyed");
 
-        glBindVertexBuffer(slot, entry.glHandle, offsetBytes, strideBytes);
+        GlCommon::VertexBufferBinding& cached = bindCache.vertexBuffers[slot];
+        bool alreadyBound = (cached.buffer      == entry.glHandle
+                          && cached.offsetBytes == offsetBytes
+                          && cached.strideBytes == strideBytes);
+        if (!alreadyBound)
+        {
+            glBindVertexBuffer(slot, entry.glHandle, offsetBytes, strideBytes);
+            cached.buffer      = entry.glHandle;
+            cached.offsetBytes = offsetBytes;
+            cached.strideBytes = strideBytes;
+        }
     }
 
     void RenderApiOpenGl::BindIndexBuffer(BufferHandle buffer, IndexType type)
@@ -1570,37 +1660,64 @@ namespace CC::Gfx
     void RenderApiOpenGl::BindTexture(int slot, TextureHandle texture, SamplerHandle sampler)
     {
         CC_ASSERT(texture.IsValid(), "BindTexture: invalid texture handle");
+        CC_ASSERT(slot >= 0 && slot < MAX_BOUND_TEXTURES, "BindTexture: slot out of range");
         uint32_t textureSlot = texture.id;
         CC_ASSERT(textureSlot < textures.size(), "TextureHandle out of range");
         GlTexture& texEntry = textures[textureSlot];
         CC_ASSERT(texEntry.isAlive, "BindTexture: texture destroyed");
 
-        glActiveTexture(GL_TEXTURE0 + slot);
-        glBindTexture(texEntry.target, texEntry.glHandle);
-
+        GLuint samplerGlHandle = 0;
         if (sampler.IsValid())
         {
             uint32_t samplerSlot = sampler.id;
             CC_ASSERT(samplerSlot < samplers.size(), "SamplerHandle out of range");
             GlSampler& samplerEntry = samplers[samplerSlot];
             CC_ASSERT(samplerEntry.isAlive, "BindTexture: sampler destroyed");
-            glBindSampler(slot, samplerEntry.glHandle);
+            samplerGlHandle = samplerEntry.glHandle;
         }
-        else
+
+        GlCommon::TextureUnitBinding& cached = bindCache.textureUnits[slot];
+        if (cached.texture != texEntry.glHandle || cached.target != texEntry.target)
         {
-            glBindSampler(slot, 0);
+            if (bindCache.activeTextureUnit != slot)
+            {
+                glActiveTexture(GL_TEXTURE0 + slot);
+                bindCache.activeTextureUnit = slot;
+            }
+            glBindTexture(texEntry.target, texEntry.glHandle);
+            cached.target  = texEntry.target;
+            cached.texture = texEntry.glHandle;
+        }
+
+        // The sampler bound at a unit is state of its own, unaffected by
+        // which texture sits there, so it is compared separately.
+        if (cached.sampler != samplerGlHandle)
+        {
+            glBindSampler(slot, samplerGlHandle);
+            cached.sampler = samplerGlHandle;
         }
     }
 
     void RenderApiOpenGl::BindUniformBuffer(int slot, BufferHandle buffer, int offsetBytes, int sizeBytes)
     {
         CC_ASSERT(buffer.IsValid(), "BindUniformBuffer: invalid handle");
+        CC_ASSERT(slot >= 0 && slot < MAX_BOUND_UNIFORM_BUFFERS, "BindUniformBuffer: slot out of range");
         uint32_t slotIndex = buffer.id;
         CC_ASSERT(slotIndex < buffers.size(), "BufferHandle out of range");
         GlBuffer& entry = buffers[slotIndex];
         CC_ASSERT(entry.isAlive, "BindUniformBuffer: buffer destroyed");
 
-        glBindBufferRange(GL_UNIFORM_BUFFER, slot, entry.glHandle, offsetBytes, sizeBytes);
+        GlCommon::UniformBufferBinding& cached = bindCache.uniformBuffers[slot];
+        bool alreadyBound = (cached.buffer      == entry.glHandle
+                          && cached.offsetBytes == offsetBytes
+                          && cached.sizeBytes   == sizeBytes);
+        if (!alreadyBound)
+        {
+            glBindBufferRange(GL_UNIFORM_BUFFER, slot, entry.glHandle, offsetBytes, sizeBytes);
+            cached.buffer      = entry.glHandle;
+            cached.offsetBytes = offsetBytes;
+            cached.sizeBytes   = sizeBytes;
+        }
     }
 
     void RenderApiOpenGl::BindStorageBuffer(int slot, BufferHandle buffer)
@@ -1634,6 +1751,13 @@ namespace CC::Gfx
             glBindBuffer(GL_UNIFORM_BUFFER, pushConstantsUbo);
             glBufferData(GL_UNIFORM_BUFFER, OBJECT_UNIFORMS_SIZE_BYTES, nullptr, GL_DYNAMIC_DRAW);
             glBindBufferBase(GL_UNIFORM_BUFFER, OBJECT_UNIFORMS_BINDING_SLOT, pushConstantsUbo);
+
+            // This binds the push-constant slot without going through
+            // BindUniformBuffer; record it so the cache still describes it.
+            GlCommon::UniformBufferBinding& cachedPushConstants = bindCache.uniformBuffers[OBJECT_UNIFORMS_BINDING_SLOT];
+            cachedPushConstants.buffer      = pushConstantsUbo;
+            cachedPushConstants.offsetBytes = 0;
+            cachedPushConstants.sizeBytes   = OBJECT_UNIFORMS_SIZE_BYTES;
         }
         else
         {
@@ -1718,6 +1842,7 @@ namespace CC::Gfx
     void RenderApiOpenGl::InvalidateCachedState()
     {
         currentPipeline = PipelineHandle();
+        bindCache.Reset();
     }
 
     // ========================

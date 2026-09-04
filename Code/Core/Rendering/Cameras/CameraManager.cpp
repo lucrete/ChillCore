@@ -44,6 +44,21 @@ namespace CC
         }
     }
 
+    void CameraManager::SetActiveCamera(CameraBase* camera)
+    {
+        CC_ASSERT(camera != nullptr, "SetActiveCamera called with a null camera");
+
+        if (camera != nullptr)
+        {
+            activeCamera = camera;
+        }
+    }
+
+    CameraBase* CameraManager::GetActiveCamera() const
+    {
+        return activeCamera;
+    }
+
     CameraBase* CameraManager::FindCamera(const std::string& cameraName) const
     {
         CameraBase* camera = nullptr;

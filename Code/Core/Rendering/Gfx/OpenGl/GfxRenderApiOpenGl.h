@@ -3,6 +3,7 @@
 
 #include "GfxRenderApi.h"
 #include "GlScopeTimer.h"
+#include "GlBindCache.h"
 #include <glad/gl.h>
 #include <vector>
 
@@ -53,6 +54,7 @@ namespace CC::Gfx
 
         // Textures
         virtual TextureHandle CreateTexture(const TextureDescription& description) override;
+        [[nodiscard]] virtual TextureHandle      RegisterExternalTexture(const ExternalTextureDescription& description) override;
         virtual void          DestroyTexture(TextureHandle handle) override;
         virtual void          UpdateTexture(TextureHandle handle, int mipLevel, int x, int y, int width, int height, const void* data) override;
 
@@ -145,6 +147,9 @@ namespace CC::Gfx
             // layers. 1 for a plain 2D texture, where only layer 0 is valid.
             int           layerCount   = 1;
             bool          isAlive      = false;
+            // False for storage another API owns. Destroying such a texture
+            // frees the pool slot and leaves the GL object alone.
+            bool          ownsGlHandle = true;
         };
 
         struct GlSampler
@@ -221,9 +226,15 @@ namespace CC::Gfx
         // ========================
 
         PipelineHandle        currentPipeline;
+
         GLenum                currentIndexType = 0x1405;  // GL_UNSIGNED_INT default
         GfxCapabilities       capabilities;
         BackbufferDescription backbufferDescription;
+
+        // Last bind made at each texture, vertex-buffer and uniform-buffer
+        // slot, so a repeat of it can be skipped. Reset by
+        // InvalidateCachedState, along with the pipeline above.
+        GlCommon::BindCacheState bindCache;
 
         // Which target the active render pass is bound to. An invalid handle
         // means the pass targets the scene framebuffer (the backbuffer path);

@@ -438,7 +438,8 @@ namespace CC
     void PostProcess::Execute(Gfx::TextureHandle sceneColorTexture,
                               Gfx::SamplerHandle sampler,
                               int width,
-                              int height)
+                              int height,
+                              Gfx::RenderTargetHandle destinationTarget)
     {
         Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
 
@@ -451,7 +452,7 @@ namespace CC
 
         UploadUberParameters();
 
-        gfxApi->BeginRenderPass(gfxApi->GetBackbuffer(), "PostProcess");
+        gfxApi->BeginRenderPass(destinationTarget, "PostProcess");
         gfxApi->InvalidateCachedState();
 
         fullscreenQuad->SetMaterial(uberMaterial);

@@ -2,6 +2,11 @@
 #include "CCAssert.h"
 #include "CoreMain.h"
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+#include <GLFW/glfw3native.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -93,6 +98,25 @@ namespace CC
 
         glfwMakeContextCurrent(window);
         glfwSwapInterval(config.vsync ? 1 : 0);
+    }
+
+    bool PlatformWindowGlfw::GetNativeGraphicsBinding(NativeGraphicsBinding& outBinding) const
+    {
+        bool result = false;
+
+#ifdef _WIN32
+        if (window != nullptr)
+        {
+            outBinding.displayOrDeviceContext = GetDC(glfwGetWin32Window(window));
+            outBinding.renderContext          = glfwGetWGLContext(window);
+            result = outBinding.displayOrDeviceContext != nullptr
+                  && outBinding.renderContext != nullptr;
+        }
+#else
+        (void)outBinding;
+#endif
+
+        return result;
     }
 
     void PlatformWindowGlfw::GlfwDropCallback(GLFWwindow* window, int pathCount, const char* paths[])

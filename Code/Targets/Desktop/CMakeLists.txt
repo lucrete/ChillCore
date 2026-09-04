@@ -16,6 +16,18 @@ target_link_directories(ChillCore PRIVATE
     "${CC_PACKAGES}/glfw-3.4.bin.WIN64/lib-vc2022"
 )
 
+if(CC_ENABLE_XR)
+    target_link_directories(ChillCore PRIVATE "${CC_OPENXR_PACKAGE}/lib-vc2022")
+
+    # The loader pulls in the Windows registry and COM APIs it uses to
+    # enumerate runtimes.
+    target_link_libraries(ChillCore PRIVATE
+        $<IF:$<CONFIG:Debug>,openxr_loaderd.lib,openxr_loader.lib>
+        advapi32.lib
+        ole32.lib
+    )
+endif()
+
 target_link_libraries(ChillCore PRIVATE
     glfw3_mt.lib
     opengl32.lib

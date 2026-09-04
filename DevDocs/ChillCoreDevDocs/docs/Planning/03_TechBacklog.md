@@ -149,6 +149,12 @@ Three file-system operations are unimplemented on Android (`PlatformFileSystemAn
 
 The pipeline builds the desktop target only; Android is still built by invoking Gradle directly. Adding it is a target-selection option and a Gradle invocation reporting into the same folder structure. Unblocked, low value until something other than a developer's machine builds the package.
 
+### XR on Quest standalone
+
+PCVR is in plan and covers the desktop target only. Standalone means the GLES backend: an OpenXR loader AAR through the Gradle prefab mechanism, an EGL graphics binding, and loader initialisation against the activity and JavaVM.
+
+Deliberately deferred, not blocked. The PCVR work is designed so this is additive — the platform graphics-binding accessor and external-texture registration both have EGL analogues — and iterating on a device is far slower than on the desktop. Wants the Android v1 ship gate closed first.
+
 ### WebGL backend
 
 A third graphics backend under emscripten, plus platform backends for window, file access, and input over the web runtime. Capability-gates compute, storage buffers, and indirect draw off — dependent states need a fallback or must report unsupported. Not started.

@@ -18,6 +18,15 @@ set(CC_PACKAGES  "${CC_CODE_ROOT}/Packages")
 
 option(CC_GFX_BACKEND_GLES "Compile the GLES backend instead of desktop GL" OFF)
 option(CC_DISABLE_DEVUI    "Compile the no-op DevUi stub instead of the ImGui DevUi" OFF)
+option(CC_ENABLE_XR        "Compile the OpenXR subsystem and link the loader" ON)
+
+# The vendored loader is a Windows static library, and the graphics binding
+# the XR layer builds is WGL. Neither exists on the GLES target.
+if(CC_GFX_BACKEND_GLES)
+    set(CC_ENABLE_XR OFF)
+endif()
+
+set(CC_OPENXR_PACKAGE "${CC_PACKAGES}/openxr-1.1.54")
 
 if(CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
@@ -59,6 +68,10 @@ if(CC_GFX_BACKEND_GLES)
 else()
     list(FILTER CC_ENGINE_SOURCES EXCLUDE REGEX ".*/Platform/Android/.*")
     list(FILTER CC_ENGINE_SOURCES EXCLUDE REGEX ".*/Rendering/Gfx/Gles/.*")
+endif()
+
+if(NOT CC_ENABLE_XR)
+    list(FILTER CC_ENGINE_SOURCES EXCLUDE REGEX ".*/Xr/.*")
 endif()
 
 # DevUi is all-or-nothing: either the ImGui views compile, or the stub does.
@@ -200,6 +213,13 @@ else()
     )
 endif()
 
+if(CC_ENABLE_XR)
+    target_include_directories(ChillCoreEngine PUBLIC
+        ${CC_CORE}/Xr
+        ${CC_OPENXR_PACKAGE}/include
+    )
+endif()
+
 # ============================================================================
 # Compile definitions
 #
@@ -218,6 +238,16 @@ endif()
 
 if(CC_DISABLE_DEVUI)
     target_compile_definitions(ChillCoreEngine PUBLIC CC_DISABLE_DEVUI)
+endif()
+
+# XR_USE_* select the platform and graphics structs openxr_platform.h declares.
+# Without them XrGraphicsBindingOpenGLWin32KHR does not exist.
+if(CC_ENABLE_XR)
+    target_compile_definitions(ChillCoreEngine PUBLIC
+        CC_ENABLE_XR
+        XR_USE_PLATFORM_WIN32
+        XR_USE_GRAPHICS_API_OPENGL
+    )
 endif()
 
 if(MSVC)

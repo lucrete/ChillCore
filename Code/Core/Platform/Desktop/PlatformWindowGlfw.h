@@ -29,6 +29,8 @@ namespace CC
 
         virtual void SetFileDropCallback(std::function<void(const std::vector<std::string>&)> callback) override;
 
+        virtual bool GetNativeGraphicsBinding(NativeGraphicsBinding& outBinding) const override;
+
     private:
         static void GlfwDropCallback(GLFWwindow* window, int pathCount, const char* paths[]);
 

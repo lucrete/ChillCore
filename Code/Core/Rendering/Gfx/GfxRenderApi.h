@@ -79,6 +79,12 @@ namespace CC::Gfx
                                                             void* destination)                             = 0;
 
         [[nodiscard]] virtual TextureHandle      CreateTexture(const TextureDescription& description)      = 0;
+
+        // Wraps storage another API owns in a handle this one accepts. The
+        // storage is not created here and is not freed by DestroyTexture;
+        // the owner outlives the handle. Returns an invalid handle where
+        // supportsExternalTextures is false.
+        [[nodiscard]] virtual TextureHandle      RegisterExternalTexture(const ExternalTextureDescription& description) = 0;
         virtual void                             DestroyTexture(TextureHandle handle)                       = 0;
         virtual void                             UpdateTexture(TextureHandle handle,
                                                                int mipLevel, int x, int y,
