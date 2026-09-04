@@ -175,4 +175,14 @@ namespace CC
     {
         triggerMap->NotifyTouchActivity();
     }
+
+    void InputActionMap::SetXrTriggerState(int trigger, bool isPressed)
+    {
+        triggerMap->SetXrTriggerState(trigger, isPressed);
+    }
+
+    void InputActionMap::NotifyXrActivity()
+    {
+        triggerMap->NotifyXrActivity();
+    }
 }

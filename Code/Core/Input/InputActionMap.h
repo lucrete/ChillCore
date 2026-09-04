@@ -78,6 +78,8 @@ namespace CC
 
         ActiveInputType GetActiveInputType() const;
         void NotifyTouchActivity();
+        void SetXrTriggerState(int trigger, bool isPressed);
+        void NotifyXrActivity();
 
     private:
         struct ActionBinding

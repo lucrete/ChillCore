@@ -78,6 +78,23 @@ namespace CC
             EditUndo,
             EditRedo,
 
+            // Tracked controller buttons. Hand-neutral names rather than the
+            // letters printed on any one controller: the primary button is X
+            // on a Touch left and A on an Index, and a binding that named the
+            // letter would be wrong on half the hardware. The runtime does
+            // the rebinding; these name what the action means.
+            XrTriggerLeft,
+            XrTriggerRight,
+            XrSqueezeLeft,
+            XrSqueezeRight,
+            XrThumbstickClickLeft,
+            XrThumbstickClickRight,
+            XrPrimaryLeft,
+            XrPrimaryRight,
+            XrSecondaryLeft,
+            XrSecondaryRight,
+            XrMenu,
+
             TriggerMax
         };
     }
@@ -95,6 +112,14 @@ namespace CC
 
         void RegisterKeyboardTrigger(int trigger, const std::string& triggerName, std::vector<KeyboardTriggerDef> keys);
         void RegisterGamepadTrigger(int trigger, const std::string& triggerName, std::vector<GamepadTriggerDef> buttons);
+
+        // XR button state is pushed in rather than polled out: the trigger map
+        // has no way to reach a runtime, and the same inversion already serves
+        // the on-screen joysticks. Written into a staging array and taken up
+        // by Update, so the previous frame's value survives for edge
+        // detection.
+        void SetXrTriggerState(int trigger, bool isPressed);
+        void NotifyXrActivity();
 
         void Update();
         bool IsTriggered(int trigger);
@@ -117,11 +142,14 @@ namespace CC
 
         bool keyboardTriggersCurrent[InputTrigger::TriggerMax];
         bool gamepadTriggersCurrent[InputTrigger::TriggerMax];
+        bool xrTriggersCurrent[InputTrigger::TriggerMax];
+        bool xrTriggersPending[InputTrigger::TriggerMax];
         bool* triggersCurrent;
         bool triggersPrevious[InputTrigger::TriggerMax];
 
         ActiveInputType activeInputType;
         bool touchActivityPending;
+        bool xrActivityPending;
 
         int lastMouseX;
         int lastMouseY;

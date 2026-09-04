@@ -56,6 +56,18 @@ namespace CC
         ActiveInputType GetActiveInputType() const;
 
         // ========================
+        // Tracked controller buttons
+        // ========================
+        //
+        // Written by the XR subsystem each frame, after it syncs its actions
+        // and before the action map resolves. Poses and axes are read from
+        // XrManager directly; only the button half goes through the three
+        // layers, because only the button half is remappable.
+
+        void SetXrTriggerState(int trigger, bool isPressed);
+        void NotifyXrActivity();
+
+        // ========================
         // Joystick override (HUD on-screen joysticks)
         // Values written by the UI persist until overwritten. UI updates run
         // after scene/camera reads, so a value written on frame N is read by

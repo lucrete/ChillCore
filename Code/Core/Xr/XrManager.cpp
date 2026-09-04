@@ -11,6 +11,7 @@
 #include <openxr/openxr_platform.h>
 
 #include "CCAssert.h"
+#include "XrInput.h"
 #include "CameraXrEye.h"
 #include "CoreMain.h"
 #include "AppMainInterface.h"
@@ -67,6 +68,8 @@ namespace CC
         Gfx::TextureHandle      sceneColorTexture[MAX_EYE_VIEWS];
         Gfx::TextureHandle      sceneDepthTexture[MAX_EYE_VIEWS];
         Gfx::RenderTargetHandle sceneTarget[MAX_EYE_VIEWS];
+
+        XrInput input;
     };
 
     namespace
@@ -133,7 +136,8 @@ namespace CC
         bool isReady = CreateInstanceAndSystem()
                     && CreateSession()
                     && CreateReferenceSpace()
-                    && CreateSwapchains();
+                    && CreateSwapchains()
+                    && CreateInput();
 
         if (!isReady)
         {
@@ -147,6 +151,7 @@ namespace CC
     {
         if (state != nullptr)
         {
+            state->input.Shutdown();
             DestroySwapchains();
 
             if (state->space != XR_NULL_HANDLE)   { xrDestroySpace(state->space); }
@@ -181,6 +186,35 @@ namespace CC
     {
         CC_ASSERT(index >= 0 && index < viewCount, "GetEyeView index out of range");
         return eyeViews[index];
+    }
+
+    // ========================
+    // Tracked controllers
+    // ========================
+
+    const TrackedPose& XrManager::GetHandPose(XrHand hand, XrPoseKind kind) const
+    {
+        return state->input.GetHandPose(hand, kind);
+    }
+
+    void XrManager::GetThumbstick(XrHand hand, float& outX, float& outY) const
+    {
+        state->input.GetThumbstick(hand, outX, outY);
+    }
+
+    float XrManager::GetTriggerValue(XrHand hand) const
+    {
+        return state->input.GetTriggerValue(hand);
+    }
+
+    float XrManager::GetSqueezeValue(XrHand hand) const
+    {
+        return state->input.GetSqueezeValue(hand);
+    }
+
+    void XrManager::TriggerHaptic(XrHand hand, float amplitude, float durationSeconds)
+    {
+        state->input.TriggerHaptic(hand, amplitude, durationSeconds);
     }
 
     // ========================
@@ -445,6 +479,13 @@ namespace CC
         return isReady;
     }
 
+    bool XrManager::CreateInput()
+    {
+        // Attaching the action set is irreversible for the session, so it is
+        // the last thing set up: nothing after it may add an action.
+        return state->input.Init(state->instance, state->session);
+    }
+
     void XrManager::DestroySwapchains()
     {
         Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
@@ -592,6 +633,13 @@ namespace CC
             {
                 isReady = (viewState.viewStateFlags & requiredFlags) == requiredFlags;
             }
+        }
+
+        // Against the same predicted display time the views were located
+        // against, so the hands sit where the head expects them.
+        if (isReady)
+        {
+            state->input.SyncActions(state->space, state->predictedDisplayTime);
         }
 
         // Acquiring is what hands the frame its target, so it comes last: a

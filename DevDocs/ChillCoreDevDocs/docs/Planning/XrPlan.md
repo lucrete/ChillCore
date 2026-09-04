@@ -1,6 +1,6 @@
 # XR Plan
 
-**Status:** M1 landed and verified. M2 is written and builds; it reaches the runtime and falls back cleanly, and its stereo output is unverified pending a connected headset. M3 and M4 are not started.
+**Status:** M1 landed and verified. M2 and M3 are written and build; they reach the runtime and fall back cleanly, and everything downstream of a live session is unverified pending a connected headset. M4 is not started.
 **Current state:** AGD-0070 (Rendering Pipeline), AGD-0080 (Graphics API Abstraction), AGD-0030 (Platform Layer) and AGD-0110 (Input System) describe the seams this work plugs into. None of them cover XR.
 **Scope:** PCVR on the desktop target — Valve Index through SteamVR, Meta Quest 2 over Link and Air Link, both through the GL 4.3 backend. Quest standalone over GLES is not in plan and is not covered here.
 
@@ -171,6 +171,12 @@ enum class XrPoseKind { Grip, Aim, Max };
 Suggested bindings for the Valve Index controller, the Oculus Touch controller, and the Khronos simple controller as fallback. The runtime performs the rebinding; the engine holds only action names.
 
 **Done when:** two controller-shaped scene objects track the hands on both headsets, buttons drive engine actions through the existing action map, and haptics fire.
+
+**Written, unverified.** `XrInput` owns the action set: ten actions, each declared for both hands through subaction paths, with suggested bindings for Touch, Index and the simple controller. Buttons are pushed into a staging array on the trigger map and taken up by its Update, so edge detection survives; poses, sticks and analogue pulls are read from `XrManager` directly. `ActiveInputType::Xr` outranks the others while a session holds input.
+
+Nothing yet consumes any of it. The first two criteria need the demo state, so they are verified together with M4 rather than on their own.
+
+**One trap, already hit and fixed.** `xrSuggestInteractionProfileBindings` **replaces** a profile's bindings rather than adding to them. A second call for the same profile silently discards the first — every binding a profile has must go in one call.
 
 ---
 

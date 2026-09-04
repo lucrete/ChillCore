@@ -44,6 +44,21 @@ namespace CC
 
         bool IsSessionRunning() const;
 
+        // ========================
+        // Tracked controllers
+        // ========================
+        //
+        // Poses and axes are read here rather than through the action map:
+        // there is no sense in which a hand position is remappable, and the
+        // action map carries no value type for one. Buttons do go through the
+        // three layers and are read as ordinary actions.
+
+        const TrackedPose& GetHandPose(XrHand hand, XrPoseKind kind) const;
+        void  GetThumbstick(XrHand hand, float& outX, float& outY) const;
+        float GetTriggerValue(XrHand hand) const;
+        float GetSqueezeValue(XrHand hand) const;
+        void  TriggerHaptic(XrHand hand, float amplitude, float durationSeconds);
+
         static const int MAX_EYE_VIEWS = 2;
 
     private:
@@ -83,6 +98,7 @@ namespace CC
         bool CreateReferenceSpace();
         bool CreateSwapchains();
         void DestroySwapchains();
+        bool CreateInput();
     };
 }
 

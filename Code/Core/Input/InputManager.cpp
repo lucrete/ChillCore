@@ -311,6 +311,16 @@ namespace CC
         return actionMap->GetActiveInputType();
     }
 
+    void InputManager::SetXrTriggerState(int trigger, bool isPressed)
+    {
+        actionMap->SetXrTriggerState(trigger, isPressed);
+    }
+
+    void InputManager::NotifyXrActivity()
+    {
+        actionMap->NotifyXrActivity();
+    }
+
     // ========================
     // Input routing
     // ========================
