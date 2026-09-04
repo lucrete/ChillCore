@@ -11,6 +11,7 @@
 #include <openxr/openxr_platform.h>
 
 #include "CCAssert.h"
+#include "FrameTimer.h"
 #include "XrInput.h"
 #include "CameraXrEye.h"
 #include "CoreMain.h"
@@ -43,6 +44,12 @@ namespace CC
 
         XrTime predictedDisplayTime = 0;
         bool   shouldRenderFrame    = false;
+
+        // The runtime's clock counts nanoseconds from an origin of its own
+        // choosing, and the value is large enough that a float cannot resolve
+        // a frame within it. Frames are handed on relative to the first one.
+        XrTime firstDisplayTime = 0;
+        bool   hasFirstDisplayTime = false;
 
         // xrEndFrame must pair with an xrBeginFrame that succeeded, and every
         // image acquired must be released even on a frame that is abandoned
@@ -151,6 +158,10 @@ namespace CC
     {
         if (state != nullptr)
         {
+            if (state->hasFirstDisplayTime)
+            {
+                FrameTimer::Get()->ClearExternalFrameTime();
+            }
             state->input.Shutdown();
             DestroySwapchains();
 
@@ -603,6 +614,18 @@ namespace CC
         {
             state->predictedDisplayTime = frameState.predictedDisplayTime;
             state->shouldRenderFrame    = frameState.shouldRender == XR_TRUE;
+
+            if (!state->hasFirstDisplayTime)
+            {
+                state->firstDisplayTime = frameState.predictedDisplayTime;
+                state->hasFirstDisplayTime = true;
+            }
+
+            // Animation has to advance to where the frame will be displayed,
+            // not to where the CPU happens to be when it starts building it.
+            const double elapsedSeconds =
+                (double)(frameState.predictedDisplayTime - state->firstDisplayTime) / 1000000000.0;
+            FrameTimer::Get()->SetExternalFrameTime((float)elapsedSeconds);
 
             XrFrameBeginInfo beginInfo = { XR_TYPE_FRAME_BEGIN_INFO };
             isReady = XrSucceeded(xrBeginFrame(state->session, &beginInfo), "xrBeginFrame");

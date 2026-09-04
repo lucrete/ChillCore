@@ -46,7 +46,7 @@ namespace CC
     void FrameTimer::FrameStart()
     {
         previousTime = currentTime;
-        currentTime = GetCurrentTime();
+        currentTime = hasExternalFrameTime ? externalFrameTime : GetCurrentTime();
         deltaTime = currentTime - previousTime;
         deltaTimeClamped = Math::Clamp(0.0f, MAX_DELTA_TIME_SECONDS, deltaTime);
 
@@ -68,6 +68,31 @@ namespace CC
             framesPerSecond = frameCount / fpsAccumulator;
             frameCount = 0;
             fpsAccumulator = 0.0f;
+        }
+    }
+
+    void FrameTimer::SetExternalFrameTime(float seconds)
+    {
+        // The external clock has its own origin. Taking it up without moving
+        // the baseline with it makes the first frame's delta the distance
+        // between two unrelated clocks.
+        if (!hasExternalFrameTime)
+        {
+            currentTime = seconds;
+            previousTime = seconds;
+        }
+
+        hasExternalFrameTime = true;
+        externalFrameTime = seconds;
+    }
+
+    void FrameTimer::ClearExternalFrameTime()
+    {
+        if (hasExternalFrameTime)
+        {
+            hasExternalFrameTime = false;
+            currentTime = GetCurrentTime();
+            previousTime = currentTime;
         }
     }
 

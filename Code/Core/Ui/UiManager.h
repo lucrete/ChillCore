@@ -7,6 +7,7 @@
 #include <vector>
 #include "UiCssParser.h"
 #include "UiInputHandler.h"
+#include "GfxHandles.h"
 
 namespace CC
 {
@@ -32,6 +33,14 @@ namespace CC
 
         void Update();
         void Render();
+
+        // Draws the active screen into an offscreen target at that target's
+        // own size rather than over the window, so it can be sampled as a
+        // texture. This is how a screen becomes a panel in world space.
+        //
+        // Layout is cached against one surface size, so this marks it dirty
+        // on the way out and the window pass recomputes its own.
+        void RenderToTarget(Gfx::RenderTargetHandle target, int width, int height);
 
         UiElement* GetElementById(const std::string& id) const;
 
@@ -64,6 +73,10 @@ namespace CC
         std::unordered_map<std::string, UiElement*> elementIdMap;
         std::vector<UiCssRule> activeCssRules;
         UiInputHandler inputHandler;
+
+        // The body both render paths share, given the surface to lay out
+        // and draw against.
+        void RenderScreen(int width, int height);
 
         void UnloadScreen();
         void BuildIdMap(UiElement* element);

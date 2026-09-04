@@ -4,6 +4,7 @@
 #include "PlatformFileSystem.h"
 #include "PrintManager.h"
 #include "RenderManager.h"
+#include "GfxRenderApi.h"
 #include "InputManager.h"
 #include "UiScreenSystem.h"
 #include "UiRenderer.h"
@@ -155,11 +156,43 @@ namespace CC
 
     void UiManager::Render()
     {
+        int width = 0;
+        int height = 0;
+        RenderManager::Get()->GetWindowSize(width, height);
+        RenderScreen(width, height);
+    }
+
+    void UiManager::RenderToTarget(Gfx::RenderTargetHandle target, int width, int height)
+    {
+        if (rootElement != nullptr && target.IsValid())
+        {
+            Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
+
+            gfxApi->BeginRenderPass(target, "UiPanel");
+            gfxApi->InvalidateCachedState();
+
+            // Text carries its own projection, set for the window by the
+            // frame start. The panel needs its own, and the window's has to
+            // come back before anything else in the frame draws text.
+            TextRenderer::Get()->BeginFrame(width, height);
+            RenderScreen(width, height);
+            TextRenderer::Get()->EndFrame();
+
+            gfxApi->EndRenderPass();
+
+            int windowWidth = 0;
+            int windowHeight = 0;
+            RenderManager::Get()->GetWindowSize(windowWidth, windowHeight);
+            TextRenderer::Get()->BeginFrame(windowWidth, windowHeight);
+
+            isLayoutDirty = true;
+        }
+    }
+
+    void UiManager::RenderScreen(int width, int height)
+    {
         if (rootElement)
         {
-            int width, height;
-            RenderManager::Get()->GetWindowSize(width, height);
-
             // Run layout if dirty
             if (isLayoutDirty)
             {

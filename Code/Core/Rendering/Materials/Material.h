@@ -62,6 +62,13 @@ namespace CC
         bool CheckUniformExists(const std::string& name) const;
 
         Texture* GetTexture() const { return texture; }
+
+        // A texture the material does not own, bound at unit 0 in place of
+        // the loaded one. Exists so a render target can be used as a surface:
+        // Texture only ever loads from a file or from memory, and a target's
+        // colour attachment is neither.
+        void SetTextureHandleOverride(Gfx::TextureHandle handle) { textureHandleOverride = handle; }
+        void ClearTextureHandleOverride() { textureHandleOverride = Gfx::TextureHandle(); }
         bool HasTexture() const { return texture != nullptr; }
 
         const std::string& GetShaderName() const { return shaderName; }
@@ -130,6 +137,7 @@ namespace CC
 
         // Base texture (mainTex / baseColor)
         Texture* texture = nullptr;
+        Gfx::TextureHandle textureHandleOverride;
         Vector3 baseColour = { 1.0f, 1.0f, 1.0f };
         Vector2 textureTiling = { 1.0f, 1.0f };
 

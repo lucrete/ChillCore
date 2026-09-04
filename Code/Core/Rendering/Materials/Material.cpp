@@ -219,9 +219,14 @@ namespace CC
             gfxApi->SetPushConstants(&objectUniforms, OBJECT_UNIFORMS_SIZE_BYTES);
 
             // Bind base color texture (unit 0). Shader declares layout(binding=0) so no sampler uniform upload needed.
-            if (texture != nullptr && texture->GetTextureHandle().IsValid())
+            Gfx::TextureHandle baseTexture = textureHandleOverride;
+            if (!baseTexture.IsValid() && texture != nullptr)
             {
-                gfxApi->BindTexture(0, texture->GetTextureHandle(), samplerHandle);
+                baseTexture = texture->GetTextureHandle();
+            }
+            if (baseTexture.IsValid())
+            {
+                gfxApi->BindTexture(0, baseTexture, samplerHandle);
             }
 
             // PBR material bindings. Shader declares layout(binding=1..4).

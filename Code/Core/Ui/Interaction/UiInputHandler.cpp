@@ -24,6 +24,17 @@ namespace CC
     {
     }
 
+    void UiInputHandler::SetPointerOverride(const UiPointerState& pointer)
+    {
+        pointerOverride = pointer;
+        hasPointerOverride = true;
+    }
+
+    void UiInputHandler::ClearPointerOverride()
+    {
+        hasPointerOverride = false;
+    }
+
     void UiInputHandler::SetCallbackMap(UiCallbackMap* map)
     {
         callbackMap = map;
@@ -111,19 +122,38 @@ namespace CC
     {
         InputManager* input = InputManager::Get();
 
-        if (input->IsMouseCursorLocked())
+        int mouseX = 0;
+        int mouseY = 0;
+        bool isMouseDown = false;
+
+        if (hasPointerOverride)
         {
-            return;
+            // A pointer that has left the surface releases whatever it was
+            // holding rather than leaving it stuck pressed.
+            if (!pointerOverride.isActive)
+            {
+                wasMouseDown = false;
+                return;
+            }
+
+            mouseX = (int)pointerOverride.x;
+            mouseY = (int)pointerOverride.y;
+            isMouseDown = pointerOverride.isDown;
+        }
+        else
+        {
+            if (input->IsMouseCursorLocked())
+            {
+                return;
+            }
+
+            input->GetMousePosition(mouseX, mouseY);
+            isMouseDown = input->IsMouseButtonDown(MouseButton::Left);
         }
 
         // World-mode HUD overlays only accept joystick interactions.
         // Other elements (buttons, sliders, etc.) need full UI focus.
         bool joystickOnly = !input->IsUiInteractable();
-
-        int mouseX, mouseY;
-        input->GetMousePosition(mouseX, mouseY);
-
-        bool isMouseDown = input->IsMouseButtonDown(MouseButton::Left);
         bool mouseJustPressed = isMouseDown && !wasMouseDown;
         bool mouseJustReleased = !isMouseDown && wasMouseDown;
 

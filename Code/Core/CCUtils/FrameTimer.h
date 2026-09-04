@@ -36,6 +36,22 @@ namespace CC
         static FrameTimer* Get();
 
         void FrameStart();
+
+        // Hands the frame clock to something that owns frame pacing itself.
+        // An XR runtime predicts when a frame will actually be displayed, and
+        // animation advanced against any other clock lands at the wrong
+        // moment on screen.
+        //
+        // Affects FrameStart only. The intra-frame profiling timestamps stay
+        // on the platform clock, which is a running measure rather than a
+        // single predicted instant.
+        //
+        // seconds must be relative to the caller's own start, not an absolute
+        // runtime timestamp: a float holds too few digits for an epoch-based
+        // value to resolve a frame.
+        void SetExternalFrameTime(float seconds);
+        void ClearExternalFrameTime();
+
         float DeltaTime() const;
         float DeltaTimeUnclamped() const;
         float TimeSinceStartup() const;
@@ -103,6 +119,9 @@ namespace CC
         int previousStandardIndices[StandardTimestampCount];
 
         float GetCurrentTime() const;
+
+        float externalFrameTime = 0.0f;
+        bool  hasExternalFrameTime = false;
 
         // Profile ring buffer
         float profileTotalMs[PROFILE_HISTORY_SIZE];

@@ -10,6 +10,20 @@ namespace CC
     class UiElement;
     class UiJoystick;
 
+    // Where the pointer is and whether it is pressed, in screen-space
+    // pixels. Normally the mouse. A ray hitting a panel in world space
+    // converts its hit to the same pixels and supplies it instead, which is
+    // how a controller drives a UI that knows nothing about controllers.
+    struct UiPointerState
+    {
+        float x = 0.0f;
+        float y = 0.0f;
+        bool  isDown = false;
+        // False where the pointer is off the surface entirely, which is not
+        // the same as being at (0,0) and released.
+        bool  isActive = false;
+    };
+
     class UiInputHandler
     {
     public:
@@ -22,6 +36,11 @@ namespace CC
 
         void SetCallbackMap(UiCallbackMap* map);
         UiCallbackMap* GetCallbackMap() { return callbackMap; }
+
+        // Replaces the mouse as the pointer source until cleared. The
+        // handler is unaware of what is driving it either way.
+        void SetPointerOverride(const UiPointerState& pointer);
+        void ClearPointerOverride();
 
         UiElement* GetSelectedElement() const;
         bool IsHovered() const { return hoveredElement != nullptr || expandedDropdown != nullptr; }
@@ -42,6 +61,9 @@ namespace CC
         UiJoystick* joystickTouchTracks[PlatformInput::MAX_TOUCH_POINTERS] = {};
 
         UiCallbackMap* callbackMap = nullptr;
+
+        UiPointerState pointerOverride;
+        bool hasPointerOverride = false;
 
         void UpdateMouse();
         void UpdateTouchPointers();

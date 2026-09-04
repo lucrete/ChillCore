@@ -1,6 +1,6 @@
 # XR Plan
 
-**Status:** M1 landed and verified. M2 and M3 are written and build; they reach the runtime and fall back cleanly, and everything downstream of a live session is unverified pending a connected headset. M4 is not started.
+**Status:** M1 landed and verified. M2, M3 and M4 are written and build. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its world-space panel drawing. Everything downstream of a live session is unverified pending a connected headset.
 **Current state:** AGD-0070 (Rendering Pipeline), AGD-0080 (Graphics API Abstraction), AGD-0030 (Platform Layer) and AGD-0110 (Input System) describe the seams this work plugs into. None of them cover XR.
 **Scope:** PCVR on the desktop target — Valve Index through SteamVR, Meta Quest 2 over Link and Air Link, both through the GL 4.3 backend. Quest standalone over GLES is not in plan and is not covered here.
 
@@ -202,6 +202,18 @@ UI, text and the developer overlay draw to the default framebuffer with no rende
 - **The developer overlay stays on the desktop mirror only.** Out of scope in-headset.
 
 **Done when:** the demo state boots directly as the initial state, objects can be picked up and released with either controller, and a world-space UI panel responds to the controller ray.
+
+**Written, partly verified.** `AppStateXrDemo` is registered and boots directly. Verified flat, with no headset: the scene builds, the panel target is created, the screen renders into it, and the quad in the scene samples it — the whole panel path works without a session, and the state reports itself inactive rather than failing. Unverified: hands, ray, grab, pointer and haptics, all of which are gated on a live session.
+
+**Three engine additions the milestone needed.**
+
+- `UiManager::RenderToTarget` draws the active screen into an offscreen target at that target's size. Layout is cached against one surface size, so it marks layout dirty on the way out and restores the text projection the window pass expects.
+- `UiPointerState` on `UiInputHandler` replaces the mouse as the pointer source. Hit testing already worked in panel-space pixels, so the ray only has to convert its hit; a pointer that leaves the surface releases what it was holding rather than leaving it stuck pressed.
+- `Material::SetTextureHandleOverride` binds a texture the material does not own at unit 0. `Texture` only ever loads from a file or from memory, and a render target's colour attachment is neither.
+
+**The panel is one frame behind.** It renders during the state's Update, because the scene samples it and the scene draws before the frame's UI pass. At headset refresh this is not perceptible; moving it would mean reordering `CoreMain::TickFrame`.
+
+**Noted, not fixed.** `Vector3`'s arithmetic operators are not const-qualified, so a `const Vector3&` cannot take part in one. The demo copies before use. Worth fixing in the maths header, but not as part of this work.
 
 ---
 
