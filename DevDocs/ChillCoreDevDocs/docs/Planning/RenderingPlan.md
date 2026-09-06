@@ -1,6 +1,6 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, three unimplemented optimisations, and two features — compute and shadows.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, three unimplemented optimisations, and three features — compute, shadows and particles.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
 **Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — occlusion culling, photometric light units, specular antialiasing, camera registration, the open design questions — is not covered here.
 
@@ -185,3 +185,37 @@ The alternative — rendering the shadow map from the previous frame's submissio
 - **Transparent geometry does not participate.** It neither casts nor receives correctly, and making it do so is a separate problem. Excluding it explicitly is better than leaving it to fall out of the pass structure by accident.
 
 **Done when:** the directional light casts a shadow from opaque geometry onto opaque geometry, masked materials cut out in the map, moving objects' shadows track them within the frame rather than lagging one, and acne and detachment are both absent at the scene's working scale.
+
+---
+
+## Particle system
+
+Nothing emits particles. There is no renderable that draws many small quads from one submission and no component that simulates them.
+
+**Why it matters.** Smoke, fire, sparks, dust and impacts are the vocabulary a scene uses to look inhabited rather than modelled, and none of it is reachable today. It is also the first thing in the engine that produces geometry per frame rather than loading it once, which is why it costs more than its output suggests: every renderable currently creates its buffers at construction and never writes them again.
+
+### What is missing
+
+**Per-instance vertex attributes.** `DrawIndexed` already takes an instance count, so the draw call itself is there. `VertexAttribute` carries a location, an offset, a type and a component count — there is no divisor, so a buffer that advances once per instance rather than once per vertex cannot be described. Without it the fallback is writing four vertices per particle into a dynamic buffer every frame: four times the bandwidth and four times the CPU work for the same image.
+
+**Additive blending a material can ask for.** `PipelineCache` sets `srcColorFactor` to `SrcAlpha` for every transparent material. `BlendFactor::One` exists in the abstraction and nothing above it can reach it, so additive is unreachable through the material path. Fire and sparks want it for how they look; the first cut wants it for a second reason, below.
+
+**A renderable that writes its geometry each frame.** `BufferMemory::CpuToGpu` and `UpdateBuffer` both exist, so per-frame vertex data is already expressible. Nothing uses them. This is the piece with no precedent to copy rather than the piece with a gap beneath it.
+
+**An emitter component.** Spawn rate, lifetime, initial velocity and spread, gravity, size and colour over life, and the texture. An ordinary component that submits a renderable, so the frame sequence does not change.
+
+### Sorting is the design decision
+
+Transparent objects are sorted per object, by squared distance from the camera. A particle system is one object with one transform, so every particle in it carries the same sort key. Correct blending between the particles of a single system is not something that sort can express, and sorting per particle means sorting every live particle every frame.
+
+**Make the first cut additive only.** Additive blending does not depend on draw order, so the sorting problem does not arise rather than being solved badly. It covers fire, sparks, embers and energy effects outright. Alpha-blended particles — smoke, dust — then arrive as their own decision with the sorting question isolated, rather than as a correctness bug discovered after the fact.
+
+### Watch out
+
+- **Particles are the worst case for overdraw, and the pre-pass does not help.** Transparent geometry writes no depth and takes no part in the pre-pass, so a screenful of smoke is a screenful of blended fragments no matter how cheap each one is. The budget is fill rate, not particle count, and a system that looks free at a thousand particles can cost the frame at the same count drawn larger.
+- **Simulate on the CPU first.** A GPU-driven system is the eventual answer, and it only pays when simulation, sorting and the draw all stay on the GPU — a partial version reads results back and loses to the CPU it replaced. Build the CPU one and let compute replace it whole.
+- **Culling is per system, and its bounds move.** A particle system is one renderable, so it is culled as a unit. Its extent is the extent of its live particles, which changes every frame and cannot be computed once at load the way a mesh's can. A conservative bound derived from emitter shape, maximum lifetime and maximum speed costs nothing per frame and does not require touching the particles.
+- **Scene authoring cannot reach blend modes.** Alpha mode is not authorable in scene YAML; it arrives only through glTF import. An emitter declared in a scene file needs its blend mode to come from somewhere, and that is a scene-format question rather than a rendering one.
+- **Soft particles need depth the shader cannot sample.** Particles will intersect geometry in a hard line until scene depth is readable. That is a known and accepted look here, and the work to change it is not covered here.
+
+**Done when:** an emitter declared in a scene spawns additive particles that simulate, draw in one instanced submission, and cull as a unit, with the live particle count and the system's fill cost both visible in the profiler.
