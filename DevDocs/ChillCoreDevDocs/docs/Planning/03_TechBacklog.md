@@ -53,6 +53,22 @@ Passing it is a small change, and it is what unblocks the effects usually asked 
 
 Needs a decision on whether depth is exposed as an ordinary sampled texture or as something the stack describes, since a depth format is not filterable the way a colour texture is.
 
+### Occlusion culling
+
+Rejecting draws hidden behind other geometry, as opposed to draws outside the view. Frustum culling and the depth pre-pass are in plan (`RenderingPlan.md`); neither covers this.
+
+**Deferred deliberately, not blocked.** The two planned items take most of the value first. Frustum culling removes what is off screen, and the pre-pass removes the *shading* cost of what is occluded — the remainder here is the draw call and the vertex processing of hidden objects. That remainder is real at production scene complexity and small below it, and this is the most complex of the three by a distance.
+
+**Three approaches, none obviously right.**
+
+- **Hardware occlusion queries.** Draw an object's bounds, ask how many samples passed. Simple to express and needs no new engine concepts, but the answer arrives a frame or more later. Reading it back in the same frame stalls the pipeline, which costs more than the overdraw it saves; using the previous frame's answer means accepting objects that pop in for a frame. There is no query surface in `Gfx::RenderApi` today.
+- **Hierarchical depth buffer.** Build a mip chain over the depth the pre-pass already produces, then test bounds against the coarsest level that covers them. No stall if the test and the draw both stay on the GPU, which needs compute to run the test and indirect draw to consume the result. `DrawIndirect` and `supportsIndirectDraw` exist in the abstraction; compute is reachable only once its planned work lands.
+- **Software occlusion rasterisation.** Rasterise a small authored occluder set on the CPU and test bounds against it. No GPU dependency, no latency, no capability gate. Costs CPU time on a thread that is not currently doing anything else, and requires occluders to be authored per scene, which is a content pipeline obligation rather than a code one.
+
+**What it needs first, regardless of approach.** Bounding volumes, which frustum culling introduces, and a populated depth buffer ahead of the draws being culled, which the pre-pass produces. Both are prerequisites that fall out of planned work rather than costs of this item.
+
+**Worth stating plainly.** Occlusion culling is the one optimisation here that can lose outright: every rejected object saves a draw, every survivor pays the test, and a scene whose geometry is mostly visible pays all of the cost for none of the benefit. It earns a place when a scene has real occluders — interiors, terrain, dense urban geometry — and not before.
+
 ### Specular antialiasing
 
 Specular highlights shimmer under motion. Measured on the helmet model over a rotation sweep of 0.35 degrees per step: peak per-pixel change of 219 of 255 between adjacent steps, with bloom disabled.
