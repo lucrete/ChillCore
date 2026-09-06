@@ -94,7 +94,7 @@ The one real decision, and it is a frame-sequencing question rather than a maths
 - **At submission.** Rejected objects never take a slot in the fixed-capacity submission array. But the newest frustum available at that point is the previous frame's, so fast camera motion pops objects in at the screen edge a frame late.
 - **After submission, before the sorts.** Tests against the current frame's camera and cannot pop. Every object has already occupied an array slot and paid its submission cost by then.
 
-Culling after the camera update is the correct-by-default choice, and array pressure is better treated as its own problem than paid for in visible popping. Moving the camera update ahead of the scene update would give submission-time culling a current frustum, but it makes camera-follow lag a frame — a worse trade in the other direction.
+A third option changes the sequence rather than choosing a place in it: moving the camera update ahead of the scene update gives submission-time culling a current frustum, at the cost of camera-follow components lagging a frame. Which of the three to take is open, and the trade differs — the first two spend either accuracy or array capacity, the third spends camera latency.
 
 ### Watch out
 
@@ -134,7 +134,7 @@ Opaque geometry is shaded in the order it is submitted. Nothing populates depth 
 - **Both passes must compute position identically.** An equal depth compare demands bit-identical results from two different shaders. A compiler is free to reassociate the transform differently in each, and the failure is not subtle — surfaces drop out across the whole frame where the two disagree in the last bit. Declaring `gl_Position` invariant in both, and computing it through one shared include, is what holds this.
 - **Masked materials cannot use the position-only shader.** `AlphaBlendMode::Mask` discards on base-colour alpha. A pre-pass ignoring that writes depth across the holes, and the shading pass then rejects what should have shown through them. Masked geometry needs its base-colour texture and cutoff in the pre-pass, which is why it needs pipelines keyed per material rather than per layout.
 - **Every opaque renderable is submitted twice.** The pre-pass doubles opaque draw calls and vertex work outright, and a scene bound by draw calls or vertex processing rather than shading loses on that trade. Culling is what changes the arithmetic, by halving what this doubles — the two compound, and this pass is worth measuring with culling in place rather than without it.
-- **It does not pay at every scene size.** Cheap fragment shaders or little overlap means paying the second submission for nothing. It wants a switch and a measurement, not unconditional enablement.
+- **A toggle is for measuring it, not for doubting it.** At production scene complexity the trade is settled: expensive shading over dense geometry is what the pass exists for. The switch earns its place by making the win measurable and by isolating the pass when something else is being diagnosed.
 - **Front-to-back ordering belongs in the pre-pass, not the shading pass.** The pre-pass has early-z of its own, and it has no batching to protect — its pipelines are few and its state near-identical across draws. A distance sort there costs nothing that matters; in the shading pass it costs the thing the pre-pass exists to preserve.
 - **A complete opaque depth buffer falls out of this.** Depth-aware post-process effects would need exactly that, and this produces it as a by-product rather than as a goal. That work is not in plan and is not covered here.
 - **The fullscreen-quad path is unaffected.** It bypasses the scene passes entirely and has no depth to pre-populate.
@@ -173,13 +173,13 @@ The alternative — rendering the shadow map from the previous frame's submissio
 
 **Shadow state on the light.** `LightDirectional` holds a direction, a colour and an intensity. Whether it casts, at what resolution, and with what bias are all new.
 
-**One light, deliberately.** `LightManager` holds a map of directional lights while `FrameUniforms` carries exactly one, so the shader has only ever seen one light. Shadowing the one light the shader reads is the whole of the first cut. A second shadow-casting light is a second pass and a second map, and it is not worth designing for until the lighting model carries more than one light at all.
+**A lighting model that carries more than one light.** `LightManager` holds a map of directional lights while `FrameUniforms` carries exactly one, so the shader has only ever seen one. Production lighting has several casters, and each one is another pass, another map and another entry in the frame block — so how many lights the model carries decides the shape of this work rather than following from it. Open: whether shadows are built against the one light the shader reads today, or the lighting model widens first.
 
 ### Watch out
 
 - **Culling has to be per-view, and it is cheaper to build it that way than to retrofit it.** The shadow pass needs what the *light* sees, which is not what the camera sees: an object behind the camera can cast into the frame, and culling it against the camera frustum deletes its shadow. A single `isVisible` flag on a renderable cannot express this. Visibility is a property of a view, not of an object.
 - **Acne and peter-panning are one dial with two failure modes.** Too little bias and surfaces self-shadow in stripes; too much and shadows detach from the objects casting them. Slope-scaled bias plus front-face culling in the shadow pass is the usual pairing, and neither is a substitute for the other.
-- **Resolution is a fixed budget spent unevenly.** A single map fitted to the whole view spends most of its texels far away where nothing looks closely. Cascades are the production answer and multiply the pass count; a single fitted map is the honest first cut, and it is worth knowing at the outset which one is being built.
+- **Resolution is a fixed budget spent unevenly.** A single map fitted to the whole view spends most of its texels in the distance and starves the foreground, where shadows are looked at. Cascaded maps — several fitted to slices of the view depth — are what production quality requires, and they multiply the pass count, the map memory and the fitting logic by the cascade count. Which is built decides the size of the work, so it is a decision for the outset rather than one to arrive at.
 - **The map is a full extra submission of opaque geometry per casting light.** With the pre-pass, opaque geometry is already submitted twice. Shadows make it three times, and every one of those passes wants the light's own culling result rather than the camera's.
 - **Masked materials cut out in the shadow map too.** The same discard the pre-pass needs, for the same reason: a leaf that is a hole in the base-colour texture must be a hole in the shadow it casts.
 - **Transparent geometry does not participate.** It neither casts nor receives correctly, and making it do so is a separate problem. Excluding it explicitly is better than leaving it to fall out of the pass structure by accident.
@@ -204,22 +204,24 @@ Nothing emits particles. There is no renderable that draws many small quads from
 
 **An emitter component.** Spawn rate, lifetime, initial velocity and spread, gravity, size and colour over life, and the texture. An ordinary component that submits a renderable, so the frame sequence does not change.
 
-### Blending and sorting — open, decide before building
+### Ordering particles within a system
 
-Transparent objects are sorted per object, by squared distance from the camera. A particle system is one object with one transform, so every particle in it carries the same sort key. Ordering particles within a system is not something that sort can express, whatever the list does.
+Transparent objects are sorted per object, by squared distance from the camera. A particle system is one object with one transform, so every particle in it carries the same sort key. Ordering particles within a system is not something that sort can express, whatever the list does, and the engine's per-object sort is unaffected by anything decided here.
 
-That constraint is fixed. What follows from it is not, and the choice decides what the first cut can depict.
+Both blend modes are required. Additive covers fire, sparks, embers and flashes, and suits a renderer working in scene-linear light where values above white feed bloom. Alpha covers smoke, dust and debris. Additive is order-independent and needs no ordering at all; alpha is not, and at production quality its ordering has to be right — overlapping smoke reads wrong when it is not, and it is most visible on the large, high-contrast particles that carry an effect.
 
-- **Additive only.** Order-independent, so the question does not arise. Covers fire, sparks, embers, flashes and energy effects, and suits a renderer working in scene-linear light where values above white feed bloom. Excludes smoke and dust, which are alpha-blended and are most of what particles are usually asked for. The narrowest useful system, and it defers rather than answers.
-- **Alpha, unsorted.** The standard shipping compromise. Overlapping particles of similar colour and low alpha look near-identical in either order, so the error is usually invisible and always cheap. It shows on high-contrast or high-alpha particles, and it shows worst on the few large ones rather than the many small ones.
-- **Alpha, sorted per system.** Correct within a system, still wrong between intersecting systems. Costs a sort of the live particles each frame — real but incremental, since a CPU system already touches every particle and, without instance divisors, already writes four vertices for each.
+So the open question is how alpha particles are ordered, not whether:
 
-The engine's own sort is per object and stays that way regardless; none of these change it. Worth settling before the emitter is written, because the blend mode reaches the material, the pipeline and the scene format, and changing it later touches all three.
+- **Sorted per system on the CPU.** Correct within a system. Costs a sort of the live particles each frame, which is incremental against work already being done — a CPU system touches every particle anyway and, without instance divisors, writes four vertices for each. Still wrong between two intersecting systems, since those remain two objects with two sort keys.
+- **Sorted on the GPU.** Belongs with a compute-driven system rather than a CPU one, and only pays as part of that whole. Scales to particle counts a CPU sort will not.
+- **Order-independent transparency.** Removes the question for particles and for the transparent pass alike. A larger piece of work than the particle system itself, and the transparency architecture is currently two sorted passes by design.
+
+The blend mode reaches the material, the pipeline and the scene format, so which modes the first system carries is worth settling before the emitter is written rather than after.
 
 ### Watch out
 
 - **Particles are the worst case for overdraw, and the pre-pass does not help.** Transparent geometry writes no depth and takes no part in the pre-pass, so a screenful of smoke is a screenful of blended fragments no matter how cheap each one is. The budget is fill rate, not particle count, and a system that looks free at a thousand particles can cost the frame at the same count drawn larger.
-- **Simulate on the CPU first.** A GPU-driven system is the eventual answer, and it only pays when simulation, sorting and the draw all stay on the GPU — a partial version reads results back and loses to the CPU it replaced. Build the CPU one and let compute replace it whole.
+- **A GPU-driven system pays only whole.** Simulation, sorting and the draw all have to stay on the GPU: a version that simulates in compute and then reads the results back to sort or submit them loses to the CPU it replaced. That makes CPU and GPU simulation two designs rather than two stages of one, and the particle counts production effects reach is what decides between them.
 - **Culling is per system, and its bounds move.** A particle system is one renderable, so it is culled as a unit. Its extent is the extent of its live particles, which changes every frame and cannot be computed once at load the way a mesh's can. A conservative bound derived from emitter shape, maximum lifetime and maximum speed costs nothing per frame and does not require touching the particles.
 - **Scene authoring cannot reach blend modes.** Alpha mode is not authorable in scene YAML; it arrives only through glTF import. An emitter declared in a scene file needs its blend mode to come from somewhere, and that is a scene-format question rather than a rendering one.
 - **Soft particles need depth the shader cannot sample.** Particles will intersect geometry in a hard line until scene depth is readable. That is a known and accepted look here, and the work to change it is not covered here.
