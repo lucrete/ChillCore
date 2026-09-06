@@ -2,7 +2,7 @@
 
 Work that is in plan, in execution order. Summaries only — detail is in the planning doc named in each row. Work not yet in plan is in `03_TechBacklog.md`; the two are mutually exclusive (`01_DevProcess.md`).
 
-Sequenced on dependency and cost, not product priority. Where priorities differ, this is the document to change.
+Rendering leads. The whole rendering block runs ahead of every other workstream, by decision rather than by dependency — no rendering row blocks anything below it. Within a workstream, order is dependency and cost. Where priorities differ, this is the document to change.
 
 | # | Work | Workstream | Plan doc | Notes |
 | --- | --- | --- | --- | --- |
@@ -22,10 +22,10 @@ Sequenced on dependency and cost, not product priority. Where priorities differ,
 
 ## Sequencing notes
 
-- **Rendering (1–6) is a block, scheduled first by priority, not dependency.** No rendering item blocks the tracker, Android, or build work.
+- **Rendering (1–6) runs first, in full.** Nothing outside the block is scheduled ahead of any part of it. This is a priority decision, not a dependency one: no rendering row blocks the tracker, Android, or build work, so the order below is what is wanted rather than what is forced.
 - **4 before 5 is a preference, not a dependency.** The pre-pass submits opaque geometry twice and culling reduces what is submitted, so the two compound and the pre-pass measures honestly only with culling already in place. Either can be built first.
 - **5 before 6 is the one dependency inside the block.** Shadows render depth-only from the light's point of view, which is the machinery the pre-pass introduces — the colour write mask and the depth-only pipelines. Building shadows first means building that twice.
-- **6 is the largest item in the plan and the most reasonable to reorder against.** Six rendering rows now sit ahead of the tracker work. If the tracker matters more than shadows do, this is the row to move rather than the block to reshuffle.
-- **AudioTracker (7–9) is independent** and can run in parallel with any other row, including the rendering block.
+- **6 is the largest item in the plan.** It carries a frame-sequencing change nothing else needs, so it is the row whose estimate is worth the least confidence — a reason to expect it to run long, not a reason to move it.
+- **AudioTracker (7–9) is independent** and can run in parallel with any other row. It is sequenced behind rendering by preference; nothing in it waits on a rendering row.
 - **Across workstreams, one hard dependency: 11 before any Android context-loss hardening.** The recovery policy is a deliberate cold restart on the premise that persistence restores the user's place.
 - **Within a workstream the order is dependency and cost.** Across workstreams it is a preference and can be reordered freely.
