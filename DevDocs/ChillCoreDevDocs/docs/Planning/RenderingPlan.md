@@ -198,17 +198,23 @@ Nothing emits particles. There is no renderable that draws many small quads from
 
 **Per-instance vertex attributes.** `DrawIndexed` already takes an instance count, so the draw call itself is there. `VertexAttribute` carries a location, an offset, a type and a component count — there is no divisor, so a buffer that advances once per instance rather than once per vertex cannot be described. Without it the fallback is writing four vertices per particle into a dynamic buffer every frame: four times the bandwidth and four times the CPU work for the same image.
 
-**Additive blending a material can ask for.** `PipelineCache` sets `srcColorFactor` to `SrcAlpha` for every transparent material. `BlendFactor::One` exists in the abstraction and nothing above it can reach it, so additive is unreachable through the material path. Fire and sparks want it for how they look; the first cut wants it for a second reason, below.
+**A blend mode a material can ask for.** `PipelineCache` sets `srcColorFactor` to `SrcAlpha` for every transparent material, so alpha is the only blend a material can have. `BlendFactor::One` exists in the abstraction and nothing above it can reach it. Additive is needed for fire and sparks whatever else is decided below, so this gap has to close either way.
 
 **A renderable that writes its geometry each frame.** `BufferMemory::CpuToGpu` and `UpdateBuffer` both exist, so per-frame vertex data is already expressible. Nothing uses them. This is the piece with no precedent to copy rather than the piece with a gap beneath it.
 
 **An emitter component.** Spawn rate, lifetime, initial velocity and spread, gravity, size and colour over life, and the texture. An ordinary component that submits a renderable, so the frame sequence does not change.
 
-### Sorting is the design decision
+### Blending and sorting — open, decide before building
 
-Transparent objects are sorted per object, by squared distance from the camera. A particle system is one object with one transform, so every particle in it carries the same sort key. Correct blending between the particles of a single system is not something that sort can express, and sorting per particle means sorting every live particle every frame.
+Transparent objects are sorted per object, by squared distance from the camera. A particle system is one object with one transform, so every particle in it carries the same sort key. Ordering particles within a system is not something that sort can express, whatever the list does.
 
-**Make the first cut additive only.** Additive blending does not depend on draw order, so the sorting problem does not arise rather than being solved badly. It covers fire, sparks, embers and energy effects outright. Alpha-blended particles — smoke, dust — then arrive as their own decision with the sorting question isolated, rather than as a correctness bug discovered after the fact.
+That constraint is fixed. What follows from it is not, and the choice decides what the first cut can depict.
+
+- **Additive only.** Order-independent, so the question does not arise. Covers fire, sparks, embers, flashes and energy effects, and suits a renderer working in scene-linear light where values above white feed bloom. Excludes smoke and dust, which are alpha-blended and are most of what particles are usually asked for. The narrowest useful system, and it defers rather than answers.
+- **Alpha, unsorted.** The standard shipping compromise. Overlapping particles of similar colour and low alpha look near-identical in either order, so the error is usually invisible and always cheap. It shows on high-contrast or high-alpha particles, and it shows worst on the few large ones rather than the many small ones.
+- **Alpha, sorted per system.** Correct within a system, still wrong between intersecting systems. Costs a sort of the live particles each frame — real but incremental, since a CPU system already touches every particle and, without instance divisors, already writes four vertices for each.
+
+The engine's own sort is per object and stays that way regardless; none of these change it. Worth settling before the emitter is written, because the blend mode reaches the material, the pipeline and the scene format, and changing it later touches all three.
 
 ### Watch out
 
@@ -218,4 +224,4 @@ Transparent objects are sorted per object, by squared distance from the camera. 
 - **Scene authoring cannot reach blend modes.** Alpha mode is not authorable in scene YAML; it arrives only through glTF import. An emitter declared in a scene file needs its blend mode to come from somewhere, and that is a scene-format question rather than a rendering one.
 - **Soft particles need depth the shader cannot sample.** Particles will intersect geometry in a hard line until scene depth is readable. That is a known and accepted look here, and the work to change it is not covered here.
 
-**Done when:** an emitter declared in a scene spawns additive particles that simulate, draw in one instanced submission, and cull as a unit, with the live particle count and the system's fill cost both visible in the profiler.
+**Done when:** an emitter declared in a scene spawns particles that simulate, draw in one instanced submission, and cull as a unit, in the blend mode settled above, with the live particle count and the system's fill cost both visible in the profiler.
