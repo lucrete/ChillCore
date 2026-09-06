@@ -1,8 +1,8 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, three unimplemented optimisations, and the compute feature.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is a camera-control defect, three unimplemented optimisations, and two features — compute and shadows.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
-**Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — photometric light units, specular antialiasing, camera registration, the open design questions — is not covered here.
+**Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — occlusion culling, photometric light units, specular antialiasing, camera registration, the open design questions — is not covered here.
 
 ---
 
@@ -100,6 +100,7 @@ Culling after the camera update is the correct-by-default choice, and array pres
 
 - **A bound that is too small is worse than no culling.** Geometry disappears at the screen edge, intermittently, and only from certain angles. Bounds must be conservative everywhere they are approximated, and a debug draw of the volumes is what makes a wrong one obvious.
 - **World bounds are a per-frame result, not a cached one.** A parent moving changes every child's world bound. Caching them across frames requires something that knows a transform changed, and nothing tracks that today.
+- **Visibility belongs to a view, not to an object.** A single flag on a renderable answers "is it on screen" and nothing else. A shadow pass asks what the light sees, and an object behind the camera can still cast into the frame — culled against the camera frustum, its shadow disappears. Producing a per-view result costs nothing extra now and is expensive to retrofit later.
 - **Cost is not zero at low object counts.** A handful of objects pays the tests and rejects nothing. Like the pre-pass, this wants measuring against a dense scene rather than the current ones.
 - **The far plane is a hardcoded 100 units.** Objects beyond it are already clipped — after being drawn. Culling makes that rejection cheap, but the literal itself stays a camera concern rather than something the culler should reach into.
 - **This rejects what is outside the view, not what is hidden behind something else.** Occlusion is a different mechanism. For shading cost the depth pre-pass below covers it; for draw-call cost nothing does, and that is not covered here.
@@ -139,3 +140,48 @@ Opaque geometry is shaded in the order it is submitted. Nothing populates depth 
 - **The fullscreen-quad path is unaffected.** It bypasses the scene passes entirely and has no depth to pre-populate.
 
 **Done when:** opaque shading runs against a fully populated depth buffer, occluded fragments are not shaded, the shading pass keeps its pipeline-then-material sort, masked materials cut out correctly in both passes, and a dense test scene shows a frame-time win over the pass disabled.
+
+---
+
+## Shadow maps
+
+Nothing casts a shadow. Lighting is evaluated per fragment with no test for whether the light reaches it, so geometry is lit through anything in the way and every object appears to float.
+
+**Why it matters.** Contact between objects and the ground reads through shadow before it reads through anything else. Without it a scene has no depth cue tying an object to the surface under it, and the lighting rig can be neither judged nor tuned — no arrangement of intensities substitutes for occlusion.
+
+### The frame sequence is the problem, not the shadow map
+
+A shadow map is opaque geometry drawn depth-only from the light's point of view, into a target of its own, before the scene pass shades anything. The engine has render targets, `TextureFormat::Depth32Float`, and — once the pre-pass lands — depth-only pipelines and a colour write mask. What it does not have is anywhere to put the pass.
+
+- `RenderManager::StartFrame` opens the scene render pass.
+- Renderables submit themselves afterwards, during the scene update.
+- Passes cannot nest.
+
+So at the moment the scene pass opens there is no geometry list to render a shadow map from, and once it is open no other pass can start. Both halves have to move: the scene pass opens after submission rather than before it, which puts `BeginRenderPass` in `Render` alongside the draw loops it brackets. That touches the fullscreen-quad branch and the post-process target decision, both currently made in `StartFrame`.
+
+The alternative — rendering the shadow map from the previous frame's submission list — keeps the sequence intact and is wrong in a way that shows: a moving object's shadow trails it by a frame, most visible on exactly the fast motion that draws the eye.
+
+### What is missing
+
+**A comparison sampler.** `Gfx::SamplerDescription` describes filtering, addressing and anisotropy. It cannot express a depth comparison, so a shadow map can only be sampled as an ordinary texture and compared in the shader by hand. That gives up the hardware's own comparison and the free bilinear filtering of the comparison result that every GPU provides for it — the cheapest percentage-closer filtering available, discarded before any is written. A `compareEnable` and `compareOp` pair on the description, in both backends.
+
+**Depth bias.** `Gfx::RasterizerState` carries a cull mode and a winding order, and nothing else. Slope-scaled depth bias is the standard answer to shadow acne, and it is rasterizer state on every graphics interface. Doing it in the shader instead is possible and worse: the bias belongs to the pass that writes the map, not to the material that reads it.
+
+**Light-space transform, and room for it.** `FrameUniforms` is 128 bytes of std140, scalars packed into the unused `w` components of surrounding vectors, matching `Include/frameUniforms.glinc` member for member. A light view-projection is another 64 bytes, plus the map's texel size and bias parameters. The layout and its shader declaration change together and must agree exactly, and a mismatch produces wrong values rather than a compile error.
+
+**Something to fit the projection to.** A directional light has no position — it needs an orthographic volume fitted to what the camera can see, and there is nothing describing the extent of a scene to fit against. Per-object bounds arrive with culling; a scene-wide extent is their union.
+
+**Shadow state on the light.** `LightDirectional` holds a direction, a colour and an intensity. Whether it casts, at what resolution, and with what bias are all new.
+
+**One light, deliberately.** `LightManager` holds a map of directional lights while `FrameUniforms` carries exactly one, so the shader has only ever seen one light. Shadowing the one light the shader reads is the whole of the first cut. A second shadow-casting light is a second pass and a second map, and it is not worth designing for until the lighting model carries more than one light at all.
+
+### Watch out
+
+- **Culling has to be per-view, and it is cheaper to build it that way than to retrofit it.** The shadow pass needs what the *light* sees, which is not what the camera sees: an object behind the camera can cast into the frame, and culling it against the camera frustum deletes its shadow. A single `isVisible` flag on a renderable cannot express this. Visibility is a property of a view, not of an object.
+- **Acne and peter-panning are one dial with two failure modes.** Too little bias and surfaces self-shadow in stripes; too much and shadows detach from the objects casting them. Slope-scaled bias plus front-face culling in the shadow pass is the usual pairing, and neither is a substitute for the other.
+- **Resolution is a fixed budget spent unevenly.** A single map fitted to the whole view spends most of its texels far away where nothing looks closely. Cascades are the production answer and multiply the pass count; a single fitted map is the honest first cut, and it is worth knowing at the outset which one is being built.
+- **The map is a full extra submission of opaque geometry per casting light.** With the pre-pass, opaque geometry is already submitted twice. Shadows make it three times, and every one of those passes wants the light's own culling result rather than the camera's.
+- **Masked materials cut out in the shadow map too.** The same discard the pre-pass needs, for the same reason: a leaf that is a hole in the base-colour texture must be a hole in the shadow it casts.
+- **Transparent geometry does not participate.** It neither casts nor receives correctly, and making it do so is a separate problem. Excluding it explicitly is better than leaving it to fall out of the pass structure by accident.
+
+**Done when:** the directional light casts a shadow from opaque geometry onto opaque geometry, masked materials cut out in the map, moving objects' shadows track them within the frame rather than lagging one, and acne and detachment are both absent at the scene's working scale.
