@@ -92,6 +92,10 @@ Any AppState must be runnable as the initial state without first passing through
 
 Implication: all global setup — UI SFX preloading, screen registration, action map contexts shared across states, etc. — must live in a location that runs before any AppState's `Init()`. `AppMain::Init()` is the canonical home for app-level globals; engine subsystems live in `CoreMain::Init()`. Do not put global setup inside an individual AppState's `Init()`. See AGD-0020.
 
+### Target Scale for Architecture and Performance Analysis
+
+When analyzing or recommending rendering/engine architecture — draw call counts, batching, overdraw, culling, memory budgets, etc. — assume the target is a complex scene with many objects, at full AAA production quality, not the trivial scenes currently in the repo. The current scenes (a handful of primitives, few materials) are placeholders for engine development, not a representative workload. Do not use their small scale to justify skipping an optimization, downplaying a cost, or assuming a bottleneck won't matter — architecture decisions should hold up under production-scale scene complexity.
+
 ## Architecture
 
 ### Execution Flow
