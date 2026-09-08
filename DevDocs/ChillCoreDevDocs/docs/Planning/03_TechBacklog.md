@@ -53,6 +53,22 @@ Passing it is a small change, and it is what unblocks the effects usually asked 
 
 Needs a decision on whether depth is exposed as an ordinary sampled texture or as something the stack describes, since a depth format is not filterable the way a colour texture is.
 
+### Occlusion culling
+
+Rejecting draws hidden behind other geometry, as opposed to draws outside the view. Frustum culling and the depth pre-pass are in plan (`RenderingPlan.md`); neither covers this.
+
+**Deferred deliberately, not blocked.** The two planned items take most of the value first. Frustum culling removes what is off screen, and the pre-pass removes the *shading* cost of what is occluded — the remainder here is the draw call and the vertex processing of hidden objects. That remainder is real at production scene complexity and small below it, and this is the most complex of the three by a distance.
+
+**Three approaches, none obviously right.**
+
+- **Hardware occlusion queries.** Draw an object's bounds, ask how many samples passed. Simple to express and needs no new engine concepts, but the answer arrives a frame or more later. Reading it back in the same frame stalls the pipeline, which costs more than the overdraw it saves; using the previous frame's answer means accepting objects that pop in for a frame. There is no query surface in `Gfx::RenderApi` today.
+- **Hierarchical depth buffer.** Build a mip chain over the depth the pre-pass already produces, then test bounds against the coarsest level that covers them. No stall if the test and the draw both stay on the GPU, which needs compute to run the test and indirect draw to consume the result. `DrawIndirect` and `supportsIndirectDraw` exist in the abstraction; compute is reachable only once its planned work lands.
+- **Software occlusion rasterisation.** Rasterise a small authored occluder set on the CPU and test bounds against it. No GPU dependency, no latency, no capability gate. Costs CPU time on a thread that is not currently doing anything else, and requires occluders to be authored per scene, which is a content pipeline obligation rather than a code one.
+
+**What it needs first, regardless of approach.** Bounding volumes, which frustum culling introduces, and a populated depth buffer ahead of the draws being culled, which the pre-pass produces. Both are prerequisites that fall out of planned work rather than costs of this item.
+
+**Worth stating plainly.** Occlusion culling is the one optimisation here that can lose outright: every rejected object saves a draw, every survivor pays the test, and a scene whose geometry is mostly visible pays all of the cost for none of the benefit. It earns a place when a scene has real occluders — interiors, terrain, dense urban geometry — and not before.
+
 ### Specular antialiasing
 
 Specular highlights shimmer under motion. Measured on the helmet model over a rotation sweep of 0.35 degrees per step: peak per-pixel change of 219 of 255 between adjacent steps, with bloom disabled.
@@ -111,6 +127,74 @@ Light intensities are authored numbers, not physical units. `LightDirectional` h
 ### Camera registration by name
 
 `CameraManager` keys its map by `std::string` and asserts rather than storing a null. `GetViewProjectionMatrix` and `GetCameraPosition` dereference `activeCamera` unguarded. No state registers a second camera beyond the manager's own default, so the F9 free-camera toggle is a no-op outside it. No longer crashes; not urgent.
+
+### Point and spot lights
+
+`LightManager` holds only `LightDirectional`, and `FrameUniforms` carries exactly one of those, so the shader has never seen a second light of any kind.
+
+Adding the light types is the smaller half. The larger one is how many lights a frame can afford: a per-frame light list, and the culling that decides which lights reach which geometry. Forward with a fixed light count, tiled or clustered light culling, and deferred shading are all open, and the choice changes the shape of the frame rather than only the shader.
+
+### Image-based lighting and environment maps
+
+The ambient term is a flat colour times an intensity, commented in `pbr.glsl` as a simplified IBL approximation.
+
+A physically based material with no environment to reflect never resolves — metal in particular has almost nothing else to show. Wants a skybox, a prefiltered environment map for specular, an irradiance representation for diffuse, and a BRDF lookup. Cubemap texture shape is supported in both backends and nothing above the abstraction creates one. Needs a decision on where the environment comes from: captured in engine, authored as an HDR image, or generated from a sky model.
+
+### Reflection probes and screen-space reflections
+
+Local reflections, as distinct from one distant environment. Probes capture the scene to a cubemap per location and need render-to-cubemap plus a placement and blending story. Screen-space reflections trace the depth buffer, cost nothing to author, and reflect only what is on screen.
+
+The two are complementary rather than alternatives, and production renderers usually carry both. SSR additionally needs scene depth in the post-process stack, which is its own item above. Neither is started.
+
+### Screen-space ambient occlusion
+
+Materials sample a baked `occlusionTex`. Nothing computes occlusion from the scene, so contact darkening exists only where an artist baked it into a single model, never between two objects that meet.
+
+Needs scene depth, which is a separate item above, and scene normals, which would be a new target.
+
+### Volumetric fog and atmospheric scattering
+
+Light shafts, haze, and distance fog that interacts with lights rather than being a flat colour blend. Gated on the same scene-depth availability as the effects above, and on shadows, since shafts are shadow information made visible.
+
+### Skeletal animation and skinning
+
+The glTF loader reads no `JOINTS` or `WEIGHTS` attributes and no animation data, and both vertex layouts are position, uv, normal and optionally tangent. Characters and anything else articulated are unreachable.
+
+The largest item recorded here. It touches the loader, the vertex layouts, a skeleton and pose representation, a joint matrix upload per draw, and an animation player — and any depth or shadow pass must skin identically to the shading pass, or a skinned object's shadow will not match it.
+
+### Static mesh instancing
+
+Drawing many copies of one mesh from one submission. `DrawIndexed` already takes an instance count; `VertexAttribute` has no divisor, so per-instance data cannot be described — the same gap the planned particle system carries.
+
+Foliage, props and crowds are where a scene's object count turns into draw calls, and this is what stops that. Open: whether per-instance data lives in a vertex buffer with a divisor, or in a storage buffer indexed by instance id.
+
+### Level of detail
+
+No mesh has alternates and nothing selects between them, so a distant object costs its full vertex load. Builds on the per-object bounds that planned frustum culling introduces; projected screen size is the usual selector.
+
+Open: whether levels are authored per mesh, generated at import, or both, and whether transitions pop or dither.
+
+### Decals
+
+Projecting a texture onto existing geometry — bullet holes, cracks, painted markings, wear. Deferred decals project through the depth buffer; forward decals re-draw or modify the receiving surface. Neither exists, and which is available depends on decisions the shading path has not made.
+
+### Compressed textures
+
+`TextureFormat` declares Bc1, Bc3, Bc7, Astc4x4 and Astc8x8. Nothing produces any of them: `Texture.cpp` decodes through stb_image to `Rgba8Srgb` or `Rgba8Unorm`, four channels, and generates mips at runtime.
+
+An uncompressed texture set costs several times the memory and bandwidth of a compressed one, and the two targets want different families — BC on desktop, ASTC on Android. As much an asset-pipeline item as a rendering one, and it meets the question of whether textures ship packaged or loose.
+
+### Motion vectors
+
+A per-pixel screen-space velocity buffer, produced by keeping each object's previous-frame transform and writing the difference. Nothing computes or stores one.
+
+It is the missing input for temporal antialiasing — discussed as an approach under specular antialiasing above — and for motion blur. Recorded on its own because the buffer is the prerequisite both share, and because it constrains frame structure: the previous frame's transforms have to survive into the current one.
+
+### Explicit pass sequencing
+
+Passes cannot nest, and the frame's sequence is fixed across `StartFrame` and `Render`. Every new pass negotiates its own position — the planned shadow work already has to move where the scene pass opens.
+
+A render graph, or any explicit declaration of passes and their resource dependencies, makes that a description rather than an edit to the frame. Not pressing while the pass count is small. The cost of its absence grows with each pass added, and probes, ambient occlusion, volumetrics and shadows are all passes.
 
 ---
 
