@@ -1,6 +1,6 @@
 # XR Plan
 
-**Status:** M1 landed and verified. M2, M3 and M4 are written and build. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its world-space panel drawing. Everything downstream of a live session is unverified pending a connected headset.
+**Status:** M1 landed and verified. M2 and M3 are written and build. M4 is mostly complete: the demo state, ray, grab and world-space panel are in, and the panel path is verified flat. M5 is designed and not started. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its panel drawing. Everything downstream of a live session is unverified pending a connected headset.
 **Current state:** AGD-0070 (Rendering Pipeline), AGD-0080 (Graphics API Abstraction), AGD-0030 (Platform Layer) and AGD-0110 (Input System) describe the seams this work plugs into. None of them cover XR.
 **Scope:** PCVR on the desktop target — Valve Index through SteamVR, Meta Quest 2 over Link and Air Link, both through the GL 4.3 backend. Quest standalone over GLES is not in plan and is not covered here.
 
@@ -31,6 +31,8 @@ The Android shell already drives `CoreMain::TickFrame` from a foreign loop. XR u
 
 - `XrManager::Init()` succeeds — `XrRunLoop(coreMain, appMain)`.
 - Otherwise — `coreMain->Run(appMain)`, the existing flat desktop path.
+
+**Chosen once, at startup, which sessions starting and stopping at runtime makes untenable.** The two collapse into a single adaptive loop that uses XR pacing while a session is live and platform pacing otherwise.
 
 `XrRunLoop` per iteration:
 
@@ -182,7 +184,11 @@ Nothing yet consumes any of it. The first two criteria need the demo state, so t
 
 ## M4 — Interaction demo
 
+**Mostly complete.** What remains of it is the input-ownership question M5 answers, not the interaction work itself.
+
 `AppStateXrDemo` under `Code/App/AppStates/`, registered in `AppMain::Init` with one line. Follows the showcase state's shape: camera install, scene init, action context, UI screen, interaction mode.
+
+**Superseded in one respect.** This milestone assumed the world-space panel is the only UI and that the state can simply declare `InteractionMode::World` to get it. That is wrong on the desktop: World mode makes `IsUiInteractable()` false, so the on-screen menu becomes unclickable, while `CameraFree` turns the same click into a cursor lock. One line produces both faults. M5 replaces the assumption — the desktop mode is derived from whether a session is live, not asserted by the state.
 
 ### Ray pointer and grab
 
@@ -201,7 +207,7 @@ UI, text and the developer overlay draw to the default framebuffer with no rende
 - **Pointer input.** `UiInputHandler` reads the platform mouse directly. It gains a pointer state — position, pressed, active — fed by the mouse by default and by an XR pointer in the headset. Hit testing already works in panel-space pixels, so the XR side only intersects the aim ray with the panel plane and converts the hit to pixels.
 - **The developer overlay stays on the desktop mirror only.** Out of scope in-headset.
 
-**Done when:** the demo state boots directly as the initial state, objects can be picked up and released with either controller, and a world-space UI panel responds to the controller ray.
+**Done when:** the demo state boots directly as the initial state, objects can be picked up and released with either controller, and a world-space UI panel responds to the controller ray. Nothing here waits on M5; the two are independent except that M5 removes the interaction-mode line this state currently sets.
 
 **Written, partly verified.** `AppStateXrDemo` is registered and boots directly. Verified flat, with no headset: the scene builds, the panel target is created, the screen renders into it, and the quad in the scene samples it — the whole panel path works without a session, and the state reports itself inactive rather than failing. Unverified: hands, ray, grab, pointer and haptics, all of which are gated on a live session.
 
@@ -214,6 +220,61 @@ UI, text and the developer overlay draw to the default framebuffer with no rende
 **The panel is one frame behind.** It renders during the state's Update, because the scene samples it and the scene draws before the frame's UI pass. At headset refresh this is not perceptible; moving it would mean reordering `CoreMain::TickFrame`.
 
 **Noted, not fixed.** `Vector3`'s arithmetic operators are not const-qualified, so a `const Vector3&` cannot take part in one. The demo copies before use. Worth fixing in the maths header, but not as part of this work.
+
+---
+
+## M5 — Session lifecycle and desktop mode
+
+Who owns input, and when. Every fix in the milestones above worked around the absence of an answer: the pointer override that implies UI focus, the panel surface, the state asserting `InteractionMode::World`. This states it once.
+
+### The desktop is neither, while XR has input
+
+`InteractionMode`, `IsUiInteractable` and `IsWorldInteractable` stay desktop concepts. They gain a third state, in which both queries answer false, because a session that owns input leaves the desktop driving nothing.
+
+| XR session | Paused | Desktop input | Desktop shows | Headset |
+| --- | --- | --- | --- | --- |
+| active | no | inert | eye mirror plus a "Tracking VR" HUD element | live, tracking |
+| active | yes | Ui, cursor shown | eye mirror plus the pause menu | live, tracking, world frozen |
+| inactive | no | the state's own Ui or World | the application as it is without XR | — |
+| inactive | yes | Ui, cursor shown | the pause menu | — |
+
+The desktop mode is **derived** from those two facts rather than stored beside them. A state that sets its own mode unconditionally is what produced the fault M4 records.
+
+Pause never stops XR. The headset keeps rendering and tracking while the desktop becomes interactive, and the mirror stays — it is the only way to see what the headset sees without wearing it.
+
+### Pause stops the world, never the camera
+
+`SceneHierarchy::SetEnabled(false)` already gates world update, and camera update runs from the rendering frontend independently of it, so the behaviour needs no new machinery.
+
+**This rule is load-bearing and outlives this milestone.** A frozen scene that still tracks the head is comfortable; a scene that stops tracking while the head moves is the standard way to make someone ill. Anything added later that pauses, including a head-following menu, keeps camera update running.
+
+**Pause is bound to the secondary face button**, either hand — B on the right controller, Y on the left Touch, B on both Index controllers. It matches the platform convention where the second face button is back-or-menu and the first is confirm, and it leaves the first free for interaction. The menu button stays unbound and reserved for the runtime's own dashboard.
+
+### Sessions start and stop at runtime
+
+The largest piece of work, and a restructure rather than an addition.
+
+- **The instance outlives the session.** Setup currently runs instance, system, session, swapchains and input in one call. Detecting XR without entering it means splitting the instance and system from everything a session owns.
+- **Sessions are created and destroyed repeatedly.** Swapchains, eye targets and eye cameras are session-owned and rebuilt each time.
+- **One adaptive loop.** The entry point currently chooses the XR loop or the flat loop once, at startup, which runtime toggling makes untenable. A single loop uses XR frame pacing while a session is live and platform pacing otherwise. The loop already ticks frames either way, so the decision moves inside it rather than a second loop appearing.
+
+**Verify before designing around it:** action sets are created on the instance but attached per session, and attachment is irreversible for that session. Whether one action set may be attached to a succession of sessions, or must be recreated for each, decides whether the action set is instance-lifetime or session-lifetime.
+
+**Ending a session hands the display back to the runtime**, which then shows its own home environment. What appears in the headset after Exit XR is not ours to choose; the alternative is holding the session open on a blank layer, which keeps the whole XR path alive to display nothing.
+
+### Entering and leaving XR
+
+- **On boot, enter XR if a session is available.** No chooser at launch.
+- **The choice lives in the pause menu**, as a submenu beside Options. Reached by pausing and navigating in, or later by booting straight to the menu with that submenu already selected.
+- **This is the affordance that must work from any state.** A launch-time chooser would conflict with booting directly into any AppState; a pause-menu entry does not, because every state can pause.
+
+The existing screens carry the pattern already: the pause menu routes a button to a separately registered Options screen through `UiScreenSystem`, and its controller takes a callback per button. The XR submenu is one more screen, one more button, one more callback.
+
+### Not in this milestone
+
+A pause menu inside the headset. Until it exists, pausing while wearing the headset shows the menu on the desktop only, so acting on it means taking the headset off. The head-following popup comes later and inherits the camera-update rule above.
+
+**Done when:** the application boots into XR when a headset is present and into the ordinary desktop path when it is not; pause shows the desktop menu with a working cursor from either mode without interrupting the headset; and XR can be left and re-entered from the pause menu repeatedly, with the desktop returning to normal interaction each time it is left.
 
 ---
 

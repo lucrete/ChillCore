@@ -84,9 +84,11 @@ namespace CC
         delete(uiRenderer);
         delete(textRenderer);
         delete(fontManager);
+
+        // Order matters: renderables free GPU buffers in their destructors.
+        delete(sceneHierarchy);
         delete(renderManager);
         delete(devUi);
-        delete(sceneHierarchy);
         delete(audioManager);
         delete(frameTimer);
         delete(printManager);

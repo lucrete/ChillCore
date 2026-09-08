@@ -18,7 +18,7 @@ Rendering leads. The whole rendering block runs ahead of every other workstream,
 | 10 | Persistence and lifecycle hooks | Persistence | `PersistencePlan.md` | Makes the Android context-loss cold-restart honest. Foundation for settings and save games — build once with both consumers in mind. |
 | 11 | Automated testing | Build pipeline | `BuildPipelinePlan.md` | `RunTests.sh` beside `Build.sh` / `Run.sh`. First tests: engine starts, loads a scene, shuts down clean. |
 | 12 | Packaged distribution | Build pipeline | `BuildPipelinePlan.md` | Archive of the self-contained output directory, labelled builds only. Cheapest once the output dir stands alone. |
-| 13 | OpenXR support, PCVR | XR | `XrPlan.md` | Four milestones ending in an in-headset interaction demo. Index through SteamVR, Quest 2 over Link. Its first milestone is engine work with no XR dependency: per-camera projection, a render view loop, and a native graphics-binding accessor. |
+| 13 | OpenXR support, PCVR | XR | `XrPlan.md` | Five milestones. Index through SteamVR, Quest 2 over Link. The first is engine work with no XR dependency: per-camera projection, a render view loop, and a native graphics-binding accessor. The last states who owns input between the headset and the desktop, and makes sessions startable and stoppable at runtime. |
 
 ## Sequencing notes
 
