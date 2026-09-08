@@ -41,10 +41,23 @@ namespace CC
 
         const TrackedPose& GetHandPose(XrHand hand, XrPoseKind kind) const;
         void  GetThumbstick(XrHand hand, float& outX, float& outY) const;
+
+        // Actions only carry input while the session is focused. Visible but
+        // unfocused still locates poses, so hands and rays keep working while
+        // every button and axis reads zero — which looks exactly like a
+        // binding that never arrived.
+        bool IsFocused() const { return isFocused; }
         float GetTriggerValue(XrHand hand) const;
         float GetSqueezeValue(XrHand hand) const;
 
         void TriggerHaptic(XrHand hand, float amplitude, float durationSeconds);
+
+        // Logs which interaction profile the runtime actually bound per hand,
+        // and whether each action came back bound. A profile the runtime
+        // declined leaves poses working through the simple controller while
+        // squeeze and thumbstick silently do not exist, which is otherwise
+        // indistinguishable from an action that is bound but never pressed.
+        void LogActiveProfile();
 
     private:
         static const int HAND_COUNT = (int)XrHand::Max;
@@ -60,6 +73,8 @@ namespace CC
 
         XrInstance instance;
         XrSession  session;
+
+        bool isFocused = false;
 
         XrActionSet actionSet;
         XrPath      handPath[HAND_COUNT];

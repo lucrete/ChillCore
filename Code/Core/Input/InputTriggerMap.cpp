@@ -23,6 +23,7 @@ namespace CC
         memset(gamepadTriggersCurrent, 0, sizeof(gamepadTriggersCurrent));
         memset(xrTriggersCurrent, 0, sizeof(xrTriggersCurrent));
         memset(xrTriggersPending, 0, sizeof(xrTriggersPending));
+        memset(keyboardTriggersPrevious, 0, sizeof(keyboardTriggersPrevious));
         memset(triggersPrevious, 0, sizeof(triggersPrevious));
 
         // Dev keyboard bindings
@@ -126,6 +127,8 @@ namespace CC
         for (int i = 0; i < InputTrigger::TriggerMax; i++)
         {
             triggersPrevious[i] = triggersCurrent[i];
+
+            keyboardTriggersPrevious[i] = keyboardTriggersCurrent[i];
 
             bool suppressKeyboard = devUiCapturingKeyboard && i >= InputTrigger::DevKeysMax;
             keyboardTriggersCurrent[i] = suppressKeyboard ? false : EvaluateKeyboardTrigger(i);
@@ -268,22 +271,50 @@ namespace CC
         return allPressed;
     }
 
+    bool InputTriggerMap::IsDeveloperTrigger(int trigger)
+    {
+        return trigger < InputTrigger::DevKeysMax
+            || (trigger >= InputTrigger::DevArrowUp && trigger <= InputTrigger::DevEscape);
+    }
+
     bool InputTriggerMap::IsTriggered(int trigger)
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
-        return triggersCurrent[trigger];
+
+        bool result = triggersCurrent[trigger];
+        if (IsDeveloperTrigger(trigger))
+        {
+            result = result || keyboardTriggersCurrent[trigger];
+        }
+        return result;
     }
 
     bool InputTriggerMap::EdgePositive(int trigger)
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
-        return triggersCurrent[trigger] && !triggersPrevious[trigger];
+
+        bool current = triggersCurrent[trigger];
+        bool previous = triggersPrevious[trigger];
+        if (IsDeveloperTrigger(trigger))
+        {
+            current = current || keyboardTriggersCurrent[trigger];
+            previous = previous || keyboardTriggersPrevious[trigger];
+        }
+        return current && !previous;
     }
 
     bool InputTriggerMap::EdgeNegative(int trigger)
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
-        return !triggersCurrent[trigger] && triggersPrevious[trigger];
+
+        bool current = triggersCurrent[trigger];
+        bool previous = triggersPrevious[trigger];
+        if (IsDeveloperTrigger(trigger))
+        {
+            current = current || keyboardTriggersCurrent[trigger];
+            previous = previous || keyboardTriggersPrevious[trigger];
+        }
+        return !current && previous;
     }
 
     bool InputTriggerMap::IsKeyboardKeyPressed(KeyCode::Key key)

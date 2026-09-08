@@ -135,9 +135,9 @@ namespace CC
     {
         if (rootElement)
         {
-            // Check for window resize
+            // Check for surface resize against whichever surface is in use.
             int width, height;
-            RenderManager::Get()->GetWindowSize(width, height);
+            GetSurfaceSize(width, height);
             if (width != lastScreenWidth || height != lastScreenHeight)
             {
                 lastScreenWidth = width;
@@ -154,18 +154,60 @@ namespace CC
         }
     }
 
-    void UiManager::Render()
+    void UiManager::GetSurfaceSize(int& outWidth, int& outHeight) const
     {
-        int width = 0;
-        int height = 0;
-        RenderManager::Get()->GetWindowSize(width, height);
-        RenderScreen(width, height);
+        if (hasPanelSurface)
+        {
+            outWidth = panelSurfaceWidth;
+            outHeight = panelSurfaceHeight;
+        }
+        else
+        {
+            RenderManager::Get()->GetWindowSize(outWidth, outHeight);
+        }
     }
 
-    void UiManager::RenderToTarget(Gfx::RenderTargetHandle target, int width, int height)
+    void UiManager::SetPanelSurface(int width, int height)
     {
-        if (rootElement != nullptr && target.IsValid())
+        panelSurfaceWidth = width;
+        panelSurfaceHeight = height;
+        hasPanelSurface = true;
+
+        // Taken up now rather than at the next Update: the panel is drawn
+        // earlier in the frame than the update that would otherwise notice.
+        lastScreenWidth = width;
+        lastScreenHeight = height;
+        isLayoutDirty = true;
+    }
+
+    void UiManager::ClearPanelSurface()
+    {
+        hasPanelSurface = false;
+        RenderManager::Get()->GetWindowSize(lastScreenWidth, lastScreenHeight);
+        isLayoutDirty = true;
+    }
+
+    void UiManager::Render()
+    {
+        // On a panel the screen is already drawn, and drawing it again over
+        // the window would lay the same tree out at a second size. Whichever
+        // ran last is what the next frame's hit test meets.
+        if (!hasPanelSurface)
         {
+            int width = 0;
+            int height = 0;
+            RenderManager::Get()->GetWindowSize(width, height);
+            RenderScreen(width, height);
+        }
+    }
+
+    void UiManager::RenderToTarget(Gfx::RenderTargetHandle target)
+    {
+        if (rootElement != nullptr && target.IsValid() && hasPanelSurface)
+        {
+            const int width = panelSurfaceWidth;
+            const int height = panelSurfaceHeight;
+
             Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
 
             gfxApi->BeginRenderPass(target, "UiPanel");
@@ -174,18 +216,20 @@ namespace CC
             // Text carries its own projection, set for the window by the
             // frame start. The panel needs its own, and the window's has to
             // come back before anything else in the frame draws text.
+            // RenderScreen flushes the text batch itself. Flushing again
+            // here would redraw every batch, because EndFrame draws what is
+            // queued and only BeginFrame clears it.
             TextRenderer::Get()->BeginFrame(width, height);
             RenderScreen(width, height);
-            TextRenderer::Get()->EndFrame();
 
             gfxApi->EndRenderPass();
 
+            // Anything drawing text later in the frame — the developer
+            // overlay on the mirror — expects the window's projection back.
             int windowWidth = 0;
             int windowHeight = 0;
             RenderManager::Get()->GetWindowSize(windowWidth, windowHeight);
             TextRenderer::Get()->BeginFrame(windowWidth, windowHeight);
-
-            isLayoutDirty = true;
         }
     }
 

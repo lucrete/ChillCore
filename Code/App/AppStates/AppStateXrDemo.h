@@ -103,6 +103,13 @@ private:
     // What the readout last said. Rewriting the same string every frame
     // dirties layout every frame for no change.
     std::string lastReadout;
+    float lastReadoutTime;
+
+    // Which grade preset the panel button last applied. An index because the
+    // presets are loaded from a file and their names are not known here.
+    int gradePresetIndex;
+
+    static constexpr float READOUT_INTERVAL_SECONDS = 0.25f;
 
     void InitControls();
     void SceneInit();
@@ -121,7 +128,14 @@ private:
     bool IntersectPanel(const CC::TrackedPose& aimPose, float& outPixelX, float& outPixelY) const;
 
     void RecentreGrabbables();
+    void ApplyNextGradePreset();
     void UpdateReadout();
+
+    // Distance from the nearest tracked grip to the nearest sphere. Reported
+    // on the panel so a grab that never fires can be told apart from a hand
+    // that was never close enough.
+    float NearestGrabbableDistance() const;
+    bool IsReadoutDue();
 };
 
 #endif // APPSTATEXRDEMO_H

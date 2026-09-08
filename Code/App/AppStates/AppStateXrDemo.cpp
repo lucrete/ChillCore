@@ -1,11 +1,16 @@
 #include "AppStateXrDemo.h"
 
+#include <stdio.h>
+
 #include "CameraManager.h"
 #include "CoreMain.h"
+#include "FrameTimer.h"
 #include "GfxRenderApi.h"
 #include "InputManager.h"
+#include "Material.h"
 #include "MaterialManager.h"
 #include "PrintManager.h"
+#include "PostProcess.h"
 #include "RenderManager.h"
 #include "RenderableCube.h"
 #include "RenderableQuad.h"
@@ -65,6 +70,8 @@ void XrPanelController::SetReadout(const std::string& text)
 AppStateXrDemo::AppStateXrDemo()
     : panelObject(nullptr)
     , panelController(nullptr)
+    , lastReadoutTime(0.0f)
+    , gradePresetIndex(0)
     , panelPosition(PANEL_WORLD_POSITION)
     , isXrActive(false)
 {
@@ -108,7 +115,7 @@ void AppStateXrDemo::Init()
 
     CC::UiManager::Get()->RegisterButtonAction("xrRecentre", [this]() { RecentreGrabbables(); });
     CC::UiManager::Get()->RegisterButtonAction("xrExit", []() { CC::StateMachine::Get()->GotoState("Boot"); });
-    CC::UiManager::Get()->RegisterButtonAction("xrCyclePreset", []() {});
+    CC::UiManager::Get()->RegisterButtonAction("xrCyclePreset", [this]() { ApplyNextGradePreset(); });
 
     CreatePanelTarget();
 
@@ -150,6 +157,11 @@ void AppStateXrDemo::SceneInit()
     materials->CreateMaterial("XrGrabbable", "LitColour", "", CC::Vector3(0.9f, 0.5f, 0.2f));
     materials->CreateMaterial("XrPanelSurface", "TextureShader");
 
+    // The panel texture is mostly empty: only the card is opaque. Drawn
+    // without blending the whole quad is a black slab with the card on it.
+    CC::Material* panelMaterial = materials->GetMaterial("XrPanelSurface");
+    panelMaterial->SetAlphaMode(CC::AlphaBlendMode::Blend);
+
     for (int hand = 0; hand < HAND_COUNT; hand++)
     {
         handObject[hand] = new CC::SceneObject(hand == 0 ? "XrHandLeft" : "XrHandRight");
@@ -174,6 +186,16 @@ void AppStateXrDemo::SceneInit()
         grabbableObject[i]->GetTransform().SetPosition(grabbableHomePosition[i]);
         CC::SceneHierarchy::Get()->AddRootObject(grabbableObject[i]);
     }
+
+    // The procedural material is built in MaterialManager and referenced by
+    // name from the scene, so its parameters are set here rather than loaded.
+    // Left unset they are all zero and the surface renders black.
+    CC::Material* proceduralVeins = materials->GetMaterial("ProceduralVeins");
+    proceduralVeins->SetUniform("aspectRatio", 1.0f);
+    proceduralVeins->SetUniform("patternScale", 6.0f);
+    proceduralVeins->SetUniform("pulseSpeed", 0.8f);
+    proceduralVeins->SetUniform("veinSharpness", 7.0f);
+    proceduralVeins->SetUniform("glowColour", CC::Vector3(4.0f, 1.4f, 0.5f));
 
     panelObject = new CC::SceneObject("XrPanel");
     panelObject->AddComponent(new CC::RenderableQuad(materials->GetMaterial("XrPanelSurface")));
@@ -205,6 +227,7 @@ void AppStateXrDemo::SceneShutdown()
 void AppStateXrDemo::Shutdown()
 {
     CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
+    CC::UiManager::Get()->ClearPanelSurface();
     DestroyPanelTarget();
     SceneShutdown();
 }
@@ -232,6 +255,12 @@ void AppStateXrDemo::CreatePanelTarget()
     targetDesc.colorAttachments[0].texture = panelColorTexture;
     targetDesc.colorAttachments[0].loadOp  = CC::Gfx::LoadOp::Clear;
     targetDesc.colorAttachments[0].storeOp = CC::Gfx::StoreOp::Store;
+    // Transparent, not the attachment default of opaque black: everything the
+    // screen does not cover has to disappear rather than become a slab.
+    targetDesc.colorAttachments[0].clearColor[0] = 0.0f;
+    targetDesc.colorAttachments[0].clearColor[1] = 0.0f;
+    targetDesc.colorAttachments[0].clearColor[2] = 0.0f;
+    targetDesc.colorAttachments[0].clearColor[3] = 0.0f;
     targetDesc.hasDepthStencil             = false;
     targetDesc.sampleCount                 = 1;
     targetDesc.debugName                   = "AppStateXrDemo::PanelTarget";
@@ -262,7 +291,25 @@ void AppStateXrDemo::DestroyPanelTarget()
 
 void AppStateXrDemo::Update()
 {
+    // The runtime reports the session ready some frames after the state has
+    // initialised, so this is watched rather than sampled once at Init.
+    const bool wasXrActive = isXrActive;
     isXrActive = CC::XrManager::Get() != nullptr && CC::XrManager::Get()->IsSessionRunning();
+
+    if (isXrActive != wasXrActive)
+    {
+        if (isXrActive)
+        {
+            CC::UiManager::Get()->SetPanelSurface(PANEL_TEXTURE_WIDTH, PANEL_TEXTURE_HEIGHT);
+        }
+        else
+        {
+            CC::UiManager::Get()->ClearPanelSurface();
+            CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
+        }
+        CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateXrDemo: xr session %s",
+                isXrActive ? "started" : "ended");
+    }
 
     if (isXrActive)
     {
@@ -275,7 +322,7 @@ void AppStateXrDemo::Update()
     // texture the scene samples, and the scene draws before the frame's UI
     // pass. Its content is therefore one frame behind the pointer, which at
     // headset refresh is not perceptible.
-    CC::UiManager::Get()->RenderToTarget(panelTarget, PANEL_TEXTURE_WIDTH, PANEL_TEXTURE_HEIGHT);
+    CC::UiManager::Get()->RenderToTarget(panelTarget);
 }
 
 void AppStateXrDemo::UpdateHands()
@@ -486,30 +533,118 @@ void AppStateXrDemo::UpdatePanelPointer()
 
 void AppStateXrDemo::UpdateReadout()
 {
+    if (!IsReadoutDue())
+    {
+        return;
+    }
+
     std::string readout;
 
     if (!isXrActive)
     {
         readout = "No XR session - running flat";
     }
-    else if (heldObject[(int)CC::XrHand::Left] != nullptr
-          || heldObject[(int)CC::XrHand::Right] != nullptr)
-    {
-        readout = "Holding an object";
-    }
-    else if (wasHoveringPanel[(int)CC::XrHand::Left] || wasHoveringPanel[(int)CC::XrHand::Right])
-    {
-        readout = "Trigger to press";
-    }
     else
     {
-        readout = "Squeeze near a sphere to pick it up";
+        // Raw action values and the reach to the nearest sphere. In a headset
+        // this line is the only instrument available: a squeeze reading zero
+        // says the binding never arrived, while a squeeze that moves with a
+        // reach that never closes says the hands are somewhere else.
+        CC::XrManager* xr = CC::XrManager::Get();
+
+        const CC::TrackedPose& leftGrip = xr->GetHandPose(CC::XrHand::Left, CC::XrPoseKind::Grip);
+        const CC::TrackedPose& rightGrip = xr->GetHandPose(CC::XrHand::Right, CC::XrPoseKind::Grip);
+
+        float nearestReach = NearestGrabbableDistance();
+
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer),
+                 "%s  sq %.2f/%.2f  tr %.2f/%.2f  track %d%d  reach %.2f  held %d%d",
+                 xr->IsSessionFocused() ? "FOCUS" : "NO-FOCUS",
+                 xr->GetSqueezeValue(CC::XrHand::Left),
+                 xr->GetSqueezeValue(CC::XrHand::Right),
+                 xr->GetTriggerValue(CC::XrHand::Left),
+                 xr->GetTriggerValue(CC::XrHand::Right),
+                 leftGrip.isTracked ? 1 : 0,
+                 rightGrip.isTracked ? 1 : 0,
+                 nearestReach,
+                 heldObject[(int)CC::XrHand::Left] != nullptr ? 1 : 0,
+                 heldObject[(int)CC::XrHand::Right] != nullptr ? 1 : 0);
+        readout = buffer;
     }
 
     if (readout != lastReadout)
     {
         lastReadout = readout;
         panelController->SetReadout(readout);
+        CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "XrDemo: %s", readout.c_str());
+    }
+}
+
+bool AppStateXrDemo::IsReadoutDue()
+{
+    // Setting the text invalidates layout, so a readout rewritten every frame
+    // relays the panel out every frame and the buttons move under the ray.
+    bool isDue = false;
+
+    float now = CC::FrameTimer::Get()->TimeSinceStartup();
+    if (now - lastReadoutTime >= READOUT_INTERVAL_SECONDS)
+    {
+        lastReadoutTime = now;
+        isDue = true;
+    }
+
+    return isDue;
+}
+
+float AppStateXrDemo::NearestGrabbableDistance() const
+{
+    float nearest = 99.0f;
+
+    for (int hand = 0; hand < HAND_COUNT; hand++)
+    {
+        const CC::TrackedPose& gripPose =
+            CC::XrManager::Get()->GetHandPose((CC::XrHand)hand, CC::XrPoseKind::Grip);
+
+        if (gripPose.isTracked)
+        {
+            CC::Vector3 gripPosition = gripPose.position;
+
+            for (int i = 0; i < GRABBABLE_COUNT; i++)
+            {
+                if (grabbableObject[i] != nullptr)
+                {
+                    CC::Vector3 offset = grabbableObject[i]->GetWorldPosition() - gripPosition;
+                    float distance = offset.Magnitude();
+                    if (distance < nearest)
+                    {
+                        nearest = distance;
+                    }
+                }
+            }
+        }
+    }
+
+    return nearest;
+}
+
+void AppStateXrDemo::ApplyNextGradePreset()
+{
+    CC::PostProcess* postProcess = CC::RenderManager::Get()->GetPostProcess();
+    int presetCount = postProcess->GetPresetCount();
+
+    if (presetCount <= 0)
+    {
+        CCPrint(CC::PrintManager::CHANNEL_WARN, "AppStateXrDemo: no grade presets to cycle");
+    }
+    else
+    {
+        gradePresetIndex = (gradePresetIndex + 1) % presetCount;
+
+        const char* presetName = postProcess->GetPresetName(gradePresetIndex);
+        postProcess->ApplyPreset(presetName);
+
+        CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateXrDemo: grade preset '%s'", presetName);
     }
 }
 
@@ -527,5 +662,11 @@ void AppStateXrDemo::RecentreGrabbables()
     for (int hand = 0; hand < HAND_COUNT; hand++)
     {
         heldObject[hand] = nullptr;
+        if (isXrActive)
+        {
+            CC::XrManager::Get()->TriggerHaptic((CC::XrHand)hand, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);
+        }
     }
+
+    CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateXrDemo: grabbables recentred");
 }

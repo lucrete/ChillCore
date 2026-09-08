@@ -1,4 +1,5 @@
 #include "UiInputHandler.h"
+#include "UiManager.h"
 
 #include "UiElement.h"
 #include "UiSlider.h"
@@ -153,7 +154,11 @@ namespace CC
 
         // World-mode HUD overlays only accept joystick interactions.
         // Other elements (buttons, sliders, etc.) need full UI focus.
-        bool joystickOnly = !input->IsUiInteractable();
+        //
+        // An overridden pointer is the exception: it exists because something
+        // is deliberately pointing at a UI surface, which is UI focus by
+        // definition even while the mode is World for the scene around it.
+        bool joystickOnly = hasPointerOverride ? false : !input->IsUiInteractable();
         bool mouseJustPressed = isMouseDown && !wasMouseDown;
         bool mouseJustReleased = !isMouseDown && wasMouseDown;
 
@@ -513,7 +518,7 @@ namespace CC
     void UiInputHandler::UpdateSliderFromMouse(UiSlider* slider, float mouseX)
     {
         int screenWidth, screenHeight;
-        RenderManager::Get()->GetWindowSize(screenWidth, screenHeight);
+        UiManager::Get()->GetSurfaceSize(screenWidth, screenHeight);
         float scaleFactor = (float)screenHeight / 1080.0f;
 
         const UiRect& rect = slider->layoutRect;
@@ -639,7 +644,7 @@ namespace CC
     int UiInputHandler::HitTestDropdownOptions(UiDropdown* dropdown, float px, float py)
     {
         int screenWidth, screenHeight;
-        RenderManager::Get()->GetWindowSize(screenWidth, screenHeight);
+        UiManager::Get()->GetSurfaceSize(screenWidth, screenHeight);
         float scaleFactor = (float)screenHeight / 1080.0f;
 
         const UiRect& rect = dropdown->layoutRect;

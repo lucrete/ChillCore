@@ -44,6 +44,10 @@ namespace CC
 
         bool IsSessionRunning() const;
 
+        // Running is not the same as focused. Only a focused session delivers
+        // button and axis input; poses locate either way.
+        bool IsSessionFocused() const;
+
         // ========================
         // Tracked controllers
         // ========================

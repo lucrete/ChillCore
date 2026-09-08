@@ -367,9 +367,23 @@ namespace CC
         syncInfo.countActiveActionSets = 1;
         syncInfo.activeActionSets      = &activeActionSet;
 
-        // A session that is not focused gets no input. That is the runtime
-        // telling us a system menu is up, not an error.
-        if (XR_SUCCEEDED(xrSyncActions(session, &syncInfo)))
+        // XR_SESSION_NOT_FOCUSED is a success code, not a failure, so a bare
+        // XR_SUCCEEDED test walks straight past it and reads actions that the
+        // runtime has already said are inactive. Every value then reads zero
+        // for a reason nothing reports.
+        XrResult syncResult = xrSyncActions(session, &syncInfo);
+
+        const bool wasFocused = isFocused;
+        isFocused = syncResult == XR_SUCCESS;
+
+        if (isFocused != wasFocused)
+        {
+            CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR input: session %s (sync %d)",
+                    isFocused ? "focused, actions live" : "NOT FOCUSED, actions inactive",
+                    (int)syncResult);
+        }
+
+        if (isFocused)
         {
             for (int hand = 0; hand < HAND_COUNT; hand++)
             {
@@ -404,12 +418,16 @@ namespace CC
                 ReadPose(handEnum, XrPoseKind::Grip, baseSpace, predictedDisplayTime);
                 ReadPose(handEnum, XrPoseKind::Aim,  baseSpace, predictedDisplayTime);
 
-                // Moving a stick or a tracked hand counts as activity, so a
-                // player who only ever points still gets XR prompts.
+                // Only a deliberate input counts as activity. A tracked hand
+                // is not one: signalling on tracking alone pins the active
+                // input type to Xr for the life of the session, and the
+                // keyboard can then never win it back.
                 const bool isStickDeflected = (thumbstickX[hand] * thumbstickX[hand]
                                              + thumbstickY[hand] * thumbstickY[hand])
                                             > (THUMBSTICK_DEAD_ZONE * THUMBSTICK_DEAD_ZONE);
-                if (isStickDeflected || handPose[hand][(int)XrPoseKind::Aim].isTracked)
+                const bool isPulled = triggerValue[hand] >= BUTTON_PRESS_THRESHOLD
+                                   || squeezeValue[hand] >= BUTTON_PRESS_THRESHOLD;
+                if (isStickDeflected || isPulled)
                 {
                     InputManager::Get()->NotifyXrActivity();
                 }
@@ -541,6 +559,68 @@ namespace CC
     {
         CC_ASSERT(hand < XrHand::Max, "GetSqueezeValue: hand out of range");
         return squeezeValue[(int)hand];
+    }
+
+    void XrInput::LogActiveProfile()
+    {
+        for (int hand = 0; hand < HAND_COUNT; hand++)
+        {
+            const char* handName = (hand == (int)XrHand::Left) ? "left" : "right";
+
+            XrInteractionProfileState profileState = { XR_TYPE_INTERACTION_PROFILE_STATE };
+            if (XR_SUCCEEDED(xrGetCurrentInteractionProfile(session, handPath[hand], &profileState)))
+            {
+                char pathText[XR_MAX_PATH_LENGTH] = {};
+                uint32_t pathLength = 0;
+
+                if (profileState.interactionProfile == XR_NULL_PATH)
+                {
+                    CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR input: %s hand has no profile", handName);
+                }
+                else if (XR_SUCCEEDED(xrPathToString(instance, profileState.interactionProfile,
+                                                     sizeof(pathText), &pathLength, pathText)))
+                {
+                    CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR input: %s hand profile %s", handName, pathText);
+                }
+            }
+
+            // isActive is the runtime saying this action resolved to a real
+            // control on the bound profile.
+            struct NamedAction { XrAction action; const char* name; };
+            const NamedAction actions[] =
+            {
+                { triggerAction,         "trigger" },
+                { squeezeAction,         "squeeze" },
+                { thumbstickClickAction, "thumbstickClick" },
+                { primaryClickAction,    "primary" },
+                { secondaryClickAction,  "secondary" },
+                { menuClickAction,       "menu" },
+            };
+
+            for (int i = 0; i < (int)(sizeof(actions) / sizeof(actions[0])); i++)
+            {
+                XrActionStateGetInfo getInfo = { XR_TYPE_ACTION_STATE_GET_INFO };
+                getInfo.action        = actions[i].action;
+                getInfo.subactionPath = handPath[hand];
+
+                bool isActive = false;
+                if (actions[i].action == triggerAction || actions[i].action == squeezeAction)
+                {
+                    XrActionStateFloat actionState = { XR_TYPE_ACTION_STATE_FLOAT };
+                    isActive = XR_SUCCEEDED(xrGetActionStateFloat(session, &getInfo, &actionState))
+                            && actionState.isActive;
+                }
+                else
+                {
+                    XrActionStateBoolean actionState = { XR_TYPE_ACTION_STATE_BOOLEAN };
+                    isActive = XR_SUCCEEDED(xrGetActionStateBoolean(session, &getInfo, &actionState))
+                            && actionState.isActive;
+                }
+
+                CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR input: %s %s %s",
+                        handName, actions[i].name, isActive ? "bound" : "UNBOUND");
+            }
+        }
     }
 
     void XrInput::TriggerHaptic(XrHand hand, float amplitude, float durationSeconds)

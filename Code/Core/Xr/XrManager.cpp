@@ -13,6 +13,7 @@
 #include "CCAssert.h"
 #include "FrameTimer.h"
 #include "XrInput.h"
+#include "CameraManager.h"
 #include "CameraXrEye.h"
 #include "CoreMain.h"
 #include "AppMainInterface.h"
@@ -56,6 +57,10 @@ namespace CC
         // partway through.
         bool   isFrameBegun      = false;
         int    acquiredEyeCount  = 0;
+
+        // Actions report inactive until the runtime has bound a profile, so
+        // what they resolved to is worth reporting once, after the first sync.
+        bool   hasLoggedProfile  = false;
 
         XrView                     views[MAX_EYE_VIEWS] = {};
         XrCompositionLayerProjectionView projectionViews[MAX_EYE_VIEWS] = {};
@@ -173,6 +178,13 @@ namespace CC
             state = nullptr;
         }
 
+        // The manager may still hold one of these as its active camera, and
+        // deleting it there would leave a dangling pointer behind.
+        if (CameraManager::Get() != nullptr)
+        {
+            CameraManager::Get()->SetActiveCamera("CameraFree");
+        }
+
         for (int i = 0; i < MAX_EYE_VIEWS; i++)
         {
             delete eyeCameras[i];
@@ -186,6 +198,11 @@ namespace CC
     bool XrManager::IsSessionRunning() const
     {
         return isSessionRunning;
+    }
+
+    bool XrManager::IsSessionFocused() const
+    {
+        return state != nullptr && state->input.IsFocused();
     }
 
     int XrManager::GetViewCount() const
@@ -539,21 +556,31 @@ namespace CC
         {
             PollEvents();
 
-            // Between session start and stop the runtime owns the pacing. The
-            // window still needs its events pumped either way, or the OS
-            // marks the application unresponsive.
+            // The frame is ticked either way. A session that has not started,
+            // or has stopped because the headset was set down, otherwise
+            // leaves the window frozen with no input running — and the only
+            // way out of a frozen window is the task manager.
+            //
+            // Without a frame to render into, the views go back to the
+            // built-in one and the frame draws flat to the window.
             if (isSessionRunning)
             {
                 if (BeginXrFrame())
                 {
                     PublishRenderViews();
-                    coreMain->TickFrame(appMain);
                 }
+                else
+                {
+                    RenderManager::Get()->ClearRenderViews();
+                }
+
+                coreMain->TickFrame(appMain);
                 EndXrFrame();
             }
             else
             {
-                PlatformWindow::Get()->PollEvents();
+                RenderManager::Get()->ClearRenderViews();
+                coreMain->TickFrame(appMain);
             }
         }
     }
@@ -569,6 +596,21 @@ namespace CC
                 const XrEventDataSessionStateChanged& changed =
                     *(const XrEventDataSessionStateChanged*)&event;
                 state->sessionState = changed.state;
+
+                const char* stateName = "?";
+                switch (changed.state)
+                {
+                case XR_SESSION_STATE_IDLE:         stateName = "IDLE";         break;
+                case XR_SESSION_STATE_READY:        stateName = "READY";        break;
+                case XR_SESSION_STATE_SYNCHRONIZED: stateName = "SYNCHRONIZED"; break;
+                case XR_SESSION_STATE_VISIBLE:      stateName = "VISIBLE";      break;
+                case XR_SESSION_STATE_FOCUSED:      stateName = "FOCUSED";      break;
+                case XR_SESSION_STATE_STOPPING:     stateName = "STOPPING";     break;
+                case XR_SESSION_STATE_EXITING:      stateName = "EXITING";      break;
+                case XR_SESSION_STATE_LOSS_PENDING: stateName = "LOSS_PENDING"; break;
+                default: break;
+                }
+                CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR: session state %s", stateName);
 
                 if (changed.state == XR_SESSION_STATE_READY)
                 {
@@ -663,6 +705,12 @@ namespace CC
         if (isReady)
         {
             state->input.SyncActions(state->space, state->predictedDisplayTime);
+
+            if (!state->hasLoggedProfile)
+            {
+                state->hasLoggedProfile = true;
+                state->input.LogActiveProfile();
+            }
         }
 
         // Acquiring is what hands the frame its target, so it comes last: a

@@ -144,6 +144,9 @@ namespace CC
         bool gamepadTriggersCurrent[InputTrigger::TriggerMax];
         bool xrTriggersCurrent[InputTrigger::TriggerMax];
         bool xrTriggersPending[InputTrigger::TriggerMax];
+        // Kept alongside the shared previous-state array so a developer key
+        // still resolves an edge while another device owns the active set.
+        bool keyboardTriggersPrevious[InputTrigger::TriggerMax];
         bool* triggersCurrent;
         bool triggersPrevious[InputTrigger::TriggerMax];
 
@@ -162,6 +165,13 @@ namespace CC
         bool EvaluateGamepadTrigger(int trigger);
 
         bool DetectMouseActivity();
+
+        // Developer keys are the escape hatch, and are read from the keyboard
+        // whatever device is active. A headset session that has taken over
+        // input is exactly when releasing the mouse or leaving fullscreen
+        // from the keyboard matters, and it is the one case where the player
+        // cannot see the screen to find another way out.
+        static bool IsDeveloperTrigger(int trigger);
     };
 }
 

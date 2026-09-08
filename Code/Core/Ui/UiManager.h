@@ -34,13 +34,26 @@ namespace CC
         void Update();
         void Render();
 
-        // Draws the active screen into an offscreen target at that target's
-        // own size rather than over the window, so it can be sampled as a
-        // texture. This is how a screen becomes a panel in world space.
-        //
-        // Layout is cached against one surface size, so this marks it dirty
-        // on the way out and the window pass recomputes its own.
-        void RenderToTarget(Gfx::RenderTargetHandle target, int width, int height);
+        // Moves the screen off the window and onto a panel of this size.
+        // Layout, hit testing and drawing then all happen against the panel,
+        // and the window pass draws nothing — a pointer supplied in panel
+        // pixels has to meet element rects laid out in the same space, and
+        // laying out twice per frame at two sizes leaves them disagreeing.
+        void SetPanelSurface(int width, int height);
+        void ClearPanelSurface();
+        bool HasPanelSurface() const { return hasPanelSurface; }
+
+        // The surface the screen is currently laid out and drawn against —
+        // the panel where one is set, the window otherwise. Everything that
+        // scales against the surface must read it from here: layout, text
+        // sizing and hit testing disagree the moment two of them ask
+        // different sources.
+        void GetSurfaceSize(int& outWidth, int& outHeight) const;
+
+        // Draws the active screen into an offscreen target at the panel size,
+        // so it can be sampled as a texture. Does nothing until a panel
+        // surface is set.
+        void RenderToTarget(Gfx::RenderTargetHandle target);
 
         UiElement* GetElementById(const std::string& id) const;
 
@@ -66,6 +79,10 @@ namespace CC
 
         UiElement* rootElement = nullptr;
         bool isLayoutDirty = true;
+
+        int  panelSurfaceWidth = 0;
+        int  panelSurfaceHeight = 0;
+        bool hasPanelSurface = false;
 
         int lastScreenWidth = 0;
         int lastScreenHeight = 0;
