@@ -19,6 +19,9 @@
 #include "StateMachine.h"
 #include "UiManager.h"
 #include "UiElement.h"
+#include "OptionsController.h"
+#include "ShowcaseHudController.h"
+#include "PauseMenuController.h"
 #include "UiScreenSystem.h"
 #include "XrManager.h"
 
@@ -74,6 +77,8 @@ AppStateXrDemo::AppStateXrDemo()
     , gradePresetIndex(0)
     , panelPosition(PANEL_WORLD_POSITION)
     , isXrActive(false)
+    , isPaused(false)
+    , pendingTogglePause(false)
 {
     for (int hand = 0; hand < HAND_COUNT; hand++)
     {
@@ -111,7 +116,17 @@ void AppStateXrDemo::Init()
     panelController = new XrPanelController();
     CC::UiScreenSystem::Get()->RegisterScreen("XrPanel", "Data/Ui/XrPanel.html", "Data/Ui/XrPanel.css",
                                               panelController);
-    CC::UiScreenSystem::Get()->SetScreen("XrPanel");
+    CC::UiScreenSystem::Get()->RegisterScreen("PauseMenu", "Data/Ui/PauseMenu.html", "Data/Ui/PauseMenu.css",
+        new PauseMenuController(
+            [this]() { pendingTogglePause = true; },
+            []() { CC::StateMachine::Get()->GotoState("Boot"); },
+            []() { CC::CoreMain::Get()->RequestQuit(); }));
+    CC::UiScreenSystem::Get()->RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css",
+        new OptionsController());
+    CC::UiScreenSystem::Get()->RegisterScreen("Hud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
+        new ShowcaseHudController([this]() { pendingTogglePause = true; }));
+
+    ShowSceneScreen();
 
     CC::UiManager::Get()->RegisterButtonAction("xrRecentre", [this]() { RecentreGrabbables(); });
     CC::UiManager::Get()->RegisterButtonAction("xrExit", []() { CC::StateMachine::Get()->GotoState("Boot"); });
@@ -126,6 +141,7 @@ void AppStateXrDemo::Init()
     panelUp     = CC::Vector3(0.0f, 1.0f, 0.0f);
 
     CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
+    CC::InputManager::Get()->SetPaused(false);
 
     CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateXrDemo::Init() (xr %s)",
             isXrActive ? "active" : "inactive");
@@ -142,7 +158,12 @@ void AppStateXrDemo::InitControls()
     actionMap.RegisterAction(CC::ActionDef(GrabSecondary,   "GrabSecondary",   CC::InputTrigger::XrSqueezeRight));
     actionMap.RegisterAction(CC::ActionDef(Select,          "Select",          CC::InputTrigger::XrTriggerLeft));
     actionMap.RegisterAction(CC::ActionDef(SelectSecondary, "SelectSecondary", CC::InputTrigger::XrTriggerRight));
-    actionMap.RegisterAction(CC::ActionDef(OpenPanel,       "OpenPanel",       CC::InputTrigger::XrMenu));
+    // Escape on the keyboard, Start on a gamepad, and the secondary face
+    // button on either controller. The XR menu button stays unbound and
+    // reserved for the runtime's own dashboard.
+    actionMap.RegisterAction(CC::ActionDef(Pause,        "Pause",        CC::InputTrigger::GamepadStart));
+    actionMap.RegisterAction(CC::ActionDef(PauseXrLeft,  "PauseXrLeft",  CC::InputTrigger::XrSecondaryLeft));
+    actionMap.RegisterAction(CC::ActionDef(PauseXrRight, "PauseXrRight", CC::InputTrigger::XrSecondaryRight));
 
     actionMap.SetContext("AppStateXrDemo");
 }
@@ -298,25 +319,25 @@ void AppStateXrDemo::Update()
 
     if (isXrActive != wasXrActive)
     {
-        if (isXrActive)
+        if (!isPaused)
         {
-            CC::UiManager::Get()->SetPanelSurface(PANEL_TEXTURE_WIDTH, PANEL_TEXTURE_HEIGHT);
-        }
-        else
-        {
-            CC::UiManager::Get()->ClearPanelSurface();
-            CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
+            ShowSceneScreen();
         }
         CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateXrDemo: xr session %s",
                 isXrActive ? "started" : "ended");
     }
 
-    if (isXrActive)
+    UpdatePauseInput();
+
+    // Hands and the world-space pointer stop with the world. The eye views
+    // do not: they are published outside this call, so the headset keeps
+    // tracking while the scene stands still.
+    if (isXrActive && !isPaused)
     {
         UpdateHands();
         UpdatePanelPointer();
+        UpdateReadout();
     }
-    UpdateReadout();
 
     // Runs here rather than with the rest of the UI because the panel is a
     // texture the scene samples, and the scene draws before the frame's UI
@@ -529,6 +550,53 @@ void AppStateXrDemo::UpdatePanelPointer()
     }
 
     CC::UiManager::Get()->GetInputHandler().SetPointerOverride(pointer);
+}
+
+void AppStateXrDemo::UpdatePauseInput()
+{
+    CC::InputManager* input = CC::InputManager::Get();
+
+    bool isPausePressed = input->EdgePositive(Pause)
+                       || input->EdgePositive(PauseXrLeft)
+                       || input->EdgePositive(PauseXrRight);
+
+    if (isPausePressed || pendingTogglePause)
+    {
+        pendingTogglePause = false;
+        TogglePause();
+    }
+}
+
+void AppStateXrDemo::TogglePause()
+{
+    isPaused = !isPaused;
+
+    // The world stops; the camera does not. A scene that stops tracking the
+    // head while the head moves is what makes people ill.
+    CC::SceneHierarchy::Get()->SetEnabled(!isPaused);
+    CC::InputManager::Get()->SetPaused(isPaused);
+
+    if (isPaused)
+    {
+        // The pointer belongs to the mouse again while the menu is up.
+        CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
+        CC::UiManager::Get()->ClearPanelSurface();
+        CC::UiScreenSystem::Get()->SetScreen("PauseMenu");
+        CC::InputManager::Get()->LockMouseCursor(false);
+    }
+    else
+    {
+        ShowSceneScreen();
+    }
+}
+
+void AppStateXrDemo::ShowSceneScreen()
+{
+    // The HUD is the window's screen either way. It carries the tracking
+    // label, which shows itself once a session owns input.
+    CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
+    CC::UiManager::Get()->ClearPanelSurface();
+    CC::UiScreenSystem::Get()->SetScreen("Hud");
 }
 
 void AppStateXrDemo::UpdateReadout()

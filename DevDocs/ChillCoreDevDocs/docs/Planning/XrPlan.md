@@ -1,6 +1,6 @@
 # XR Plan
 
-**Status:** M1 landed and verified. M2 and M3 are written and build. M4 is mostly complete: the demo state, ray, grab and world-space panel are in, and the panel path is verified flat. M5 is designed and not started. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its panel drawing. Everything downstream of a live session is unverified pending a connected headset.
+**Status:** M1 landed and verified. M2 and M3 are written and build. M4 is mostly complete: the demo state, ray, grab and world-space panel are in, and the panel path is verified flat. M5 is written and builds; the flat path and clean shutdown are verified, and everything needing a live session is not. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its panel drawing. Everything downstream of a live session is unverified pending a connected headset.
 **Current state:** AGD-0070 (Rendering Pipeline), AGD-0080 (Graphics API Abstraction), AGD-0030 (Platform Layer) and AGD-0110 (Input System) describe the seams this work plugs into. None of them cover XR.
 **Scope:** PCVR on the desktop target — Valve Index through SteamVR, Meta Quest 2 over Link and Air Link, both through the GL 4.3 backend. Quest standalone over GLES is not in plan and is not covered here.
 
@@ -275,6 +275,21 @@ The existing screens carry the pattern already: the pause menu routes a button t
 A pause menu inside the headset. Until it exists, pausing while wearing the headset shows the menu on the desktop only, so acting on it means taking the headset off. The head-following popup comes later and inherits the camera-update rule above.
 
 **Done when:** the application boots into XR when a headset is present and into the ordinary desktop path when it is not; pause shows the desktop menu with a working cursor from either mode without interrupting the headset; and XR can be left and re-entered from the pause menu repeatedly, with the desktop returning to normal interaction each time it is left.
+
+**Written, partly verified.**
+
+- `InteractionMode` gains `None`, and the effective mode is derived by `InputManager` from a state's preference plus two pushed facts — whether XR owns input and whether the app is paused. Paused outranks XR, so the menu is always reachable. `IsHudInteractable` answers false in `None` too, or the HUD would keep taking input the desktop no longer owns.
+- `XrManager::Init` now creates only the instance and system. `StartSession` and `EndSession` build and tear down the session, swapchains, eye targets, cameras and action set, and are driven by requests taken up between frames so nothing is destroyed under an open pass. The action set is recreated per session rather than reattached, which is correct whichever way the spec question falls.
+- One loop drives every frame whether or not a session is live, and `StartSession` retries detection, so a headset connected after launch can still be entered.
+- The runtime asking to exit now ends the session and returns to the desktop instead of quitting the application.
+- Pause is on Escape, gamepad Start, and the secondary face button of either controller. It stops `SceneHierarchy` and leaves the cameras running.
+- The XR submenu is registered in `AppMain::Init` rather than per state, because it carries no per-state callbacks and has to reach any state that can pause. The pause menu routes to it exactly as it routes to Options, so no state wiring changed.
+
+**Verified:** builds clean; boots flat with no headset and drives the frame through the adaptive loop; exits with code 0 on a window close. **Unverified:** everything needing a live session — entering and leaving XR, the paused-in-XR desktop mode, and the controller pause binding.
+
+**One HUD, not two.** The window's screen is the application HUD in every unpaused case, and it carries a tracking label that shows itself whenever the effective mode is `None`. Nothing new was added to the screen system: a second HUD, and an API for showing no screen at all, were both written and then removed once the shared HUD covered the case.
+
+**Costs the world-space panel for now.** `UiManager` holds one active screen tree, so the HUD on the window and the panel in the headset compete for it. With the HUD taking the slot, the panel surface is off and M4's in-headset panel does not render. Restoring both needs a second, independent UI tree — one laid out and drawn for the window, one for the panel — which is what would also let the pause menu appear on the desktop while the panel stays up in the headset. That belongs with M4.
 
 ---
 

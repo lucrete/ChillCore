@@ -9,7 +9,10 @@ namespace CC
     enum class InteractionMode
     {
         Ui,
-        World
+        World,
+        // Nothing on the desktop is interactive. What the mouse would drive
+        // is being driven from somewhere else, currently an XR session.
+        None
     };
 
     class InputManager
@@ -82,7 +85,19 @@ namespace CC
         // Input routing
         // ========================
 
+        // The state's preference. What the desktop actually gets is derived
+        // from it along with the two facts below, so a state cannot assert a
+        // mode that contradicts them.
         void SetInteractionMode(InteractionMode mode);
+        InteractionMode GetEffectiveInteractionMode() const;
+
+        // An XR session takes the desktop out of the loop while it is
+        // running, except when paused, which is when the desktop menu is the
+        // only way to act.
+        void SetXrOwnsInput(bool doesXrOwnInput);
+        void SetPaused(bool isPaused);
+        bool IsPaused() const { return isPaused; }
+
         bool IsUiInteractable() const;
         bool IsHudInteractable() const;
         bool IsWorldInteractable() const;
@@ -117,6 +132,8 @@ namespace CC
         bool joystickOverrideSet[STICK_MAX];
 
         InteractionMode interactionMode = InteractionMode::World;
+        bool doesXrOwnInput = false;
+        bool isPaused = false;
         bool isInputBlocked = false;
 
         void UpdateMouseAsAnalogStick();

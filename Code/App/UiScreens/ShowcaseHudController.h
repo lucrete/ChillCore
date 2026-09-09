@@ -21,7 +21,9 @@ private:
     std::function<void()> onPauseCallback;
     CC::UiElement* moveStick = nullptr;
     CC::UiElement* lookStick = nullptr;
+    CC::UiElement* trackingLabel = nullptr;
     bool joysticksVisible = false;
+    bool isTrackingLabelVisible = false;
 };
 
 #endif // SHOWCASEHUDCONTROLLER_H

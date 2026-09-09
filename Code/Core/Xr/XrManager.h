@@ -28,12 +28,28 @@ namespace CC
 
         static XrManager* Get();
 
-        // Creates the instance, system and session. False where no runtime is
-        // installed or the system is unavailable, which is the ordinary case
-        // on a machine with no headset and is not an error: the caller falls
-        // back to the flat desktop path.
+        // Creates the instance and finds the system. False where no runtime
+        // is installed or no headset is present, which is ordinary and not an
+        // error. No session is started; the instance outlives every session.
         bool Init();
         void Shutdown();
+
+        // A session owns the swapchains, eye targets, eye cameras and action
+        // set, so each one builds and tears down all of them. Both are safe
+        // to call when already in that state.
+        // Whether a runtime and headset were found. False until Init has
+        // succeeded, which StartSession retries so a headset connected after
+        // launch can still be entered.
+        bool IsAvailable() const;
+
+        bool StartSession();
+        void EndSession();
+        bool IsSessionActive() const;
+
+        // Requests taken up between frames. Starting or ending a session
+        // mid-frame would pull targets out from under an open render pass.
+        void RequestStartSession();
+        void RequestEndSession();
 
         // Drives frames until the runtime asks the session to end or the
         // application requests a quit. Replaces CoreMain::Run.
@@ -75,8 +91,11 @@ namespace CC
         CameraXrEye* eyeCameras[MAX_EYE_VIEWS];
         int          viewCount;
 
+        bool isSessionActive;
         bool isSessionRunning;
         bool isExitRequested;
+        bool isStartRequested;
+        bool isEndRequested;
 
         // ========================
         // Frame
@@ -98,6 +117,7 @@ namespace CC
         // ========================
 
         bool CreateInstanceAndSystem();
+        void ApplyPendingSessionRequests();
         bool CreateSession();
         bool CreateReferenceSpace();
         bool CreateSwapchains();

@@ -19,6 +19,10 @@ void PauseMenuController::Init()
     {
         CC::UiScreenSystem::Get()->TransitionForward("Options");
     });
+    uiManager->RegisterButtonAction("xrMode", []()
+    {
+        CC::UiScreenSystem::Get()->TransitionForward("XrMode");
+    });
     uiManager->RegisterButtonAction("backToMenu", onBackToMenuCallback);
     uiManager->RegisterButtonAction("quit", onQuitCallback);
 }

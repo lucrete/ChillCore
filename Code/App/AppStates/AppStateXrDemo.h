@@ -53,7 +53,9 @@ private:
         GrabSecondary,
         Select,
         SelectSecondary,
-        OpenPanel,
+        Pause,
+        PauseXrLeft,
+        PauseXrRight,
         XrDemoActionMax
     };
 
@@ -98,6 +100,8 @@ private:
     CC::Vector3             panelUp;
 
     bool isXrActive;
+    bool isPaused;
+    bool pendingTogglePause;
     XrPanelController* panelController;
 
     // What the readout last said. Rewriting the same string every frame
@@ -130,6 +134,9 @@ private:
     void RecentreGrabbables();
     void ApplyNextGradePreset();
     void UpdateReadout();
+    void TogglePause();
+    void ShowSceneScreen();
+    void UpdatePauseInput();
 
     // Distance from the nearest tracked grip to the nearest sphere. Reported
     // on the panel so a grab that never fires can be told apart from a hand

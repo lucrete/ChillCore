@@ -62,3 +62,12 @@
     background-image: circle256;
     opacity: 0.85;
 }
+
+/* Shown only while a session owns input, when the window is a mirror of what
+   the headset sees and nothing here can be operated. */
+.hud-tracking {
+    padding: 8 16;
+    font-size: 20;
+    color: rgba(140, 220, 255, 0.9);
+    background-color: rgba(0, 0, 0, 0.45);
+}

@@ -14,29 +14,24 @@ int main(void)
     coreMain->Init();
 
     // Before AppMain, so a state's Init can see whether XR exists at all.
-    // The session is still not running at that point — the runtime only
-    // reports ready some frames into the loop — so a state that cares has to
-    // watch for it rather than sample it once.
+    // Init only creates the instance; no session runs until one is started.
 #ifdef CC_ENABLE_XR
     CC::XrManager* xrManager = new CC::XrManager();
-    bool isXrReady = xrManager->Init();
+    bool isXrAvailable = xrManager->Init();
 #endif
 
     AppMain* appMain = new AppMain();
     appMain->Init();
 
-    // An XR runtime takes over frame pacing, so it drives TickFrame itself
-    // rather than going through Run. Absent one — no headset, no runtime
-    // installed — Init fails and the flat desktop loop runs unchanged.
+    // With a headset present the application boots into it. The loop runs
+    // whether or not a session is live, so it drives the frame either way and
+    // XR can be entered later even when none was found at launch.
 #ifdef CC_ENABLE_XR
-    if (isXrReady)
+    if (isXrAvailable)
     {
-        xrManager->RunFrameLoop(coreMain, appMain);
+        xrManager->StartSession();
     }
-    else
-    {
-        coreMain->Run(appMain);
-    }
+    xrManager->RunFrameLoop(coreMain, appMain);
     delete(xrManager);
 #else
     coreMain->Run(appMain);

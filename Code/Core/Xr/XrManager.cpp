@@ -18,6 +18,7 @@
 #include "CoreMain.h"
 #include "AppMainInterface.h"
 #include "GfxRenderApi.h"
+#include "InputManager.h"
 #include "PlatformWindow.h"
 #include "PrintManager.h"
 #include "RenderManager.h"
@@ -117,8 +118,11 @@ namespace CC
     XrManager::XrManager()
         : state(nullptr)
         , viewCount(0)
+        , isSessionActive(false)
         , isSessionRunning(false)
         , isExitRequested(false)
+        , isStartRequested(false)
+        , isEndRequested(false)
     {
         CC_ASSERT(instance == nullptr, "XrManager already created");
         instance = this;
@@ -145,11 +149,7 @@ namespace CC
         CC_ASSERT(state == nullptr, "XrManager::Init called twice");
         state = new XrState();
 
-        bool isReady = CreateInstanceAndSystem()
-                    && CreateSession()
-                    && CreateReferenceSpace()
-                    && CreateSwapchains()
-                    && CreateInput();
+        bool isReady = CreateInstanceAndSystem();
 
         if (!isReady)
         {
@@ -159,27 +159,76 @@ namespace CC
         return isReady;
     }
 
-    void XrManager::Shutdown()
+    bool XrManager::IsAvailable() const
+    {
+        return state != nullptr;
+    }
+
+    bool XrManager::StartSession()
+    {
+        bool isReady = isSessionActive;
+
+        // A headset connected after launch leaves no instance behind, so the
+        // detection is retried rather than failing for the life of the run.
+        if (!isReady && state == nullptr)
+        {
+            Init();
+        }
+
+        if (!isReady && state != nullptr)
+        {
+            isReady = CreateSession()
+                   && CreateReferenceSpace()
+                   && CreateSwapchains()
+                   && CreateInput();
+
+            if (isReady)
+            {
+                isSessionActive = true;
+                CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR: session started");
+            }
+            else
+            {
+                EndSession();
+            }
+        }
+
+        return isReady;
+    }
+
+    void XrManager::EndSession()
     {
         if (state != nullptr)
         {
+            // The manager may still hold an eye camera as the active one, and
+            // the frame's views name targets that are about to go.
+            RenderManager::Get()->ClearRenderViews();
+            InputManager::Get()->SetXrOwnsInput(false);
+
             if (state->hasFirstDisplayTime)
             {
                 FrameTimer::Get()->ClearExternalFrameTime();
+                state->hasFirstDisplayTime = false;
             }
+
             state->input.Shutdown();
             DestroySwapchains();
 
-            if (state->space != XR_NULL_HANDLE)   { xrDestroySpace(state->space); }
-            if (state->session != XR_NULL_HANDLE) { xrDestroySession(state->session); }
-            if (state->instance != XR_NULL_HANDLE) { xrDestroyInstance(state->instance); }
+            if (state->space != XR_NULL_HANDLE)
+            {
+                xrDestroySpace(state->space);
+                state->space = XR_NULL_HANDLE;
+            }
+            if (state->session != XR_NULL_HANDLE)
+            {
+                xrDestroySession(state->session);
+                state->session = XR_NULL_HANDLE;
+            }
 
-            delete state;
-            state = nullptr;
+            state->sessionState = XR_SESSION_STATE_UNKNOWN;
+            state->hasLoggedProfile = false;
         }
 
-        // The manager may still hold one of these as its active camera, and
-        // deleting it there would leave a dangling pointer behind.
         if (CameraManager::Get() != nullptr)
         {
             CameraManager::Get()->SetActiveCamera("CameraFree");
@@ -191,8 +240,62 @@ namespace CC
             eyeCameras[i] = nullptr;
         }
 
+        if (isSessionActive)
+        {
+            CCPrint(PrintManager::CHANNEL_RENDER, "OpenXR: session ended");
+        }
+
+        isSessionActive = false;
         isSessionRunning = false;
         viewCount = 0;
+    }
+
+    bool XrManager::IsSessionActive() const
+    {
+        return isSessionActive;
+    }
+
+    void XrManager::RequestStartSession()
+    {
+        isStartRequested = true;
+        isEndRequested = false;
+    }
+
+    void XrManager::RequestEndSession()
+    {
+        isEndRequested = true;
+        isStartRequested = false;
+    }
+
+    void XrManager::ApplyPendingSessionRequests()
+    {
+        if (isEndRequested)
+        {
+            isEndRequested = false;
+            EndSession();
+        }
+
+        if (isStartRequested)
+        {
+            isStartRequested = false;
+            StartSession();
+        }
+    }
+
+    void XrManager::Shutdown()
+    {
+        EndSession();
+
+        if (state != nullptr)
+        {
+            if (state->instance != XR_NULL_HANDLE)
+            {
+                xrDestroyInstance(state->instance);
+            }
+
+            delete state;
+            state = nullptr;
+        }
     }
 
     bool XrManager::IsSessionRunning() const
@@ -202,7 +305,7 @@ namespace CC
 
     bool XrManager::IsSessionFocused() const
     {
-        return state != nullptr && state->input.IsFocused();
+        return isSessionActive && state != nullptr && state->input.IsFocused();
     }
 
     int XrManager::GetViewCount() const
@@ -554,15 +657,22 @@ namespace CC
 
         while (!isExitRequested && !coreMain->IsQuitRequested())
         {
-            PollEvents();
+            // Between frames, where no render pass is open and no view names
+            // a target that is about to be destroyed.
+            ApplyPendingSessionRequests();
+
+            if (isSessionActive)
+            {
+                PollEvents();
+            }
+
+            // The desktop drives nothing while a session has input, except
+            // when paused, which is the only way back out of one.
+            InputManager::Get()->SetXrOwnsInput(isSessionRunning);
 
             // The frame is ticked either way. A session that has not started,
             // or has stopped because the headset was set down, otherwise
-            // leaves the window frozen with no input running — and the only
-            // way out of a frozen window is the task manager.
-            //
-            // Without a frame to render into, the views go back to the
-            // built-in one and the frame draws flat to the window.
+            // leaves the window frozen with no input running.
             if (isSessionRunning)
             {
                 if (BeginXrFrame())
@@ -629,8 +739,11 @@ namespace CC
                 else if (changed.state == XR_SESSION_STATE_EXITING
                       || changed.state == XR_SESSION_STATE_LOSS_PENDING)
                 {
+                    // The runtime is asking for the session to go, not the
+                    // application. Leaving XR returns to the desktop, from
+                    // where it can be entered again.
                     isSessionRunning = false;
-                    isExitRequested  = true;
+                    RequestEndSession();
                 }
             }
             else if (event.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)

@@ -16,6 +16,12 @@ void ShowcaseHudController::Init()
 
     moveStick = ui->GetElementById("moveStick");
     lookStick = ui->GetElementById("lookStick");
+    trackingLabel = ui->GetElementById("trackingXr");
+
+    if (trackingLabel != nullptr)
+    {
+        trackingLabel->SetVisible(false);
+    }
 
     ui->RegisterButtonAction("pause", onPauseCallback);
 
@@ -57,6 +63,20 @@ void ShowcaseHudController::Init()
 void ShowcaseHudController::OnUpdate()
 {
     CC::InputManager* input = CC::InputManager::Get();
+
+    // The window is a mirror whenever something other than the desktop owns
+    // input, which today means a running XR session.
+    bool isMirroring = input->GetEffectiveInteractionMode() == CC::InteractionMode::None;
+    if (isMirroring != isTrackingLabelVisible)
+    {
+        if (trackingLabel != nullptr)
+        {
+            trackingLabel->SetVisible(isMirroring);
+        }
+        CC::UiManager::Get()->InvalidateLayout();
+        isTrackingLabelVisible = isMirroring;
+    }
+
     bool isTouchActive = input->GetActiveInputType() == CC::ActiveInputType::Touch;
 
     if (isTouchActive != joysticksVisible)

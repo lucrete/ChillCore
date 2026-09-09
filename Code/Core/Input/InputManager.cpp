@@ -330,21 +330,50 @@ namespace CC
         interactionMode = mode;
     }
 
+    void InputManager::SetXrOwnsInput(bool _doesXrOwnInput)
+    {
+        doesXrOwnInput = _doesXrOwnInput;
+    }
+
+    void InputManager::SetPaused(bool _isPaused)
+    {
+        isPaused = _isPaused;
+    }
+
+    InteractionMode InputManager::GetEffectiveInteractionMode() const
+    {
+        // Paused outranks everything: the menu is the only way to act, and in
+        // XR it is the only way back out.
+        InteractionMode result = interactionMode;
+        if (isPaused)
+        {
+            result = InteractionMode::Ui;
+        }
+        else if (doesXrOwnInput)
+        {
+            result = InteractionMode::None;
+        }
+        return result;
+    }
+
     bool InputManager::IsUiInteractable() const
     {
-        bool result = !isInputBlocked && !DevUi::Get()->IsHovered() && interactionMode == InteractionMode::Ui;
+        bool result = !isInputBlocked && !DevUi::Get()->IsHovered()
+                   && GetEffectiveInteractionMode() == InteractionMode::Ui;
         return result;
     }
 
     bool InputManager::IsHudInteractable() const
     {
-        bool result = !isInputBlocked && !DevUi::Get()->IsHovered();
+        bool result = !isInputBlocked && !DevUi::Get()->IsHovered()
+                   && GetEffectiveInteractionMode() != InteractionMode::None;
         return result;
     }
 
     bool InputManager::IsWorldInteractable() const
     {
-        bool result = !isInputBlocked && !DevUi::Get()->IsHovered() && interactionMode == InteractionMode::World;
+        bool result = !isInputBlocked && !DevUi::Get()->IsHovered()
+                   && GetEffectiveInteractionMode() == InteractionMode::World;
         return result;
     }
 
