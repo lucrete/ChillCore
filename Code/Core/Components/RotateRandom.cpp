@@ -51,7 +51,6 @@ namespace CC
 // ========================
 // Factory Registration
 // ========================
-
 static CC::Component* CreateRotateRandom(ryml::ConstNodeRef componentData)
 {
     return new CC::RotateRandom();

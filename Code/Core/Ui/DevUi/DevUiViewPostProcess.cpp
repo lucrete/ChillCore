@@ -100,7 +100,6 @@ namespace CC
     // ========================
     // Private
     // ========================
-
     // Saving writes the whole preset file, not just the new look: the file is
     // the engine's source of presets, so the panel and the file cannot drift.
     void DevUiViewPostProcess::DrawPresetSaving()

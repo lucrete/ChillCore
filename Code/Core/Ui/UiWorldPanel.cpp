@@ -91,7 +91,6 @@ namespace CC
     // ========================
     // Plane
     // ========================
-
     void UiWorldPanel::RebuildPlane()
     {
         Mat4x4 worldMatrix;
@@ -121,7 +120,6 @@ namespace CC
     // ========================
     // UiPointerTarget
     // ========================
-
     bool UiWorldPanel::IntersectPointerRay(const Vector3& origin, const Vector3& direction,
                                            float maxDistance, float& outDistance) const
     {
@@ -229,7 +227,6 @@ namespace CC
 // ========================
 // Scene file registration
 // ========================
-
 static CC::Component* CreateUiWorldPanel(ryml::ConstNodeRef componentData)
 {
     std::string surfaceName = "UiWorldPanel";

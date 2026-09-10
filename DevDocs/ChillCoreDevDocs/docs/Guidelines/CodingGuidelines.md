@@ -33,6 +33,7 @@ These are guidelines, not rules, where if followed will result in an easier to u
     // Section
     // ========================
 ~~~
+* Do not leave a blank line between a comment header block and the line it heads. The header belongs to what follows it, and the blank line above the header is what separates it from the previous section.
 
 ## Casing terminology
 * camelCase: no spaces, capitalize first letter only of each word except the first word. Including acronyms. Variables, function parameters.

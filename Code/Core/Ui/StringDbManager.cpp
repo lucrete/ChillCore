@@ -35,7 +35,6 @@ namespace CC
     // ========================
     // Language management
     // ========================
-
     bool StringDbManager::LoadLanguage(const std::string& languageId, const std::string& filePath)
     {
         bool isSuccess = false;
@@ -125,7 +124,6 @@ namespace CC
     // ========================
     // String queries
     // ========================
-
     const std::string& StringDbManager::GetString(const std::string& stringId) const
     {
         const std::string* result = &MISSING_STRING;
@@ -160,7 +158,6 @@ namespace CC
     // ========================
     // Listener registration
     // ========================
-
     void StringDbManager::RegisterListener(IStringDbListener* listener)
     {
         listeners.push_back(listener);

@@ -32,7 +32,6 @@ namespace CC
     // ========================
     // Measure Pass (bottom-up)
     // ========================
-
     void UiLayoutEngine::MeasurePass(UiElement* element, float parentWidth, float parentHeight)
     {
         const UiStyleProperties& style = element->computedStyle;
@@ -193,7 +192,6 @@ namespace CC
     // ========================
     // Arrange Pass (top-down)
     // ========================
-
     void UiLayoutEngine::ArrangePass(UiElement* element, float parentX, float parentY,
         float parentWidth, float parentHeight)
     {
@@ -244,7 +242,6 @@ namespace CC
         // ========================
         // Flex layout for flow children
         // ========================
-
         bool isRow = (style.flexDirection == FlexDirection::Row);
         float mainAxisSize = isRow ? contentWidth : contentHeight;
         float crossAxisSize = isRow ? contentHeight : contentWidth;
@@ -404,7 +401,6 @@ namespace CC
         // ========================
         // Absolute-positioned children
         // ========================
-
         for (UiElement* child : absoluteChildren)
         {
             const UiStyleProperties& childStyle = child->computedStyle;
@@ -447,7 +443,6 @@ namespace CC
     // ========================
     // Cache invalidation
     // ========================
-
     void UiLayoutEngine::InvalidateTextCaches(UiElement* element)
     {
         element->cachedTextHeight = -1.0f;
@@ -461,7 +456,6 @@ namespace CC
     // ========================
     // Dimension resolution
     // ========================
-
     float UiLayoutEngine::ResolveWidth(UiElement* element, float parentWidth)
     {
         const UiDimension& dim = element->computedStyle.width;

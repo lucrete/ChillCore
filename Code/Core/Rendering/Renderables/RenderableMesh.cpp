@@ -102,7 +102,6 @@ namespace CC
 // ========================
 // Factory Registration
 // ========================
-
 static bool HasGltfExtension(const std::string& path)
 {
     std::string ext = CCFile::GetExtension(path);

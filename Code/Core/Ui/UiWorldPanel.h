@@ -48,7 +48,6 @@ namespace CC
         // ========================
         // UiPointerTarget
         // ========================
-
         virtual bool IntersectPointerRay(const Vector3& origin, const Vector3& direction,
                                          float maxDistance, float& outDistance) const override;
         virtual void OnPointerHit(int pointerId, const Vector3& origin, const Vector3& direction,

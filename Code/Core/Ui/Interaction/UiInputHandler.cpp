@@ -111,7 +111,6 @@ namespace CC
     // ========================
     // Per-frame
     // ========================
-
     void UiInputHandler::Update()
     {
         if (rootElement != nullptr && callbackMap != nullptr)
@@ -396,7 +395,6 @@ namespace CC
     // ========================
     // Keyboard/gamepad navigation
     // ========================
-
     void UiInputHandler::UpdateNavigation()
     {
         if (navigationList.empty())

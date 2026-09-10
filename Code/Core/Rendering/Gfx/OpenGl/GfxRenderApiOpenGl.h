@@ -124,7 +124,6 @@ namespace CC::Gfx
         // ========================
         // Internal pool entries
         // ========================
-
         struct GlBuffer
         {
             GLuint       glHandle      = 0;
@@ -224,7 +223,6 @@ namespace CC::Gfx
         // ========================
         // State tracking
         // ========================
-
         PipelineHandle        currentPipeline;
 
         GLenum                currentIndexType = 0x1405;  // GL_UNSIGNED_INT default
@@ -281,7 +279,6 @@ namespace CC::Gfx
         // ========================
         // Helpers
         // ========================
-
         void QueryCapabilities();
     };
 }

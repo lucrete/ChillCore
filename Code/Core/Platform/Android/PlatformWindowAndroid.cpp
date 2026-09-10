@@ -44,7 +44,6 @@ namespace CC
     // ========================
     // PlatformWindowAndroid
     // ========================
-
     PlatformWindowAndroid::PlatformWindowAndroid()
     {
     }

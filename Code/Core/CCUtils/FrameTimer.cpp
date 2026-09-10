@@ -170,7 +170,6 @@ namespace CC
     // ========================
     // Profile Data
     // ========================
-
     // A scope name is either a plain phase name or a "Group/Detail" pair. The
     // profiler shows the group, so several passes read as one phase, while
     // capture tools keep the full name and its per-pass detail.
@@ -319,7 +318,6 @@ namespace CC
     // ========================
     // Capture
     // ========================
-
     void FrameTimer::StartCapture(float durationSeconds)
     {
         captureFrameCount = 0;
@@ -412,7 +410,6 @@ namespace CC
     // ========================
     // Profile Accessors
     // ========================
-
     int FrameTimer::GetProfileWriteIndex() const
     {
         return profileWriteIndex;

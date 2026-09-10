@@ -58,7 +58,6 @@ namespace CC
     // ========================
     // Setup
     // ========================
-
     bool XrInput::Init(XrInstance _instance, XrSession _session)
     {
         instance = _instance;
@@ -356,7 +355,6 @@ namespace CC
     // ========================
     // Frame
     // ========================
-
     void XrInput::SyncActions(XrSpace baseSpace, XrTime predictedDisplayTime)
     {
         XrActiveActionSet activeActionSet;
@@ -521,7 +519,6 @@ namespace CC
     // ========================
     // Queries
     // ========================
-
     const TrackedPose& XrInput::GetHandPose(XrHand hand, XrPoseKind kind) const
     {
         CC_ASSERT(hand < XrHand::Max && kind < XrPoseKind::Max, "GetHandPose: out of range");

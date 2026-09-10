@@ -19,7 +19,6 @@ namespace CC
         // ========================
         // Helpers
         // ========================
-
         static std::string NodeToString(ryml::ConstNodeRef node)
         {
             std::string result;
@@ -209,7 +208,6 @@ namespace CC
         // ========================
         // Public API
         // ========================
-
         std::string GetDefaultProjectPath()
         {
             return TrackerPaths::GetProjectsPath() + "/song.cctrack";

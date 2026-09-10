@@ -58,7 +58,6 @@ namespace CC
     // ========================
     // Screen building
     // ========================
-
     UiElement* UiManager::BuildScreen(const std::string& htmlPath, const std::string& cssPath,
                                       std::vector<UiCssRule>& outCssRules)
     {
@@ -91,7 +90,6 @@ namespace CC
     // ========================
     // Surfaces
     // ========================
-
     UiSurface* UiManager::CreateSurface(const std::string& name, int width, int height)
     {
         UiSurface* surface = new UiSurface(name, UiSurfaceKind::Offscreen, width, height);
@@ -121,7 +119,6 @@ namespace CC
     // ========================
     // Per-frame
     // ========================
-
     void UiManager::UpdateScreens()
     {
         for (UiSurface* surface : surfaces)

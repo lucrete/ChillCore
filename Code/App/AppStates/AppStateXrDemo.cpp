@@ -102,7 +102,6 @@ AppStateXrDemo::~AppStateXrDemo()
 // ========================
 // Lifecycle
 // ========================
-
 void AppStateXrDemo::Init()
 {
     // Absent a session the state still runs, flat, so the scene and the panel
@@ -254,7 +253,6 @@ void AppStateXrDemo::Shutdown()
 // ========================
 // Frame
 // ========================
-
 void AppStateXrDemo::Update()
 {
     // The runtime reports the session ready some frames after the state has
@@ -403,7 +401,6 @@ void AppStateXrDemo::UpdateGrab(CC::XrHand hand, const CC::TrackedPose& gripPose
 // ========================
 // Panel pointer
 // ========================
-
 void AppStateXrDemo::SubmitPanelPointer(CC::XrHand hand, const CC::TrackedPose& aimPose)
 {
     const int handIndex = (int)hand;

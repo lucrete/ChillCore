@@ -58,7 +58,6 @@ namespace CC
     // ========================
     // Target
     // ========================
-
     void UiSurface::CreateTarget()
     {
         Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
@@ -111,7 +110,6 @@ namespace CC
     // ========================
     // Element tree
     // ========================
-
     void UiSurface::LoadScreen(UiElement* root)
     {
         elementIdMap.clear();
@@ -184,7 +182,6 @@ namespace CC
     // ========================
     // Callback registration
     // ========================
-
     void UiSurface::RegisterButtonAction(const std::string& key, std::function<void()> callback)
     {
         UiCallbackMap* map = inputHandler.GetCallbackMap();
@@ -223,7 +220,6 @@ namespace CC
     // ========================
     // Size
     // ========================
-
     void UiSurface::GetSize(int& outWidth, int& outHeight) const
     {
         outWidth  = width;
@@ -256,7 +252,6 @@ namespace CC
     // ========================
     // Per-frame
     // ========================
-
     void UiSurface::Update()
     {
         if (kind != UiSurfaceKind::Null && isEnabled)
@@ -494,7 +489,6 @@ namespace CC
             // ========================
             // Specialized element rendering
             // ========================
-
             if (element->GetType() == UiElementType::Slider)
             {
                 UiSlider* slider = static_cast<UiSlider*>(element);

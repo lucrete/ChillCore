@@ -69,7 +69,6 @@ namespace CC
     // ========================
     // Frame Timing Snapshot
     // ========================
-
     std::string DevUiViewFrameProfile::GetFrameTimingSnapshot() const
     {
         const Timestamp* timestamps = FrameTimer::Get()->GetPreviousFrameTimestamps();
@@ -166,7 +165,6 @@ namespace CC
     // ========================
     // Graph
     // ========================
-
     void DevUiViewFrameProfile::DrawFrameTimeGraph()
     {
         int count = FrameTimer::Get()->GetProfileSampleCount();
@@ -243,7 +241,6 @@ namespace CC
     // ========================
     // GPU Overlay Line
     // ========================
-
     void DevUiViewFrameProfile::DrawGpuOverlayLine(ImVec2 origin, float graphWidth, float graphHeight, float scaleMax, int count, int oldest)
     {
         int historySize = FrameTimer::PROFILE_HISTORY_SIZE;
@@ -269,7 +266,6 @@ namespace CC
     // ========================
     // Phase Breakdown Bar
     // ========================
-
     void DevUiViewFrameProfile::DrawPhaseBreakdownBar()
     {
         int historySize = FrameTimer::PROFILE_HISTORY_SIZE;
@@ -322,7 +318,6 @@ namespace CC
     // ========================
     // Stats
     // ========================
-
     void DevUiViewFrameProfile::DrawStats()
     {
         ImGui::Separator();
@@ -361,7 +356,6 @@ namespace CC
     // ========================
     // GPU Phase Graph
     // ========================
-
     void DevUiViewFrameProfile::DrawGpuPhaseGraph()
     {
         int count = FrameTimer::Get()->GetProfileSampleCount();
@@ -448,7 +442,6 @@ namespace CC
     // ========================
     // GPU Phase Breakdown Bar
     // ========================
-
     void DevUiViewFrameProfile::DrawGpuPhaseBreakdownBar()
     {
         int historySize = FrameTimer::PROFILE_HISTORY_SIZE;
@@ -518,7 +511,6 @@ namespace CC
     // ========================
     // GPU Phase Stats
     // ========================
-
     void DevUiViewFrameProfile::DrawGpuPhaseStats()
     {
         ImGui::Separator();

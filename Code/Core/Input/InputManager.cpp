@@ -202,7 +202,6 @@ namespace CC
     // ========================
     // Joystick override
     // ========================
-
     void InputManager::SetJoystickOverride(AnalogStick stick, float x, float y)
     {
         CC_ASSERT(stick >= 0 && stick < STICK_MAX, "Invalid stick");
@@ -324,7 +323,6 @@ namespace CC
     // ========================
     // Input routing
     // ========================
-
     void InputManager::SetInteractionMode(InteractionMode mode)
     {
         interactionMode = mode;

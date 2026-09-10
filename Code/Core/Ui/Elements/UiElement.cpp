@@ -23,7 +23,6 @@ namespace CC
     // ========================
     // Surface
     // ========================
-
     void UiElement::MarkSurfaceDirty()
     {
         if (surface != nullptr)
@@ -35,7 +34,6 @@ namespace CC
     // ========================
     // Tree structure
     // ========================
-
     void UiElement::AddChild(UiElement* child)
     {
         child->parent = this;
@@ -64,7 +62,6 @@ namespace CC
     // ========================
     // Identity
     // ========================
-
     void UiElement::AddClass(const std::string& className)
     {
         classes.push_back(className);
@@ -78,7 +75,6 @@ namespace CC
     // ========================
     // Style + State
     // ========================
-
     void UiElement::RecomputeActiveStyle()
     {
         computedStyle = stateStyles[static_cast<int>(UiElementState::Normal)];

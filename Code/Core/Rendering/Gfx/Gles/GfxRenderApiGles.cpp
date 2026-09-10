@@ -11,7 +11,6 @@ namespace CC::Gfx
     // ========================
     // Static translation tables
     // ========================
-
     static GLenum ToGlBufferTarget(BufferUsage usage)
     {
         GLenum result = GL_ARRAY_BUFFER;
@@ -277,7 +276,6 @@ namespace CC::Gfx
     // ========================
     // Lifecycle
     // ========================
-
     RenderApiGles::RenderApiGles()
     {
     }
@@ -441,7 +439,6 @@ namespace CC::Gfx
     // ========================
     // Frame
     // ========================
-
     void RenderApiGles::BeginFrame()
     {
     }
@@ -454,7 +451,6 @@ namespace CC::Gfx
     // ========================
     // Backbuffer
     // ========================
-
     void RenderApiGles::ConfigureBackbuffer(const BackbufferDescription& description)
     {
         // Rebuilding the framebuffers rebinds, so an open pass would
@@ -651,7 +647,6 @@ namespace CC::Gfx
     // ========================
     // Buffers
     // ========================
-
     BufferHandle RenderApiGles::CreateBuffer(const BufferDescription& description)
     {
         CC_ASSERT(description.sizeBytes > 0, "BufferDescription.sizeBytes must be > 0");
@@ -744,7 +739,6 @@ namespace CC::Gfx
     // ========================
     // Textures
     // ========================
-
     TextureHandle RenderApiGles::CreateTexture(const TextureDescription& description)
     {
         CC_ASSERT(description.width > 0 && description.height > 0, "TextureDescription: width/height must be > 0");
@@ -932,7 +926,6 @@ namespace CC::Gfx
     // ========================
     // Samplers
     // ========================
-
     SamplerHandle RenderApiGles::CreateSampler(const SamplerDescription& description)
     {
         GlSampler entry;
@@ -988,7 +981,6 @@ namespace CC::Gfx
     // ========================
     // Shaders
     // ========================
-
     static const char* GlShaderStageName(GLenum stage)
     {
         const char* result = "Unknown";
@@ -1131,7 +1123,6 @@ namespace CC::Gfx
     // ========================
     // Pipelines
     // ========================
-
     static bool IsNormalizedAttribType(VertexAttribType type)
     {
         return type == VertexAttribType::Uint8Norm;
@@ -1213,7 +1204,6 @@ namespace CC::Gfx
     // ========================
     // Render targets
     // ========================
-
     RenderTargetHandle RenderApiGles::CreateRenderTarget(const RenderTargetDescription& description)
     {
         CC_ASSERT(description.colorAttachmentCount >= 0 && description.colorAttachmentCount <= MAX_COLOR_ATTACHMENTS,
@@ -1382,7 +1372,6 @@ namespace CC::Gfx
     // ========================
     // Command recording
     // ========================
-
     void RenderApiGles::BindPipeline(PipelineHandle pipeline)
     {
         CC_ASSERT(pipeline.IsValid(), "BindPipeline: invalid handle");
@@ -1641,7 +1630,6 @@ namespace CC::Gfx
     // ========================
     // Compute
     // ========================
-
     void RenderApiGles::DispatchCompute(int groupsX, int groupsY, int groupsZ)
     {
         glDispatchCompute(groupsX, groupsY, groupsZ);
@@ -1661,7 +1649,6 @@ namespace CC::Gfx
     // ========================
     // Synchronisation
     // ========================
-
     void RenderApiGles::MemoryBarrier(unsigned int barrierBits)
     {
         glMemoryBarrier(ToGlBarrierBits(barrierBits));

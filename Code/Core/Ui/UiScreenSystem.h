@@ -23,7 +23,6 @@ namespace CC
         // ========================
         // Registration
         // ========================
-
         void RegisterScreen(const std::string& screenId, const std::string& htmlPath,
                             const std::string& cssPath, UiScreenController* controller);
         void ClearAllScreens();
@@ -31,7 +30,6 @@ namespace CC
         // ========================
         // Navigation
         // ========================
-
         void TransitionForward(const std::string& screenId);
         void TransitionBack();
         void SetScreen(const std::string& screenId);
@@ -39,7 +37,6 @@ namespace CC
         // ========================
         // State queries
         // ========================
-
         bool IsTransitioning() const;
         int GetStackDepth() const { return stackDepth; }
 
@@ -50,7 +47,6 @@ namespace CC
         // ========================
         // Per-frame
         // ========================
-
         void Update();
 
     private:

@@ -100,7 +100,6 @@ namespace CC
         // ========================
         // Frame
         // ========================
-
         void PollEvents();
 
         // Waits on the runtime's frame pacing and locates the views against
@@ -115,7 +114,6 @@ namespace CC
         // ========================
         // Setup
         // ========================
-
         bool CreateInstanceAndSystem();
         void ApplyPendingSessionRequests();
         bool CreateSession();

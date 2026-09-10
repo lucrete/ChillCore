@@ -18,7 +18,6 @@ namespace CC
     // ========================
     // Helper Functions
     // ========================
-
     // colorSpace follows the glTF slot: base colour and emissive are colour
     // and are decoded on sample; normal, metallic-roughness and occlusion
     // carry measurements and stay linear.
@@ -78,7 +77,6 @@ namespace CC
     // ========================
     // Public Methods
     // ========================
-
     SceneObject* GltfLoader::LoadGltf(const std::string& filePath)
     {
         cgltf_options options = {};

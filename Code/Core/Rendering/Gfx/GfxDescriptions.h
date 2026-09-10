@@ -11,7 +11,6 @@ namespace CC::Gfx
     // ========================
     // Limits
     // ========================
-
     static constexpr int MAX_VERTEX_ATTRIBUTES = 8;
     static constexpr int MAX_COLOR_ATTACHMENTS = 4;
     static constexpr int MAX_BOUND_TEXTURES = 16;
@@ -22,7 +21,6 @@ namespace CC::Gfx
     // ========================
     // Buffer description
     // ========================
-
     struct BufferDescription
     {
         int          sizeBytes    = 0;
@@ -35,7 +33,6 @@ namespace CC::Gfx
     // ========================
     // Texture description
     // ========================
-
     struct TextureDescription
     {
         int           width          = 0;
@@ -54,7 +51,6 @@ namespace CC::Gfx
     // ========================
     // Sampler description
     // ========================
-
     struct SamplerDescription
     {
         FilterMode  minFilter    = FilterMode::Linear;
@@ -70,7 +66,6 @@ namespace CC::Gfx
     // ========================
     // Vertex input layout
     // ========================
-
     struct VertexAttribute
     {
         int              location   = 0;
@@ -105,7 +100,6 @@ namespace CC::Gfx
     // ========================
     // Blend state
     // ========================
-
     struct BlendState
     {
         bool        enabled        = false;
@@ -120,7 +114,6 @@ namespace CC::Gfx
     // ========================
     // Depth / stencil state
     // ========================
-
     struct DepthStencilState
     {
         bool      depthTestEnabled  = true;
@@ -131,7 +124,6 @@ namespace CC::Gfx
     // ========================
     // Rasterizer state
     // ========================
-
     struct RasterizerState
     {
         CullMode  cullMode  = CullMode::Back;
@@ -163,7 +155,6 @@ namespace CC::Gfx
     // ========================
     // Render target description
     // ========================
-
     // A texture whose storage another API already owns — an XR runtime's
     // swapchain image being the case this exists for. Registering one yields
     // an ordinary TextureHandle that render targets and binds accept;

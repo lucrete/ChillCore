@@ -84,7 +84,6 @@ namespace CC
         // ========================
         // Input routing
         // ========================
-
         // The state's preference. What the desktop actually gets is derived
         // from it along with the two facts below, so a state cannot assert a
         // mode that contradicts them.

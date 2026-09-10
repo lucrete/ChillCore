@@ -52,13 +52,11 @@ namespace CC
         // ========================
         // Screens
         // ========================
-
         UiScreenSystem& Screens() { return screens; }
 
         // ========================
         // Element tree
         // ========================
-
         void LoadScreen(UiElement* root);
         void LoadScreen(UiElement* root, const std::vector<UiCssRule>& cssRules);
         void LoadScreen(const std::string& htmlPath, const std::string& cssPath);
@@ -74,7 +72,6 @@ namespace CC
         // ========================
         // Callback registration
         // ========================
-
         void RegisterButtonAction(const std::string& key, std::function<void()> callback);
         void RegisterSliderAction(const std::string& key, std::function<void(float)> callback);
         void RegisterToggleAction(const std::string& key, std::function<void(bool)> callback);
@@ -86,7 +83,6 @@ namespace CC
         // ========================
         // Size
         // ========================
-
         // The one place anything scaling against this surface reads its size
         // from. Layout, text sizing and hit testing disagree the moment two
         // of them ask different sources.
@@ -100,7 +96,6 @@ namespace CC
         // ========================
         // Redraw
         // ========================
-
         // Force the next render to re-run UiLayoutEngine. Layout otherwise
         // only re-runs on resize and screen load.
         void InvalidateLayout();
@@ -114,7 +109,6 @@ namespace CC
         // ========================
         // Per-frame
         // ========================
-
         void Update();
 
         // Draws into whatever is bound. Window surfaces only.

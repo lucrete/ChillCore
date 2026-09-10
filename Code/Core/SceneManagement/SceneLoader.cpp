@@ -22,12 +22,9 @@ namespace CC
     // ========================
     // Helper Functions
     // ========================
-
-
     // ========================
     // Scene Loading
     // ========================
-
     bool SceneLoader::LoadScene(const std::string& filePath, SceneHierarchy& hierarchy)
     {
         bool succeeded = false;

@@ -109,7 +109,6 @@ namespace CC::Gfx
         // ========================
         // Internal pool entries
         // ========================
-
         struct GlBuffer
         {
             GLuint       glHandle      = 0;
@@ -182,7 +181,6 @@ namespace CC::Gfx
         // ========================
         // Pools
         // ========================
-
         std::vector<GlBuffer>       buffers;
         std::vector<GlTexture>      textures;
         std::vector<GlSampler>      samplers;
@@ -205,7 +203,6 @@ namespace CC::Gfx
         // ========================
         // State tracking
         // ========================
-
         PipelineHandle        currentPipeline;
 
         GLenum                currentIndexType = GL_UNSIGNED_INT;

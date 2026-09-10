@@ -235,7 +235,6 @@ namespace CC
         // ========================
         // Layout properties
         // ========================
-
         if (name == "display")
         {
             if (value == "flex") properties.display = DisplayType::Flex;
@@ -281,7 +280,6 @@ namespace CC
         // ========================
         // Sizing properties
         // ========================
-
         else if (name == "width")
         {
             properties.width = ParseDimension(value);
@@ -310,7 +308,6 @@ namespace CC
         // ========================
         // Spacing properties
         // ========================
-
         else if (name == "padding")
         {
             ParseEdgeShorthand(value, properties.padding);
@@ -355,7 +352,6 @@ namespace CC
         // ========================
         // Position offsets
         // ========================
-
         else if (name == "top")
         {
             properties.top = std::strtof(value.c_str(), nullptr);
@@ -376,7 +372,6 @@ namespace CC
         // ========================
         // Appearance properties
         // ========================
-
         else if (name == "background-color" || name == "background")
         {
             properties.backgroundColor = ParseColour(value);
@@ -411,7 +406,6 @@ namespace CC
         // ========================
         // Text properties
         // ========================
-
         else if (name == "font-family")
         {
             properties.fontFamily = value;

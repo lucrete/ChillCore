@@ -82,7 +82,6 @@ namespace CC
         // ========================
         // Surface
         // ========================
-
         // The surface this element is currently loaded on. Set when a tree
         // is loaded, and how a setter marks the right surface for redraw
         // without anything having to know which one is current.
@@ -97,7 +96,6 @@ namespace CC
         // ========================
         // Tree structure
         // ========================
-
         void AddChild(UiElement* child);
         void ClearChildren();
         const std::vector<UiElement*>& GetChildren() const;
@@ -106,7 +104,6 @@ namespace CC
         // ========================
         // Identity
         // ========================
-
         UiElementType GetType() const { return type; }
         const std::string& GetId() const { return id; }
         void SetId(const std::string& _id) { id = _id; }
@@ -119,7 +116,6 @@ namespace CC
         // ========================
         // Style
         // ========================
-
         static constexpr int STATE_COUNT = static_cast<int>(UiElementState::StateMax);
         UiStyleProperties stateStyles[STATE_COUNT];
         UiStyleProperties computedStyle;
@@ -129,7 +125,6 @@ namespace CC
         // ========================
         // State
         // ========================
-
         UiElementState GetState() const { return currentState; }
         void SetState(UiElementState state);
         bool IsEnabled() const { return isEnabled; }
@@ -142,7 +137,6 @@ namespace CC
         // ========================
         // Layout
         // ========================
-
         UiRect layoutRect;
         bool isLayoutDirty = true;
 
@@ -164,7 +158,6 @@ namespace CC
         // ========================
         // Content
         // ========================
-
         const std::string& GetTextContent() const { return textContent; }
         void SetTextContent(const std::string& text);
 

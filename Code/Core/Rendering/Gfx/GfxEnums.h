@@ -37,7 +37,6 @@ namespace CC::Gfx
     // ========================
     // Buffer usage and memory
     // ========================
-
     enum class BufferUsage
     {
         Vertex,
@@ -59,7 +58,6 @@ namespace CC::Gfx
     // ========================
     // Vertex input
     // ========================
-
     enum class VertexAttribType
     {
         Float32,
@@ -92,7 +90,6 @@ namespace CC::Gfx
     // ========================
     // Pipeline state
     // ========================
-
     enum class CompareOp
     {
         Never,
@@ -149,7 +146,6 @@ namespace CC::Gfx
     // ========================
     // Sampler
     // ========================
-
     enum class FilterMode
     {
         Nearest,
@@ -177,7 +173,6 @@ namespace CC::Gfx
     // ========================
     // Shader
     // ========================
-
     enum class ShaderStage
     {
         Vertex,
@@ -189,7 +184,6 @@ namespace CC::Gfx
     // ========================
     // Image access (for compute image bindings)
     // ========================
-
     enum class ImageAccess
     {
         ReadOnly,
@@ -201,7 +195,6 @@ namespace CC::Gfx
     // ========================
     // Load / store ops for render targets
     // ========================
-
     enum class LoadOp
     {
         Load,

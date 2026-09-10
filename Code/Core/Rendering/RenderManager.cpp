@@ -329,7 +329,6 @@ namespace CC
     // ========================
     // Post-processing
     // ========================
-
     bool RenderManager::IsPostProcessEnabled() const
     {
         return postProcessTarget.IsValid();

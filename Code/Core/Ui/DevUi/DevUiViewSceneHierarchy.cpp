@@ -19,7 +19,6 @@ namespace CC
     // ========================
     // Draw
     // ========================
-
     void DevUiViewSceneHierarchy::Draw()
     {
         int currentVersion = SceneHierarchy::Get()->GetVersion();
@@ -57,7 +56,6 @@ namespace CC
     // ========================
     // Scene Tree
     // ========================
-
     void DevUiViewSceneHierarchy::DrawSceneTree()
     {
         const std::vector<SceneObject*>& rootObjects = SceneHierarchy::Get()->GetRootObjects();
@@ -121,7 +119,6 @@ namespace CC
     // ========================
     // Properties Panel
     // ========================
-
     void DevUiViewSceneHierarchy::DrawPropertiesPanel()
     {
         if (selectedObject == nullptr)

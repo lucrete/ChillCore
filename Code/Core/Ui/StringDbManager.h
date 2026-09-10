@@ -24,7 +24,6 @@ namespace CC
         // ========================
         // Language management
         // ========================
-
         bool LoadLanguage(const std::string& languageId, const std::string& filePath);
         bool SetLanguage(const std::string& languageId);
         const std::string& GetCurrentLanguage() const;
@@ -32,14 +31,12 @@ namespace CC
         // ========================
         // String queries
         // ========================
-
         const std::string& GetString(const std::string& stringId) const;
         bool HasString(const std::string& stringId) const;
 
         // ========================
         // Listener registration
         // ========================
-
         void RegisterListener(IStringDbListener* listener);
         void UnregisterListener(IStringDbListener* listener);
         void Refresh();

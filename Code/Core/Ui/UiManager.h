@@ -30,7 +30,6 @@ namespace CC
         // ========================
         // Surfaces
         // ========================
-
         // The window's surface. Where no window exists this is real and has
         // nothing behind it, so application code never branches on it.
         UiSurface* GetWindowSurface() const { return windowSurface; }
@@ -47,7 +46,6 @@ namespace CC
         // ========================
         // Per-frame
         // ========================
-
         // Screen stacks and their transitions, every surface.
         void UpdateScreens();
 

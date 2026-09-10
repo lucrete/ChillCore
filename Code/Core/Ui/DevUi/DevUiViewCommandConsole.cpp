@@ -24,7 +24,6 @@ namespace CC
     // ========================
     // Draw
     // ========================
-
     void DevUiViewCommandConsole::Draw()
     {
         ImGui::SetNextWindowPos(ImVec2(10, 400), ImGuiCond_FirstUseEver);
@@ -41,7 +40,6 @@ namespace CC
     // ========================
     // Log Output
     // ========================
-
     void DevUiViewCommandConsole::DrawLogOutput()
     {
         float footerHeight = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
@@ -103,7 +101,6 @@ namespace CC
     // ========================
     // Command Input
     // ========================
-
     void DevUiViewCommandConsole::DrawCommandInput()
     {
         ImGui::Separator();
@@ -153,7 +150,6 @@ namespace CC
     // ========================
     // Command History
     // ========================
-
     void DevUiViewCommandConsole::AddToHistory(const std::string& command)
     {
         commandHistory[historyWriteIndex] = command;

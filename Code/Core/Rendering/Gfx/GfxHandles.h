@@ -75,7 +75,6 @@ namespace CC::Gfx
     // ========================
     // Handle equality
     // ========================
-
     inline bool operator==(BufferHandle a, BufferHandle b)       { return a.id == b.id; }
     inline bool operator!=(BufferHandle a, BufferHandle b)       { return a.id != b.id; }
     inline bool operator==(TextureHandle a, TextureHandle b)     { return a.id == b.id; }

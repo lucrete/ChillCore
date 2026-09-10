@@ -114,7 +114,6 @@ namespace CC
     // ========================
     // Lifetime
     // ========================
-
     XrManager::XrManager()
         : state(nullptr)
         , viewCount(0)
@@ -322,7 +321,6 @@ namespace CC
     // ========================
     // Tracked controllers
     // ========================
-
     const TrackedPose& XrManager::GetHandPose(XrHand hand, XrPoseKind kind) const
     {
         return state->input.GetHandPose(hand, kind);
@@ -351,7 +349,6 @@ namespace CC
     // ========================
     // Setup
     // ========================
-
     bool XrManager::CreateInstanceAndSystem()
     {
         const char* const extensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
@@ -650,7 +647,6 @@ namespace CC
     // ========================
     // Frame
     // ========================
-
     void XrManager::RunFrameLoop(CoreMain* coreMain, IAppMain* appMain)
     {
         CC_ASSERT(coreMain != nullptr && appMain != nullptr, "RunFrameLoop needs CoreMain and AppMain");

@@ -26,7 +26,6 @@ namespace CC
     // ========================
     // Registration
     // ========================
-
     void UiScreenSystem::RegisterScreen(const std::string& screenId, const std::string& htmlPath,
                                         const std::string& cssPath, UiScreenController* controller)
     {
@@ -90,7 +89,6 @@ namespace CC
     // ========================
     // Navigation
     // ========================
-
     void UiScreenSystem::SetScreen(const std::string& screenId)
     {
         UiScreenDef* screenDef = FindScreenDef(screenId);
@@ -135,7 +133,6 @@ namespace CC
     // ========================
     // State queries
     // ========================
-
     bool UiScreenSystem::IsTransitioning() const
     {
         return transitionState != TransitionState::Idle;
@@ -144,7 +141,6 @@ namespace CC
     // ========================
     // Per-frame
     // ========================
-
     void UiScreenSystem::Update()
     {
         float deltaTime = FrameTimer::Get()->DeltaTime();
@@ -213,7 +209,6 @@ namespace CC
     // ========================
     // Private helpers
     // ========================
-
     void UiScreenSystem::ActivateCurrentScreen()
     {
         if (stackDepth > 0)
