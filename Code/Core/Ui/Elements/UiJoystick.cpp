@@ -33,9 +33,13 @@ namespace CC
 
     void UiJoystick::SetKnobNormalized(float x, float y)
     {
-        knobX = x;
-        knobY = y;
-        ApplyKnobLayout();
+        if (knobX != x || knobY != y)
+        {
+            knobX = x;
+            knobY = y;
+            ApplyKnobLayout();
+            MarkSurfaceDirty();
+        }
     }
 
     void UiJoystick::OnLayoutComputed()

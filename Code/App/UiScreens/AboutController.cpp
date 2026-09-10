@@ -2,16 +2,15 @@
 
 #include "BuildInfo.h"
 #include "UiElement.h"
-#include "UiManager.h"
-#include "UiScreenSystem.h"
+#include "UiSurface.h"
 
 void AboutController::Init()
 {
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
-    ui->RegisterButtonAction("back", []()
+    ui->RegisterButtonAction("back", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionBack();
+        ui->Screens().TransitionBack();
     });
 
     // Build details are compiled in, so they are set once rather than per
@@ -24,7 +23,7 @@ void AboutController::Init()
 
 void AboutController::SetElementText(const char* elementId, const char* text)
 {
-    CC::UiElement* element = CC::UiManager::Get()->GetElementById(elementId);
+    CC::UiElement* element = GetSurface()->GetElementById(elementId);
 
     if (element != nullptr)
     {

@@ -1,5 +1,7 @@
 #include "UiElement.h"
 
+#include "UiSurface.h"
+
 #include <algorithm>
 
 namespace CC
@@ -16,6 +18,18 @@ namespace CC
             delete child;
         }
         children.clear();
+    }
+
+    // ========================
+    // Surface
+    // ========================
+
+    void UiElement::MarkSurfaceDirty()
+    {
+        if (surface != nullptr)
+        {
+            surface->MarkContentDirty();
+        }
     }
 
     // ========================
@@ -103,6 +117,27 @@ namespace CC
         {
             currentState = state;
             RecomputeActiveStyle();
+            MarkSurfaceDirty();
+        }
+    }
+
+    void UiElement::SetVisible(bool visible)
+    {
+        if (isVisible != visible)
+        {
+            isVisible = visible;
+            MarkSurfaceDirty();
+        }
+    }
+
+    void UiElement::SetTextContent(const std::string& text)
+    {
+        if (textContent != text)
+        {
+            textContent = text;
+            cachedTextHeight = -1.0f;
+            cachedTextDraw.Invalidate();
+            MarkSurfaceDirty();
         }
     }
 

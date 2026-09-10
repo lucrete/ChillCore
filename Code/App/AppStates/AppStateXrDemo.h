@@ -13,6 +13,7 @@
 namespace CC
 {
     class UiElement;
+    class UiWorldPanel;
 }
 
 // The panel's screen controller. Holds the readout line so the state can say
@@ -70,13 +71,13 @@ private:
     static constexpr float RAY_LENGTH = 3.0f;
     static constexpr float RAY_THICKNESS = 0.006f;
 
-    // The panel in world space, in metres, and the texture behind it. The
-    // texture is far denser than the panel is wide because text read from
+    // The panel in world space, in metres, and the surface behind it. The
+    // surface is far denser than the panel is wide because text read from
     // half a metre away shows every pixel.
     static constexpr float PANEL_WIDTH = 1.2f;
     static constexpr float PANEL_HEIGHT = 0.9f;
-    static const int PANEL_TEXTURE_WIDTH = 1024;
-    static const int PANEL_TEXTURE_HEIGHT = 768;
+    static const int PANEL_SURFACE_WIDTH = 1024;
+    static const int PANEL_SURFACE_HEIGHT = 768;
 
     static constexpr float HAPTIC_AMPLITUDE = 0.4f;
     static constexpr float HAPTIC_DURATION_SECONDS = 0.03f;
@@ -90,14 +91,11 @@ private:
     CC::SceneObject* grabbableObject[GRABBABLE_COUNT];
     CC::Vector3      grabbableHomePosition[GRABBABLE_COUNT];
 
-    // Panel
-    CC::SceneObject*        panelObject;
-    CC::Gfx::TextureHandle  panelColorTexture;
-    CC::Gfx::RenderTargetHandle panelTarget;
-    CC::Vector3             panelPosition;
-    CC::Vector3             panelNormal;
-    CC::Vector3             panelRight;
-    CC::Vector3             panelUp;
+    // Panel. The component owns its surface, its target and its quad; the
+    // state only places it and registers a screen on it.
+    CC::SceneObject*   panelObject;
+    CC::UiWorldPanel*  panelComponent;
+    CC::Vector3        panelPosition;
 
     bool isXrActive;
     bool isPaused;
@@ -119,17 +117,12 @@ private:
     void SceneInit();
     void SceneShutdown();
 
-    void CreatePanelTarget();
-    void DestroyPanelTarget();
-
     void UpdateHands();
     void UpdateRay(CC::XrHand hand, const CC::TrackedPose& aimPose);
     void UpdateGrab(CC::XrHand hand, const CC::TrackedPose& gripPose);
-    void UpdatePanelPointer();
-
-    // Intersects an aim ray with the panel plane. False where the ray points
-    // away from the panel or the hit falls outside its bounds.
-    bool IntersectPanel(const CC::TrackedPose& aimPose, float& outPixelX, float& outPixelY) const;
+    // Offers each hand's aim ray to the pointer router, which decides which
+    // panel — if any — the ray reaches. Nothing here knows where a panel is.
+    void SubmitPanelPointer(CC::XrHand hand, const CC::TrackedPose& aimPose);
 
     void RecentreGrabbables();
     void ApplyNextGradePreset();

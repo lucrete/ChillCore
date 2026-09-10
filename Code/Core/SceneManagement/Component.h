@@ -18,7 +18,9 @@ namespace CC
         void SetOwner(SceneObject* _owner);
         SceneObject* GetOwner() const { return owner; }
 
-        void SetEnabled(bool _isEnabled) { isEnabled = _isEnabled; }
+        // Virtual because a component can own state outside itself that has
+        // to stop with it — a UI panel's surface skips its render.
+        virtual void SetEnabled(bool _isEnabled) { isEnabled = _isEnabled; }
         bool IsEnabled() const { return isEnabled; }
 
         void SetPauseable(bool _isPauseable) { isPauseable = _isPauseable; }

@@ -42,6 +42,7 @@ namespace CC
     };
 
     class Font;
+    class UiSurface;
 
     struct CachedTextDraw
     {
@@ -77,6 +78,21 @@ namespace CC
     public:
         UiElement(UiElementType type);
         virtual ~UiElement();
+
+        // ========================
+        // Surface
+        // ========================
+
+        // The surface this element is currently loaded on. Set when a tree
+        // is loaded, and how a setter marks the right surface for redraw
+        // without anything having to know which one is current.
+        void SetSurface(UiSurface* _surface) { surface = _surface; }
+        UiSurface* GetSurface() const { return surface; }
+
+        // Marks this element's surface as having something new to draw.
+        // Called by the setters below; specialized elements call it from
+        // their own.
+        void MarkSurfaceDirty();
 
         // ========================
         // Tree structure
@@ -119,7 +135,7 @@ namespace CC
         bool IsEnabled() const { return isEnabled; }
         void SetEnabled(bool enabled);
         bool IsVisible() const { return isVisible; }
-        void SetVisible(bool visible) { isVisible = visible; }
+        void SetVisible(bool visible);
         bool IsNavigable() const { return isNavigable; }
         void SetNavigable(bool navigable) { isNavigable = navigable; }
 
@@ -150,15 +166,13 @@ namespace CC
         // ========================
 
         const std::string& GetTextContent() const { return textContent; }
-        void SetTextContent(const std::string& text)
-        {
-            textContent = text;
-            cachedTextHeight = -1.0f;
-            cachedTextDraw.Invalidate();
-        }
+        void SetTextContent(const std::string& text);
 
     protected:
         UiElementType type;
+
+        // Surface
+        UiSurface* surface = nullptr;
 
         // Tree
         UiElement* parent = nullptr;

@@ -1,10 +1,11 @@
 # AGD-0130: UI Screens and Navigation
 
-- **Scope:** How screens are registered, activated, and navigated between, and how application code attaches behaviour to them. Covers the navigation stack, screen fades, cancel handling, and the controller lifecycle. Does not cover how a screen is laid out or drawn.
+- **Scope:** How screens are registered, activated, and navigated between, and how application code attaches behaviour to them. Covers the navigation stack, screen fades, cancel handling, and the controller lifecycle. Does not cover how a screen is laid out or drawn, nor how the interface serves several destinations at once.
 
 ## Overview
 
 - A screen pairs an element tree with a controller holding its behaviour. Screens are registered once and activated by name.
+- A screen stack belongs to one surface. Every surface has one, and the calls on it are the same everywhere.
 - Navigation is a stack. Going forward pushes, going back pops, and a separate flat replacement discards history entirely.
 - Forward and back navigation fade the interface only. The scene behind it is untouched.
 - Cancelling goes back automatically, without every screen implementing it.
@@ -16,17 +17,19 @@
 - **Controller** — application code owning a screen's behaviour: callbacks, per-activation state, per-frame logic.
 - **Navigation stack** — the history of screens entered, allowing return to the previous one.
 - **Flat replacement** — setting the active screen and discarding history, for swaps where returning makes no sense.
-- **Global alpha** — a single opacity applied to all interface drawing, used for the screen fade.
+- **Fade alpha** — one opacity per surface, applied to that surface's interface drawing before it draws.
 
 ## Architecture
 
 `UiScreenSystem` owns registration, the navigation stack, the active screen, and the transition sequence. The stack is a fixed-size array with a small depth limit, so navigation never allocates.
 
-A screen controller is the boundary where application behaviour meets an interface definition. It registers callbacks against the action identifiers in its markup, and handles per-activation setup.
+**It is an instance owned by a surface, not a singleton.** A screen definition holds its built element tree, so a screen lives on the one surface it was registered with; two panels showing the same markup register it on each, which is already how registration works. Nothing addresses "the" screen system — code names the surface whose stack it means.
+
+A screen controller is the boundary where application behaviour meets an interface definition. It registers callbacks against the action identifiers in its markup, and handles per-activation setup. It is bound to its surface at registration and never rebound, so it resolves elements and callbacks against that surface rather than against whatever happens to be active. The same controller class then works unchanged wherever it is registered.
 
 Callback registrations live with the screen and persist across activations, because they are configuration rather than state. Per-activation concerns — enabling elements, setting initial selection, refreshing text from current data — belong to the enter and exit calls.
 
-The fade is implemented as a single opacity applied to interface and text drawing together. It does not involve the scene, and does not go through the fullscreen overlay used for application state transitions.
+The fade is an opacity applied to interface and text drawing together. Each surface applies its own before drawing, so surfaces fade independently. It does not involve the scene, and does not go through the fullscreen overlay used for application state transitions.
 
 ## Runtime flow
 
@@ -40,13 +43,15 @@ The fade is implemented as a single opacity applied to interface and text drawin
 
 **Flat replacement** skips the fade entirely and swaps immediately, because it exists for swaps that should feel instant.
 
-**Cancelling** is handled by the system during its idle phase. If the stack has somewhere to return to, cancel navigates back. A controller wanting different behaviour intercepts the action in its own update before the system sees it.
+**Cancelling** is handled during the idle phase of the surface that reads platform input. Cancel is one input stream with no spatial origin, so only that surface consumes it; panels are navigated by pointing at them. If the stack has somewhere to return to, cancel navigates back. A controller wanting different behaviour intercepts the action in its own update before the system sees it.
 
 **While a screen is active and not transitioning**, its controller receives a per-frame update.
 
 ## Working with it
 
-**Add a screen.** Author the markup and stylesheet, implement a controller, and register it under an identifier. Register callbacks in the controller's initialisation, since they persist.
+**Add a screen.** Author the markup and stylesheet, implement a controller, and register it on a surface under an identifier. Register callbacks in the controller's initialisation, since they persist.
+
+**Reach the stack you mean.** Name its surface. A controller asks for its own; application code asks the interface manager for the window's.
 
 **Navigate into a sub-screen.** Transition forward. Cancel will return automatically; no back callback is needed.
 
@@ -70,7 +75,7 @@ The stack is a fixed-size array with a small limit, so navigation never allocate
 
 ### Screen fades affect the interface only
 
-The fade is a single opacity applied to interface and text drawing. The scene renders normally throughout.
+The fade is an opacity applied to interface and text drawing, held per surface. The scene renders normally throughout.
 
 Reusing the fullscreen overlay that covers application state transitions was rejected because it would black out the scene for what is merely a menu change, and would conflate two unrelated things — one is "the whole application is changing", the other is "this panel is being replaced".
 
@@ -105,4 +110,5 @@ The cost is a trap for authors: putting content refresh in initialisation appear
 - Controller precedence over automatic cancel is a convention, not an enforced ordering.
 - Two independent fade systems exist with different durations and scopes.
 - Flat replacement discards the whole stack, so it cannot be used to swap the current screen while preserving history.
-- Registration temporarily activates a screen's tree, so registration order can matter if a controller has side effects beyond attaching callbacks.
+- Registration temporarily activates a screen's tree on its surface, so registration order can matter if a controller has side effects beyond attaching callbacks.
+- Screen identifiers are unique per surface, not globally. The same identifier on two surfaces names two separate screens.

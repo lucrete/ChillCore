@@ -3,7 +3,8 @@
 #include "InputManager.h"
 #include "PrintManager.h"
 #include "CameraManager.h"
-#include "UiScreenSystem.h"
+#include "UiManager.h"
+#include "UiSurface.h"
 #include "AudioTrackerController.h"
 #include "TrackerEngine.h"
 #include "TrackerCommandHistory.h"
@@ -85,17 +86,17 @@ void AppStateAudioTracker::Init()
         project.songTracks.push_back(defaultSongTrack);
     }
 
-    CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
-    screens->RegisterScreen("AudioTracker", "Data/Ui/AudioTracker.html", "Data/Ui/AudioTracker.css",
+    CC::UiScreenSystem& screens = CC::UiManager::Get()->GetWindowSurface()->Screens();
+    screens.RegisterScreen("AudioTracker", "Data/Ui/AudioTracker.html", "Data/Ui/AudioTracker.css",
         new AudioTrackerController(&project));
-    screens->SetScreen("AudioTracker");
+    screens.SetScreen("AudioTracker");
     CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
 }
 
 void AppStateAudioTracker::Update()
 {
     if (CC::InputManager::Get()->EdgePositive(Quit)
-        && CC::UiScreenSystem::Get()->GetStackDepth() <= 1)
+        && CC::UiManager::Get()->GetWindowSurface()->Screens().GetStackDepth() <= 1)
     {
         CC::CoreMain::Get()->RequestQuit();
     }
@@ -117,7 +118,7 @@ void AppStateAudioTracker::Shutdown()
 {
     CC::PlatformWindow::Get()->SetFileDropCallback(nullptr);
 
-    CC::UiScreenSystem::Get()->ClearAllScreens();
+    CC::UiManager::Get()->GetWindowSurface()->Screens().ClearAllScreens();
 
     if (trackerEngine != nullptr)
     {

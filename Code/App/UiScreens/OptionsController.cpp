@@ -1,6 +1,5 @@
 #include "OptionsController.h"
-#include "UiManager.h"
-#include "UiScreenSystem.h"
+#include "UiSurface.h"
 #include "RenderManager.h"
 #include "UiToggle.h"
 #include "UiDropdown.h"
@@ -9,11 +8,11 @@ static constexpr int MSAA_SAMPLE_VALUES[] = { 0, 2, 4, 8 };
 
 void OptionsController::Init()
 {
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
-    ui->RegisterButtonAction("back", []()
+    ui->RegisterButtonAction("back", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionBack();
+        ui->Screens().TransitionBack();
     });
 
     ui->RegisterToggleAction("fullscreen", [](bool isChecked)
@@ -43,7 +42,7 @@ void OptionsController::Init()
 void OptionsController::OnEnter()
 {
     CC::RenderManager* renderManager = CC::RenderManager::Get();
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
     CC::UiToggle* fullscreenToggle = static_cast<CC::UiToggle*>(ui->GetElementById("fullscreen"));
     if (fullscreenToggle != nullptr)

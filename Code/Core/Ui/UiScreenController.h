@@ -3,10 +3,19 @@
 
 namespace CC
 {
+    class UiSurface;
+
     class UiScreenController
     {
     public:
         virtual ~UiScreenController() = default;
+
+        // Bound at RegisterScreen and never changed. A controller resolves
+        // its elements and callbacks against this rather than against an
+        // implicit current surface, so the same controller class works on
+        // the window and on a panel with no change.
+        void SetSurface(UiSurface* _surface) { surface = _surface; }
+        UiSurface* GetSurface() const { return surface; }
 
         // Called once at RegisterScreen. Element tree is built, elements exist.
         // Register callbacks, set text from StringDb, any one-time setup.
@@ -24,6 +33,9 @@ namespace CC
 
         // Localization refresh. Called from Init() and on language change.
         virtual void UpdateStrings() {}
+
+    protected:
+        UiSurface* surface = nullptr;
     };
 }
 

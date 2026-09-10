@@ -1,8 +1,7 @@
 #include "XrModeController.h"
 
 #include "UiElement.h"
-#include "UiManager.h"
-#include "UiScreenSystem.h"
+#include "UiSurface.h"
 
 #ifdef CC_ENABLE_XR
 #include "XrManager.h"
@@ -37,15 +36,15 @@ XrModeController::XrModeController()
 
 void XrModeController::Init()
 {
-    CC::UiManager* uiManager = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
-    statusElement = uiManager->GetElementById("xrStatus");
-    toggleElement = uiManager->GetElementById("xrToggle");
+    statusElement = ui->GetElementById("xrStatus");
+    toggleElement = ui->GetElementById("xrToggle");
 
-    uiManager->RegisterButtonAction("xrToggle", [this]() { ToggleXr(); });
-    uiManager->RegisterButtonAction("xrBack", []()
+    ui->RegisterButtonAction("xrToggle", [this]() { ToggleXr(); });
+    ui->RegisterButtonAction("xrBack", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionBack();
+        ui->Screens().TransitionBack();
     });
 
     RefreshLabels();
@@ -100,6 +99,6 @@ void XrModeController::RefreshLabels()
             toggleElement->SetTextContent("Enter XR");
         }
 
-        CC::UiManager::Get()->InvalidateLayout();
+        GetSurface()->InvalidateLayout();
     }
 }

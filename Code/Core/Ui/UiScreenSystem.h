@@ -7,12 +7,18 @@
 
 namespace CC
 {
+    class UiSurface;
+
+    // The screen stack of one surface. Screens are instances rather than
+    // templates: a definition holds its built tree, so it lives on the one
+    // surface it was registered with. Two panels showing the same markup
+    // register it on each.
     class UiScreenSystem
     {
     public:
-        UiScreenSystem();
+        UiScreenSystem() = delete;
+        explicit UiScreenSystem(UiSurface* surface);
         ~UiScreenSystem();
-        static UiScreenSystem* Get();
 
         // ========================
         // Registration
@@ -37,6 +43,10 @@ namespace CC
         bool IsTransitioning() const;
         int GetStackDepth() const { return stackDepth; }
 
+        // The transition fade, applied by the surface before its own draw
+        // bracket so surfaces fade independently of each other.
+        float GetFadeAlpha() const { return fadeAlpha; }
+
         // ========================
         // Per-frame
         // ========================
@@ -44,7 +54,7 @@ namespace CC
         void Update();
 
     private:
-        static UiScreenSystem* instance;
+        UiSurface* surface = nullptr;
 
         std::unordered_map<std::string, UiScreenDef> screenRegistry;
 

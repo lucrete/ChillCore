@@ -13,16 +13,16 @@
 #include "PostProcess.h"
 #include "RenderManager.h"
 #include "RenderableCube.h"
-#include "RenderableQuad.h"
 #include "RenderableSphere.h"
 #include "SceneHierarchy.h"
 #include "StateMachine.h"
 #include "UiManager.h"
+#include "UiSurface.h"
+#include "UiWorldPanel.h"
 #include "UiElement.h"
 #include "OptionsController.h"
 #include "ShowcaseHudController.h"
 #include "PauseMenuController.h"
-#include "UiScreenSystem.h"
 #include "XrManager.h"
 
 namespace
@@ -49,7 +49,7 @@ XrPanelController::XrPanelController()
 
 void XrPanelController::Init()
 {
-    readoutElement = CC::UiManager::Get()->GetElementById("readout");
+    readoutElement = GetSurface()->GetElementById("readout");
 
     if (readoutElement != nullptr && !pendingReadout.empty())
     {
@@ -66,12 +66,13 @@ void XrPanelController::SetReadout(const std::string& text)
     if (readoutElement != nullptr)
     {
         readoutElement->SetTextContent(text);
-        CC::UiManager::Get()->InvalidateLayout();
+        GetSurface()->InvalidateLayout();
     }
 }
 
 AppStateXrDemo::AppStateXrDemo()
     : panelObject(nullptr)
+    , panelComponent(nullptr)
     , panelController(nullptr)
     , lastReadoutTime(0.0f)
     , gradePresetIndex(0)
@@ -113,32 +114,30 @@ void AppStateXrDemo::Init()
     SceneInit();
     InitControls();
 
-    panelController = new XrPanelController();
-    CC::UiScreenSystem::Get()->RegisterScreen("XrPanel", "Data/Ui/XrPanel.html", "Data/Ui/XrPanel.css",
-                                              panelController);
-    CC::UiScreenSystem::Get()->RegisterScreen("PauseMenu", "Data/Ui/PauseMenu.html", "Data/Ui/PauseMenu.css",
+    // The window keeps the application HUD and the pause menu. The panel in
+    // the world has its own surface, so the two no longer take turns.
+    CC::UiSurface* windowSurface = CC::UiManager::Get()->GetWindowSurface();
+    windowSurface->Screens().RegisterScreen("PauseMenu", "Data/Ui/PauseMenu.html", "Data/Ui/PauseMenu.css",
         new PauseMenuController(
             [this]() { pendingTogglePause = true; },
             []() { CC::StateMachine::Get()->GotoState("Boot"); },
             []() { CC::CoreMain::Get()->RequestQuit(); }));
-    CC::UiScreenSystem::Get()->RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css",
+    windowSurface->Screens().RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css",
         new OptionsController());
-    CC::UiScreenSystem::Get()->RegisterScreen("Hud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
+    windowSurface->Screens().RegisterScreen("Hud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
         new ShowcaseHudController([this]() { pendingTogglePause = true; }));
 
     ShowSceneScreen();
 
-    CC::UiManager::Get()->RegisterButtonAction("xrRecentre", [this]() { RecentreGrabbables(); });
-    CC::UiManager::Get()->RegisterButtonAction("xrExit", []() { CC::StateMachine::Get()->GotoState("Boot"); });
-    CC::UiManager::Get()->RegisterButtonAction("xrCyclePreset", [this]() { ApplyNextGradePreset(); });
+    CC::UiSurface* panelSurface = panelComponent->GetSurface();
+    panelController = new XrPanelController();
+    panelSurface->Screens().RegisterScreen("XrPanel", "Data/Ui/XrPanel.html", "Data/Ui/XrPanel.css",
+                                           panelController);
+    panelSurface->Screens().SetScreen("XrPanel");
 
-    CreatePanelTarget();
-
-    // The panel is flat and axis-aligned, so its basis is fixed. A panel that
-    // could be moved would rebuild these whenever it did.
-    panelNormal = CC::Vector3(0.0f, 0.0f, 1.0f);
-    panelRight  = CC::Vector3(1.0f, 0.0f, 0.0f);
-    panelUp     = CC::Vector3(0.0f, 1.0f, 0.0f);
+    panelSurface->RegisterButtonAction("xrRecentre", [this]() { RecentreGrabbables(); });
+    panelSurface->RegisterButtonAction("xrExit", []() { CC::StateMachine::Get()->GotoState("Boot"); });
+    panelSurface->RegisterButtonAction("xrCyclePreset", [this]() { ApplyNextGradePreset(); });
 
     CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
     CC::InputManager::Get()->SetPaused(false);
@@ -176,12 +175,6 @@ void AppStateXrDemo::SceneInit()
     materials->CreateMaterial("XrHand", "LitColour", "", CC::Vector3(0.7f, 0.75f, 0.9f));
     materials->CreateMaterial("XrRay",  "LitColour", "", CC::Vector3(0.3f, 0.9f, 1.0f));
     materials->CreateMaterial("XrGrabbable", "LitColour", "", CC::Vector3(0.9f, 0.5f, 0.2f));
-    materials->CreateMaterial("XrPanelSurface", "TextureShader");
-
-    // The panel texture is mostly empty: only the card is opaque. Drawn
-    // without blending the whole quad is a black slab with the card on it.
-    CC::Material* panelMaterial = materials->GetMaterial("XrPanelSurface");
-    panelMaterial->SetAlphaMode(CC::AlphaBlendMode::Blend);
 
     for (int hand = 0; hand < HAND_COUNT; hand++)
     {
@@ -218,8 +211,11 @@ void AppStateXrDemo::SceneInit()
     proceduralVeins->SetUniform("veinSharpness", 7.0f);
     proceduralVeins->SetUniform("glowColour", CC::Vector3(4.0f, 1.4f, 0.5f));
 
+    // The panel's size in metres is its transform; the surface behind it
+    // knows only pixels.
     panelObject = new CC::SceneObject("XrPanel");
-    panelObject->AddComponent(new CC::RenderableQuad(materials->GetMaterial("XrPanelSurface")));
+    panelComponent = new CC::UiWorldPanel("XrDemoPanel", PANEL_SURFACE_WIDTH, PANEL_SURFACE_HEIGHT);
+    panelObject->AddComponent(panelComponent);
     panelObject->GetTransform().SetPosition(panelPosition);
     panelObject->GetTransform().SetScale(CC::Vector3(PANEL_WIDTH, PANEL_HEIGHT, 1.0f));
     CC::SceneHierarchy::Get()->AddRootObject(panelObject);
@@ -243,67 +239,16 @@ void AppStateXrDemo::SceneShutdown()
         grabbableObject[i] = nullptr;
     }
     panelObject = nullptr;
+
+    // The component's Shutdown ran with the hierarchy and took its surface,
+    // and the controller registered on that surface went with it.
+    panelComponent = nullptr;
+    panelController = nullptr;
 }
 
 void AppStateXrDemo::Shutdown()
 {
-    CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
-    CC::UiManager::Get()->ClearPanelSurface();
-    DestroyPanelTarget();
     SceneShutdown();
-}
-
-// ========================
-// Panel target
-// ========================
-
-void AppStateXrDemo::CreatePanelTarget()
-{
-    CC::Gfx::RenderApi* gfxApi = CC::Gfx::RenderApi::Get();
-
-    CC::Gfx::TextureDescription colorDesc;
-    colorDesc.width          = PANEL_TEXTURE_WIDTH;
-    colorDesc.height         = PANEL_TEXTURE_HEIGHT;
-    colorDesc.format         = CC::Gfx::TextureFormat::Rgba8Unorm;
-    colorDesc.isRenderTarget = true;
-    colorDesc.debugName      = "AppStateXrDemo::PanelColor";
-    panelColorTexture = gfxApi->CreateTexture(colorDesc);
-
-    CC::Gfx::RenderTargetDescription targetDesc;
-    targetDesc.width                       = PANEL_TEXTURE_WIDTH;
-    targetDesc.height                      = PANEL_TEXTURE_HEIGHT;
-    targetDesc.colorAttachmentCount        = 1;
-    targetDesc.colorAttachments[0].texture = panelColorTexture;
-    targetDesc.colorAttachments[0].loadOp  = CC::Gfx::LoadOp::Clear;
-    targetDesc.colorAttachments[0].storeOp = CC::Gfx::StoreOp::Store;
-    // Transparent, not the attachment default of opaque black: everything the
-    // screen does not cover has to disappear rather than become a slab.
-    targetDesc.colorAttachments[0].clearColor[0] = 0.0f;
-    targetDesc.colorAttachments[0].clearColor[1] = 0.0f;
-    targetDesc.colorAttachments[0].clearColor[2] = 0.0f;
-    targetDesc.colorAttachments[0].clearColor[3] = 0.0f;
-    targetDesc.hasDepthStencil             = false;
-    targetDesc.sampleCount                 = 1;
-    targetDesc.debugName                   = "AppStateXrDemo::PanelTarget";
-    panelTarget = gfxApi->CreateRenderTarget(targetDesc);
-
-    CC::MaterialManager::Get()->GetMaterial("XrPanelSurface")->SetTextureHandleOverride(panelColorTexture);
-}
-
-void AppStateXrDemo::DestroyPanelTarget()
-{
-    CC::Gfx::RenderApi* gfxApi = CC::Gfx::RenderApi::Get();
-
-    if (panelTarget.IsValid())
-    {
-        gfxApi->DestroyRenderTarget(panelTarget);
-        panelTarget = CC::Gfx::RenderTargetHandle();
-    }
-    if (panelColorTexture.IsValid())
-    {
-        gfxApi->DestroyTexture(panelColorTexture);
-        panelColorTexture = CC::Gfx::TextureHandle();
-    }
 }
 
 // ========================
@@ -335,15 +280,8 @@ void AppStateXrDemo::Update()
     if (isXrActive && !isPaused)
     {
         UpdateHands();
-        UpdatePanelPointer();
         UpdateReadout();
     }
-
-    // Runs here rather than with the rest of the UI because the panel is a
-    // texture the scene samples, and the scene draws before the frame's UI
-    // pass. Its content is therefore one frame behind the pointer, which at
-    // headset refresh is not perceptible.
-    CC::UiManager::Get()->RenderToTarget(panelTarget);
 }
 
 void AppStateXrDemo::UpdateHands()
@@ -369,6 +307,7 @@ void AppStateXrDemo::UpdateHands()
         if (aimPose.isTracked)
         {
             UpdateRay(handEnum, aimPose);
+            SubmitPanelPointer(handEnum, aimPose);
         }
     }
 }
@@ -465,91 +404,30 @@ void AppStateXrDemo::UpdateGrab(CC::XrHand hand, const CC::TrackedPose& gripPose
 // Panel pointer
 // ========================
 
-bool AppStateXrDemo::IntersectPanel(const CC::TrackedPose& aimPose, float& outPixelX, float& outPixelY) const
+void AppStateXrDemo::SubmitPanelPointer(CC::XrHand hand, const CC::TrackedPose& aimPose)
 {
-    bool isHit = false;
+    const int handIndex = (int)hand;
+    const int selectAction = (hand == CC::XrHand::Left) ? Select : SelectSecondary;
 
-    CC::Vector3 forward = aimPose.orientation.RotateVector(CC::Vector3(0.0f, 0.0f, -1.0f));
+    // Vector3's arithmetic is not const-qualified, so the pose is copied
+    // before use rather than read through the const reference.
     CC::Vector3 aimPosition = aimPose.position;
+    CC::Vector3 forward = aimPose.orientation.RotateVector(CC::Vector3(0.0f, 0.0f, -1.0f));
 
-    CC::Vector3 planeNormal = panelNormal;
-    CC::Vector3 planeOrigin = panelPosition;
-    CC::Vector3 planeRight  = panelRight;
-    CC::Vector3 planeUp     = panelUp;
+    CC::UiManager::Get()->GetPointerRouter().SubmitRay(
+        handIndex, aimPosition, forward, RAY_LENGTH,
+        CC::InputManager::Get()->IsPressed(selectAction));
 
-    float denominator = forward.Dot(planeNormal);
-
-    // Near zero means the ray runs along the panel rather than into it, and
-    // the intersection is either nowhere or everywhere.
-    if (denominator < -0.0001f || denominator > 0.0001f)
+    // A pulse as the ray crosses onto a panel. Without it there is no way to
+    // feel the edge, and the ray has no shadow to judge it by. What the
+    // router decided last frame, because this frame's ray has not been
+    // resolved yet.
+    bool isOnPanel = panelComponent->IsPointerOn(handIndex);
+    if (isOnPanel && !wasHoveringPanel[handIndex])
     {
-        CC::Vector3 toPanel = planeOrigin - aimPosition;
-        float distance = toPanel.Dot(planeNormal) / denominator;
-
-        if (distance > 0.0f && distance <= RAY_LENGTH)
-        {
-            CC::Vector3 hit = aimPosition + forward * distance;
-            CC::Vector3 local = hit - planeOrigin;
-
-            float halfWidth = PANEL_WIDTH * 0.5f;
-            float halfHeight = PANEL_HEIGHT * 0.5f;
-            float localX = local.Dot(planeRight);
-            float localY = local.Dot(planeUp);
-
-            if (localX >= -halfWidth && localX <= halfWidth
-             && localY >= -halfHeight && localY <= halfHeight)
-            {
-                // Panel space is centred and Y-up; the UI is corner-origin
-                // and Y-down.
-                outPixelX = ((localX + halfWidth) / PANEL_WIDTH) * (float)PANEL_TEXTURE_WIDTH;
-                outPixelY = (1.0f - ((localY + halfHeight) / PANEL_HEIGHT)) * (float)PANEL_TEXTURE_HEIGHT;
-                isHit = true;
-            }
-        }
+        CC::XrManager::Get()->TriggerHaptic(hand, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);
     }
-
-    return isHit;
-}
-
-void AppStateXrDemo::UpdatePanelPointer()
-{
-    CC::XrManager* xr = CC::XrManager::Get();
-    CC::InputManager* input = CC::InputManager::Get();
-
-    CC::UiPointerState pointer;
-
-    // One pointer, whichever hand is on the panel. The right hand wins a tie
-    // only because something has to; both hands driving one cursor at once
-    // reads as a fight.
-    for (int hand = 0; hand < HAND_COUNT; hand++)
-    {
-        const CC::XrHand handEnum = (CC::XrHand)hand;
-        const CC::TrackedPose& aimPose = xr->GetHandPose(handEnum, CC::XrPoseKind::Aim);
-
-        float pixelX = 0.0f;
-        float pixelY = 0.0f;
-        bool isOnPanel = aimPose.isTracked && IntersectPanel(aimPose, pixelX, pixelY);
-
-        if (isOnPanel)
-        {
-            const int selectAction = (handEnum == CC::XrHand::Left) ? Select : SelectSecondary;
-
-            pointer.x        = pixelX;
-            pointer.y        = pixelY;
-            pointer.isDown   = input->IsPressed(selectAction);
-            pointer.isActive = true;
-        }
-
-        // A pulse as the ray crosses onto the panel. Without it there is no
-        // way to feel the edge, and the ray has no shadow to judge it by.
-        if (isOnPanel && !wasHoveringPanel[hand])
-        {
-            xr->TriggerHaptic(handEnum, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);
-        }
-        wasHoveringPanel[hand] = isOnPanel;
-    }
-
-    CC::UiManager::Get()->GetInputHandler().SetPointerOverride(pointer);
+    wasHoveringPanel[handIndex] = isOnPanel;
 }
 
 void AppStateXrDemo::UpdatePauseInput()
@@ -578,10 +456,9 @@ void AppStateXrDemo::TogglePause()
 
     if (isPaused)
     {
-        // The pointer belongs to the mouse again while the menu is up.
-        CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
-        CC::UiManager::Get()->ClearPanelSurface();
-        CC::UiScreenSystem::Get()->SetScreen("PauseMenu");
+        // Only the window's screen changes. The panel in the world keeps its
+        // own surface and carries on showing what it was showing.
+        CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("PauseMenu");
         CC::InputManager::Get()->LockMouseCursor(false);
     }
     else
@@ -594,9 +471,7 @@ void AppStateXrDemo::ShowSceneScreen()
 {
     // The HUD is the window's screen either way. It carries the tracking
     // label, which shows itself once a session owns input.
-    CC::UiManager::Get()->GetInputHandler().ClearPointerOverride();
-    CC::UiManager::Get()->ClearPanelSurface();
-    CC::UiScreenSystem::Get()->SetScreen("Hud");
+    CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("Hud");
 }
 
 void AppStateXrDemo::UpdateReadout()

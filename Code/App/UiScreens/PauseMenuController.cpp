@@ -1,6 +1,5 @@
 #include "PauseMenuController.h"
-#include "UiManager.h"
-#include "UiScreenSystem.h"
+#include "UiSurface.h"
 
 PauseMenuController::PauseMenuController(std::function<void()> onResume, std::function<void()> onBackToMenu,
                                          std::function<void()> onQuit)
@@ -12,17 +11,17 @@ PauseMenuController::PauseMenuController(std::function<void()> onResume, std::fu
 
 void PauseMenuController::Init()
 {
-    CC::UiManager* uiManager = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
-    uiManager->RegisterButtonAction("resume", onResumeCallback);
-    uiManager->RegisterButtonAction("options", []()
+    ui->RegisterButtonAction("resume", onResumeCallback);
+    ui->RegisterButtonAction("options", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionForward("Options");
+        ui->Screens().TransitionForward("Options");
     });
-    uiManager->RegisterButtonAction("xrMode", []()
+    ui->RegisterButtonAction("xrMode", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionForward("XrMode");
+        ui->Screens().TransitionForward("XrMode");
     });
-    uiManager->RegisterButtonAction("backToMenu", onBackToMenuCallback);
-    uiManager->RegisterButtonAction("quit", onQuitCallback);
+    ui->RegisterButtonAction("backToMenu", onBackToMenuCallback);
+    ui->RegisterButtonAction("quit", onQuitCallback);
 }

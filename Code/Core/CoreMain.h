@@ -16,7 +16,6 @@ namespace CC
     class TextRenderer;
     class UiRenderer;
     class UiManager;
-    class UiScreenSystem;
     class StringDbManager;
     class AudioManager;
 
@@ -67,7 +66,6 @@ namespace CC
         UiRenderer* uiRenderer;
         StringDbManager* stringDbManager;
         UiManager* uiManager;
-        UiScreenSystem* uiScreenSystem;
         AudioManager* audioManager;
     };
 }

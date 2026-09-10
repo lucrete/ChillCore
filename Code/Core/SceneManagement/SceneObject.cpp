@@ -41,9 +41,12 @@ namespace CC
 
     void SceneObject::Init()
     {
-        for (Component* component : components)
+        // Indexed rather than ranged: a component may add another during its
+        // own Init, and the appended one is then initialised in turn instead
+        // of invalidating the iterator.
+        for (size_t i = 0; i < components.size(); i++)
         {
-            component->Init();
+            components[i]->Init();
         }
 
         for (SceneObject* child : children)

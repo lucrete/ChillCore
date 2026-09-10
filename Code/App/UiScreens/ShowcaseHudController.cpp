@@ -1,6 +1,6 @@
 #include "ShowcaseHudController.h"
 
-#include "UiManager.h"
+#include "UiSurface.h"
 #include "UiElement.h"
 #include "InputManager.h"
 
@@ -12,7 +12,7 @@ ShowcaseHudController::ShowcaseHudController(std::function<void()> onPause)
 void ShowcaseHudController::Init()
 {
     CC::InputManager* input = CC::InputManager::Get();
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
     moveStick = ui->GetElementById("moveStick");
     lookStick = ui->GetElementById("lookStick");
@@ -73,7 +73,7 @@ void ShowcaseHudController::OnUpdate()
         {
             trackingLabel->SetVisible(isMirroring);
         }
-        CC::UiManager::Get()->InvalidateLayout();
+        GetSurface()->InvalidateLayout();
         isTrackingLabelVisible = isMirroring;
     }
 
@@ -92,7 +92,7 @@ void ShowcaseHudController::OnUpdate()
 
         // Layout skips invisible elements; toggling visible needs a re-run
         // so newly-shown elements get real rects instead of (0, 0, 0, 0).
-        CC::UiManager::Get()->InvalidateLayout();
+        GetSurface()->InvalidateLayout();
 
         // Drop any cached override values when the user has switched away
         // from touch — otherwise the last drag value would persist as the

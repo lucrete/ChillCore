@@ -5,7 +5,6 @@
 #include "TextRenderer.h"
 #include "UiRenderer.h"
 #include "UiManager.h"
-#include "UiScreenSystem.h"
 #include "StringDbManager.h"
 #include "GfxRenderApi.h"
 #include "AudioManager.h"
@@ -73,12 +72,10 @@ namespace CC
         uiRenderer = new UiRenderer();
         stringDbManager = new StringDbManager();
         uiManager = new UiManager();
-        uiScreenSystem = new UiScreenSystem();
     }
 
     void CoreMain::Shutdown()
     {
-        delete(uiScreenSystem);
         delete(uiManager);
         delete(stringDbManager);
         delete(uiRenderer);
@@ -122,12 +119,17 @@ namespace CC
 
         // UiUpdate phase
         frameTimer->AddTimestamp(StandardTimestamp::UiScreen,         "UiScreen");
-        uiScreenSystem->Update();
+        uiManager->UpdateScreens();
         frameTimer->AddTimestamp(StandardTimestamp::UiUpdate,         "UiUpdate");
         uiManager->Update();
         frameTimer->AddTimestamp(StandardTimestamp::DevUiUpdate,      "DevUi");
         devUi->Update();                // toggles + content building (overlay, view draws)
         audioManager->Update();         // reap finished SFX after UI/DevUi may have triggered new ones
+
+        // Offscreen UI surfaces, drawn before the scene that samples them.
+        // Each opens and closes its own pass, so this cannot sit inside the
+        // scene's.
+        uiManager->RenderSurfaces();
 
         // Render phase
         frameTimer->AddTimestamp(StandardTimestamp::Render,           "Render");

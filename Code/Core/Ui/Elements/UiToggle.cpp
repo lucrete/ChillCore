@@ -11,4 +11,13 @@ namespace CC
     UiToggle::~UiToggle()
     {
     }
+
+    void UiToggle::SetChecked(bool checked)
+    {
+        if (isChecked != checked)
+        {
+            isChecked = checked;
+            MarkSurfaceDirty();
+        }
+    }
 }

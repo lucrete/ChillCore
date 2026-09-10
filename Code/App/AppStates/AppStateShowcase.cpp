@@ -10,8 +10,8 @@
 #include "SceneHierarchy.h"
 #include "RenderableSphere.h"
 #include "RotateRandom.h"
-#include "UiScreenSystem.h"
 #include "UiManager.h"
+#include "UiSurface.h"
 #include "UiElement.h"
 #include "CoreMain.h"
 #include "StateMachine.h"
@@ -56,19 +56,19 @@ void AppStateShowcase::Init()
     actionMap.RegisterAction(CC::ActionDef(Pause, "Pause", CC::InputTrigger::GamepadStart));
     actionMap.RegisterAction(CC::ActionDef(CycleGradePreset, "CycleGradePreset", CC::InputTrigger::GamepadFaceRight));
 
-    CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
-    screens->RegisterScreen("ShowcaseHud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
+    CC::UiScreenSystem& screens = CC::UiManager::Get()->GetWindowSurface()->Screens();
+    screens.RegisterScreen("ShowcaseHud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
         new ShowcaseHudController(
             [this]() { pendingTogglePause = true; }));
-    screens->RegisterScreen("PauseMenu", "Data/Ui/PauseMenu.html", "Data/Ui/PauseMenu.css",
+    screens.RegisterScreen("PauseMenu", "Data/Ui/PauseMenu.html", "Data/Ui/PauseMenu.css",
         new PauseMenuController(
             [this]() { pendingTogglePause = true; },
             []() { CC::StateMachine::Get()->GotoState("Boot"); },
             []() { CC::CoreMain::Get()->RequestQuit(); }
         ));
-    screens->RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css",
+    screens.RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css",
         new OptionsController());
-    screens->SetScreen("ShowcaseHud");
+    screens.SetScreen("ShowcaseHud");
 
     CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
     CC::InputManager::Get()->LockMouseCursor(true);
@@ -210,12 +210,12 @@ void AppStateShowcase::TogglePause()
         wasMouseLocked = CC::InputManager::Get()->IsMouseCursorLocked();
         CC::InputManager::Get()->LockMouseCursor(false);
         CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
-        CC::UiScreenSystem::Get()->SetScreen("PauseMenu");
+        CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("PauseMenu");
     }
     else
     {
         CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
-        CC::UiScreenSystem::Get()->SetScreen("ShowcaseHud");
+        CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("ShowcaseHud");
         if (wasMouseLocked)
         {
             CC::InputManager::Get()->LockMouseCursor(true);
@@ -245,7 +245,7 @@ void AppStateShowcase::ApplyNextGradePreset()
 
 void AppStateShowcase::UpdateTimerDisplay()
 {
-    CC::UiElement* timerElement = CC::UiManager::Get()->GetElementById("timer");
+    CC::UiElement* timerElement = CC::UiManager::Get()->GetWindowSurface()->GetElementById("timer");
     if (timerElement != nullptr)
     {
         int totalSeconds = static_cast<int>(elapsedTime);
@@ -262,7 +262,7 @@ void AppStateShowcase::Shutdown()
 {
     CC::RenderManager::Get()->GetPostProcess()->DisableAllEffects();
 
-    CC::UiScreenSystem::Get()->ClearAllScreens();
+    CC::UiManager::Get()->GetWindowSurface()->Screens().ClearAllScreens();
 
     CC::SceneHierarchy::Get()->SetPaused(false);
     SceneShutdown();

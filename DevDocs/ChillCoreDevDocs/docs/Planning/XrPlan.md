@@ -1,6 +1,6 @@
 # XR Plan
 
-**Status:** M1 landed and verified. M2 and M3 are written and build. M4 is mostly complete: the demo state, ray, grab and world-space panel are in, and the panel path is verified flat. M5 is written and builds; the flat path and clean shutdown are verified, and everything needing a live session is not. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its panel drawing. Everything downstream of a live session is unverified pending a connected headset.
+**Status:** M1 landed and verified. M2 and M3 are written and build. M4 is mostly complete: the demo state, ray, grab and world-space panel are in, and the panel path is verified flat. M5 is written and builds, including the in-headset panel rebuilt on its own surface so it and the desktop pause menu coexist; the flat path and clean shutdown are verified, and everything needing a live session is not. What can be exercised without a headset is verified: the loader reaches the runtime, the flat fallback is unchanged, and the demo state boots and runs with its panel drawing. Everything downstream of a live session is unverified pending a connected headset.
 **Current state:** AGD-0070 (Rendering Pipeline), AGD-0080 (Graphics API Abstraction), AGD-0030 (Platform Layer) and AGD-0110 (Input System) describe the seams this work plugs into. None of them cover XR.
 **Scope:** PCVR on the desktop target — Valve Index through SteamVR, Meta Quest 2 over Link and Air Link, both through the GL 4.3 backend. Quest standalone over GLES is not in plan and is not covered here.
 
@@ -211,13 +211,11 @@ UI, text and the developer overlay draw to the default framebuffer with no rende
 
 **Written, partly verified.** `AppStateXrDemo` is registered and boots directly. Verified flat, with no headset: the scene builds, the panel target is created, the screen renders into it, and the quad in the scene samples it — the whole panel path works without a session, and the state reports itself inactive rather than failing. Unverified: hands, ray, grab, pointer and haptics, all of which are gated on a live session.
 
-**Three engine additions the milestone needed.**
+**Three engine additions the milestone needed.** Two have since been replaced by the surface work in M5; the third stands.
 
-- `UiManager::RenderToTarget` draws the active screen into an offscreen target at that target's size. Layout is cached against one surface size, so it marks layout dirty on the way out and restores the text projection the window pass expects.
-- `UiPointerState` on `UiInputHandler` replaces the mouse as the pointer source. Hit testing already worked in panel-space pixels, so the ray only has to convert its hit; a pointer that leaves the surface releases what it was holding rather than leaving it stuck pressed.
-- `Material::SetTextureHandleOverride` binds a texture the material does not own at unit 0. `Texture` only ever loads from a file or from memory, and a render target's colour attachment is neither.
-
-**The panel is one frame behind.** It renders during the state's Update, because the scene samples it and the scene draws before the frame's UI pass. At headset refresh this is not perceptible; moving it would mean reordering `CoreMain::TickFrame`.
+- `UiManager::RenderToTarget` drew the active screen into an offscreen target. Replaced: a surface owns its target and the UI manager renders every offscreen surface before the scene.
+- `UiPointerState` on `UiInputHandler` replaced the mouse as the pointer source. Kept as the pointer type, but there is no longer an override — a surface holds several pointers at once and whoever points at it supplies them.
+- `Material::SetTextureHandleOverride` binds a texture the material does not own at unit 0. `Texture` only ever loads from a file or from memory, and a render target's colour attachment is neither. Unchanged, and how a panel's quad samples its surface.
 
 **Noted, not fixed.** `Vector3`'s arithmetic operators are not const-qualified, so a `const Vector3&` cannot take part in one. The demo copies before use. Worth fixing in the maths header, but not as part of this work.
 
@@ -289,7 +287,15 @@ A pause menu inside the headset. Until it exists, pausing while wearing the head
 
 **One HUD, not two.** The window's screen is the application HUD in every unpaused case, and it carries a tracking label that shows itself whenever the effective mode is `None`. Nothing new was added to the screen system: a second HUD, and an API for showing no screen at all, were both written and then removed once the shared HUD covered the case.
 
-**Costs the world-space panel for now.** `UiManager` holds one active screen tree, so the HUD on the window and the panel in the headset compete for it. With the HUD taking the slot, the panel surface is off and M4's in-headset panel does not render. Restoring both needs a second, independent UI tree — one laid out and drawn for the window, one for the panel — which is what would also let the pause menu appear on the desktop while the panel stays up in the headset. That belongs with M4.
+**The world panel and the desktop menu now coexist.** The panel was rebuilt on its own surface rather than repaired in place, once the UI could hold more than one. The panel is a `UiWorldPanel` component on a scene object, owning its surface, its target and its quad; its screen is registered on that surface, and the window's HUD, pause menu and options are registered on the window's. Pausing changes the window's screen and leaves the panel showing what it was showing.
+
+Three workarounds went with it rather than being kept:
+
+- **The pointer override is gone.** Each hand submits its aim ray to the UI's pointer router, which takes the nearest hit-testable target and hands that target the hit. Nothing in the demo knows where a panel is, and the haptic pulse on crossing an edge reads what the router decided rather than intersecting a second time.
+- **The panel-surface switch is gone.** There is no "current surface" to switch; the window and the panel each lay out and hit-test against their own size.
+- **The render-to-target call is gone.** Offscreen surfaces are rendered by the UI manager before the scene that samples them, so the demo no longer drives a UI render from inside its own update. The panel is no longer a frame behind.
+
+**Verified flat, with no headset:** builds clean; boots into the demo with the window HUD and the panel surface both live; the panel draws once and then not again until its content changes, and once per change after that. A second panel authored in a scene file creates its own surface alongside the demo's, so the panel path is not specific to this state. **Still unverified:** everything needing a live session — the ray reaching the panel, two hands on one panel, the haptic edge, entering and leaving XR, and the paused-in-XR desktop mode.
 
 ---
 

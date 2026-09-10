@@ -16,7 +16,12 @@ namespace CC
 
     void UiSlider::SetCurrentValue(float value)
     {
-        currentValue = std::max(minValue, std::min(maxValue, value));
+        float clamped = std::max(minValue, std::min(maxValue, value));
+        if (clamped != currentValue)
+        {
+            currentValue = clamped;
+            MarkSurfaceDirty();
+        }
     }
 
     float UiSlider::GetNormalizedValue() const
