@@ -3,6 +3,7 @@
 #include "FrameTimer.h"
 #include "InputManager.h"
 #include "RenderManager.h"
+#include "SceneHierarchy.h"
 #include "AudioManager.h"
 #include "stddef.h"
 
@@ -142,6 +143,14 @@ namespace CC
         {
             activeState->Shutdown();
         }
+
+        // Pausing is a decision one state makes, but the mechanism behind it
+        // is global, so a state left while paused would hand its pause to
+        // whatever runs next. The incoming state gets an unpaused world, and
+        // a paused input manager no longer outranks the interaction mode it
+        // asks for.
+        SceneHierarchy::Get()->SetPaused(false);
+        InputManager::Get()->SetPaused(false);
 
         activeState = stateMap[pendingState];
         pendingState.clear();

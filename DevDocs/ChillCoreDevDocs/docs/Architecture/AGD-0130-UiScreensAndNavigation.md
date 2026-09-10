@@ -51,6 +51,8 @@ The fade is an opacity applied to interface and text drawing together. Each surf
 
 **Add a screen.** Author the markup and stylesheet, implement a controller, and register it on a surface under an identifier. Register callbacks in the controller's initialisation, since they persist.
 
+**Register the screens a state needs, in that state.** Including sub-screens its menus route to. A state clears the window's registry on the way out, so identifiers are free for the next state to reuse.
+
 **Reach the stack you mean.** Name its surface. A controller asks for its own; application code asks the interface manager for the window's.
 
 **Navigate into a sub-screen.** Transition forward. Cancel will return automatically; no back callback is needed.
@@ -93,6 +95,14 @@ A guard prevents navigating past the root, so cancel at the top level does nothi
 
 Controllers needing different behaviour intercept the action first. The cost is that this precedence is a convention rather than something enforced.
 
+### A stack belongs to the scene, so screens are registered per state
+
+A state registers its screens on entry and clears them on exit. The next state starts from a clean registry, and identifiers like "Options" or "PauseMenu" are reused freely because no two states hold them at once.
+
+Registering shared screens once at application startup was tried and rejected. It splits ownership of one registry between the application and whichever state is running, so the state's clear on exit destroys screens it did not register — which then needs a lifetime marker on every registration to work around. Screens are content of the scene, and the same rule as the scene itself is simpler: whoever set it up takes it down.
+
+The cost is that a screen used by several states is registered by each of them. That is a few lines per state, and it keeps the question "what is registered right now" answerable from one place.
+
 ### Controllers initialise once and then enter and exit repeatedly
 
 Initialisation runs at registration; enter and exit run per activation.
@@ -112,3 +122,4 @@ The cost is a trap for authors: putting content refresh in initialisation appear
 - Flat replacement discards the whole stack, so it cannot be used to swap the current screen while preserving history.
 - Registration temporarily activates a screen's tree on its surface, so registration order can matter if a controller has side effects beyond attaching callbacks.
 - Screen identifiers are unique per surface, not globally. The same identifier on two surfaces names two separate screens.
+- A menu routing to a sub-screen its state did not register fails an assertion at the transition. Nothing checks the pairing at registration.

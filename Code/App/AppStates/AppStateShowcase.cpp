@@ -123,6 +123,7 @@ void AppStateShowcase::InitControls()
 
 void AppStateShowcase::Update()
 {
+
     if (pendingTogglePause)
     {
         pendingTogglePause = false;
@@ -264,7 +265,6 @@ void AppStateShowcase::Shutdown()
 
     CC::UiManager::Get()->GetWindowSurface()->Screens().ClearAllScreens();
 
-    CC::SceneHierarchy::Get()->SetPaused(false);
     SceneShutdown();
 
     procArtController->Shutdown();

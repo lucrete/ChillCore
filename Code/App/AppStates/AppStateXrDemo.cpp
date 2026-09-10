@@ -23,6 +23,7 @@
 #include "OptionsController.h"
 #include "ShowcaseHudController.h"
 #include "PauseMenuController.h"
+#include "XrModeController.h"
 #include "XrManager.h"
 
 namespace
@@ -81,6 +82,8 @@ AppStateXrDemo::AppStateXrDemo()
     , isPaused(false)
     , pendingTogglePause(false)
 {
+    isXrSupported = true;
+
     for (int hand = 0; hand < HAND_COUNT; hand++)
     {
         handObject[hand] = nullptr;
@@ -125,6 +128,8 @@ void AppStateXrDemo::Init()
         new OptionsController());
     windowSurface->Screens().RegisterScreen("Hud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
         new ShowcaseHudController([this]() { pendingTogglePause = true; }));
+    windowSurface->Screens().RegisterScreen("XrMode", "Data/Ui/XrMode.html", "Data/Ui/XrMode.css",
+        new XrModeController());
 
     ShowSceneScreen();
 
@@ -248,6 +253,10 @@ void AppStateXrDemo::SceneShutdown()
 void AppStateXrDemo::Shutdown()
 {
     SceneShutdown();
+
+    // The screens this state registered on the window go with it. The
+    // app-lifetime ones stay.
+    CC::UiManager::Get()->GetWindowSurface()->Screens().ClearAllScreens();
 }
 
 // ========================
@@ -446,9 +455,14 @@ void AppStateXrDemo::TogglePause()
 {
     isPaused = !isPaused;
 
+    // Paused, not disabled. Renderables submit to the render list from their
+    // own component update, so disabling the hierarchy stops the scene being
+    // drawn at all rather than stopping it moving. Pausing skips only the
+    // components that declare themselves pauseable.
+    //
     // The world stops; the camera does not. A scene that stops tracking the
     // head while the head moves is what makes people ill.
-    CC::SceneHierarchy::Get()->SetEnabled(!isPaused);
+    CC::SceneHierarchy::Get()->SetPaused(isPaused);
     CC::InputManager::Get()->SetPaused(isPaused);
 
     if (isPaused)

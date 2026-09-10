@@ -15,6 +15,7 @@
 - **App state** — a named unit of application behaviour with an initialise, update, and shut down lifecycle. Registered once, activated by name.
 - **Transition** — the fade-out, swap, fade-in sequence that separates two states.
 - **Pauseable** — a property of a component, not of a state. A pauseable component stops updating while the scene is paused; everything else keeps running.
+- **XR support** — a property of a state. Whether its scene can be entered in a headset, declared by the state and false unless it says otherwise.
 
 ## Architecture
 
@@ -22,11 +23,11 @@
 
 Because it is a singleton, a state requests a transition by naming the target. It holds no reference to the machine and knows nothing about which state it is handing off to.
 
-`StateMachineState` is the base contract: initialise, update, shut down. It is deliberately unaware of transitions, fading, and pause — a state cannot observe or interfere with the machinery moving it.
+`StateMachineState` is the base contract: initialise, update, shut down, and whether the state supports XR. It is deliberately unaware of transitions, fading, and pause — a state cannot observe or interfere with the machinery moving it.
 
 The fade overlay is not owned here. `StateMachine` sets a fade level on the render subsystem, which owns a fullscreen quad drawn after everything else. The state machine carries no knowledge of how the fade is drawn.
 
-Pause is owned by the scene hierarchy as a single flag. Components declare whether they respond to it. The decision to pause is per state; the mechanism is global.
+Pause is owned by the scene hierarchy as a single flag, with a matching one on input. Components declare whether they respond to it. The decision to pause is per state; the mechanism is global, so the machine clears both flags at a state swap rather than trusting each state to.
 
 ## Runtime flow
 
@@ -64,6 +65,16 @@ Acting immediately would mean shutting down a state from inside its own update, 
 
 The one exception is the first transition, when no state is active. There is nothing to defer, so it executes immediately.
 
+### The state machine clears pause at a swap
+
+Pause is a per-state decision acting on a global mechanism — one flag on the scene hierarchy, one on input. A state that is left *while paused* would otherwise hand its pause to whatever runs next.
+
+That failure is quiet and lands somewhere else. A paused input manager outranks the interaction mode a state asks for, so the next state sets up normally, reports the mode it wanted, and simply never receives world input: the camera stops responding to the mouse with nothing in the log and no crash.
+
+Clearing at the swap rather than in each state's shut-down is deliberate. Requiring every state to reset both flags is a rule that holds only while everyone remembers, and the states that most need it are the ones whose exit path *is* the pause menu. The machine already owns the boundary, so it owns the reset.
+
+The incoming state's initialisation still runs after the reset, so a state that wants to begin paused can say so.
+
 ### The fade is a full-frame overlay, not a UI element
 
 The overlay covers the three-dimensional scene, the UI, text, and the developer UI, because it is drawn after all of them.
@@ -94,9 +105,21 @@ Marking individual components as pauseable solves it directly. Renderables are n
 
 The cost is the default. Not-pauseable is the safe default for the engine but the wrong default for gameplay, so a new gameplay component that nobody marked will keep animating through a pause. Defaulting the other way would have required every always-on component to opt out, which is a larger change to the component base.
 
+### Whether a state supports XR is the state's own answer
+
+A state declares whether its scene can be entered in a headset, and the pause menu offers the XR entry only where it can. The default is no.
+
+Defaulting to no is the point. A state authored for a window — a fullscreen shader, a tracker grid, a flat menu — has not thought about stereo, a tracked head, or a scene measured in metres, and offering XR from it would put the user in a headset looking at something that does not work there. Opting in is a deliberate statement that the scene has been considered for it.
+
+Deriving support instead — from whether a state installs a perspective camera, say — was rejected as a guess about intent from a fact about implementation. The two come apart immediately: a state can have a perfectly ordinary camera and a scene that still makes no sense in a headset.
+
+The cost is that the flag and the XR screen's registration are two separate things a state has to remember. A state answering true without registering the screen fails an assertion the first time someone navigates to it.
+
 ### Global setup belongs to application startup, not to a boot state
 
-Any state must be directly bootable as the first state. That requires everything shared — preloaded UI sounds, screens used by more than one state, input contexts spanning states — to be established before the first state activates, in application startup rather than in a boot state.
+Any state must be directly bootable as the first state. That requires everything shared — preloaded UI sounds, input contexts spanning states — to be established before the first state activates, in application startup rather than in a boot state.
+
+Screens are not on that list. A screen stack belongs to the scene, so a state registers the screens it uses and clears them on the way out, and a screen used by several states is registered by each. Hoisting shared screens to application startup splits ownership of one registry, and the state's clear on exit then destroys screens it never registered.
 
 The alternative, letting a boot state perform global setup, makes every other state silently depend on having passed through it. A state would work when reached through the menu and fail when booted directly, which is exactly the friction the policy removes.
 
@@ -108,5 +131,6 @@ The cost is vigilance: the policy holds only as long as new global setup is put 
 
 - State initialisation is synchronous, and runs during the black frame. A state with heavy loading holds a black screen for as long as it takes, with no progress indication.
 - Components default to not pauseable, so a gameplay component that should freeze will keep running unless explicitly marked.
+- Pause is cleared at a state swap but not on any other path. Anything else that sets it globally and outlives its setter has the same failure.
 - Two independent fade systems exist with different durations and scopes.
 - States cannot be unregistered, and there is no mechanism for a state to hand data to its successor.

@@ -6,9 +6,6 @@
 #include "AppStateAudioTracker.h"
 #include "AppStateXrDemo.h"
 #include "AudioManager.h"
-#include "UiManager.h"
-#include "UiSurface.h"
-#include "XrModeController.h"
 
 AppMain::AppMain()
 {
@@ -23,9 +20,6 @@ AppMain::~AppMain()
 void AppMain::Init()
 {
     LoadGlobalUiSfx();
-
-    CC::UiManager::Get()->GetWindowSurface()->Screens().RegisterScreen("XrMode", "Data/Ui/XrMode.html", "Data/Ui/XrMode.css",
-                                              new XrModeController());
 
     stateMachine = new CC::StateMachine();
     stateMachine->RegisterState("Boot", new AppStateBoot());

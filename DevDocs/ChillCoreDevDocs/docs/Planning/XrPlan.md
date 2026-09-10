@@ -242,7 +242,9 @@ Pause never stops XR. The headset keeps rendering and tracking while the desktop
 
 ### Pause stops the world, never the camera
 
-`SceneHierarchy::SetEnabled(false)` already gates world update, and camera update runs from the rendering frontend independently of it, so the behaviour needs no new machinery.
+`SceneHierarchy::SetPaused(true)` gates world update, and camera update runs from the rendering frontend independently of it, so the behaviour needs no new machinery.
+
+**Not `SetEnabled(false)`.** Renderables submit to the render list from their own component update, so disabling the hierarchy stops the scene being drawn at all rather than stopping it moving — the window goes blank behind the menu. Pausing skips only the components that declare themselves pauseable, and renderables do not.
 
 **This rule is load-bearing and outlives this milestone.** A frozen scene that still tracks the head is comfortable; a scene that stops tracking while the head moves is the standard way to make someone ill. Anything added later that pauses, including a head-following menu, keeps camera update running.
 
@@ -264,7 +266,9 @@ The largest piece of work, and a restructure rather than an addition.
 
 - **On boot, enter XR if a session is available.** No chooser at launch.
 - **The choice lives in the pause menu**, as a submenu beside Options. Reached by pausing and navigating in, or later by booting straight to the menu with that submenu already selected.
-- **This is the affordance that must work from any state.** A launch-time chooser would conflict with booting directly into any AppState; a pause-menu entry does not, because every state can pause.
+- **This is the affordance that must work from any state that supports XR.** A launch-time chooser would conflict with booting directly into any AppState; a pause-menu entry does not, because every state can pause.
+
+- **Whether a state supports XR is the state's own answer**, a flag on `StateMachineState` defaulting to false. A state that has not been authored for stereo, a tracked head and a scene in metres does not offer XR, and the pause menu hides the entry rather than offering something that would put the user in a headset looking at a window's content. The AudioTracker is the clear case; a state answering true also registers the XR screen its pause menu routes to.
 
 The existing screens carry the pattern already: the pause menu routes a button to a separately registered Options screen through `UiScreenSystem`, and its controller takes a callback per button. The XR submenu is one more screen, one more button, one more callback.
 
@@ -280,7 +284,7 @@ A pause menu inside the headset. Until it exists, pausing while wearing the head
 - `XrManager::Init` now creates only the instance and system. `StartSession` and `EndSession` build and tear down the session, swapchains, eye targets, cameras and action set, and are driven by requests taken up between frames so nothing is destroyed under an open pass. The action set is recreated per session rather than reattached, which is correct whichever way the spec question falls.
 - One loop drives every frame whether or not a session is live, and `StartSession` retries detection, so a headset connected after launch can still be entered.
 - The runtime asking to exit now ends the session and returns to the desktop instead of quitting the application.
-- Pause is on Escape, gamepad Start, and the secondary face button of either controller. It stops `SceneHierarchy` and leaves the cameras running.
+- Pause is on Escape, gamepad Start, and the secondary face button of either controller. It pauses `SceneHierarchy` and leaves the cameras running.
 - The XR submenu is registered in `AppMain::Init` rather than per state, because it carries no per-state callbacks and has to reach any state that can pause. The pause menu routes to it exactly as it routes to Options, so no state wiring changed.
 
 **Verified:** builds clean; boots flat with no headset and drives the frame through the adaptive loop; exits with code 0 on a window close. **Unverified:** everything needing a live session — entering and leaving XR, the paused-in-XR desktop mode, and the controller pause binding.
@@ -295,7 +299,11 @@ Three workarounds went with it rather than being kept:
 - **The panel-surface switch is gone.** There is no "current surface" to switch; the window and the panel each lay out and hit-test against their own size.
 - **The render-to-target call is gone.** Offscreen surfaces are rendered by the UI manager before the scene that samples them, so the demo no longer drives a UI render from inside its own update. The panel is no longer a frame behind.
 
-**Verified flat, with no headset:** builds clean; boots into the demo with the window HUD and the panel surface both live; the panel draws once and then not again until its content changes, and once per change after that. A second panel authored in a scene file creates its own surface alongside the demo's, so the panel path is not specific to this state. **Still unverified:** everything needing a live session — the ray reaching the panel, two hands on one panel, the haptic edge, entering and leaving XR, and the paused-in-XR desktop mode.
+**Found on the desktop pass.** Leaving the demo through its own pause menu left the input manager paused, and paused outranks the interaction mode, so the next state's free camera silently took no mouse input. The state machine now clears both pause flags at a swap, because the exit path for a state that pauses is the pause menu itself.
+
+Two further faults the surface rebuild surfaced rather than caused, both now fixed: pause used `SetEnabled` and blanked the scene behind the menu, and the demo state did not clear the screens it registered, so leaving it asserted on the next state's registration. Clearing them exposed a third — the XR submenu registered once at application startup was destroyed by the first state to leave — settled by moving its registration into the states that support XR, which is where a scene's screens belong.
+
+**Verified flat, with no headset:** builds clean; boots into the demo with the window HUD and the panel surface both live; pausing keeps the scene drawing (32 renderables submitted per frame paused and unpaused, against 0 before the fix) and leaving the state for the main menu registers cleanly with the XR submenu still reachable; the panel draws once and then not again until its content changes, and once per change after that. A second panel authored in a scene file creates its own surface alongside the demo's, so the panel path is not specific to this state. **Still unverified:** everything needing a live session — the ray reaching the panel, two hands on one panel, the haptic edge, entering and leaving XR, and the paused-in-XR desktop mode.
 
 ---
 

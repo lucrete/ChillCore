@@ -21,6 +21,10 @@ namespace CC
 
         bool IsTransitioning() const;
 
+        // The state currently running. Null between registration and the
+        // first transition.
+        StateMachineState* GetActiveState() const { return activeState; }
+
     private:
         static StateMachine* instance;
 
