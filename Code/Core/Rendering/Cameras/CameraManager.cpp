@@ -84,7 +84,7 @@ namespace CC
 
     void CameraManager::Update()
     {
-        if (InputManager::Get()->IsWorldInteractable()
+        if (InputManager::Get()->DoesSceneReceiveInput(InputDomain::Window)
             && InputManager::Get()->EdgePositive(InputAction::DevToggleFreeCam))
         {
             CameraBase* toggled = FindCamera(isFreeCameraActive ? activeCameraName : FREE_CAMERA_NAME);

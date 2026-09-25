@@ -307,6 +307,23 @@ Two further faults the surface rebuild surfaced rather than caused, both now fix
 
 ---
 
+## M6 — Input domains, AppState pause and engine hands
+
+Replaces M5's derived desktop mode. Full behaviour and design are in `SurfacesAndFocus.html`, under *Feature brief* and *Tech brief*; this section is the summary.
+
+- **Simulation clock.** `FrameTimer` gains Simulation delta and elapsed time with a time scale. `SceneHierarchy` keeps its pause flag; components still opt in with `SetPauseable`. Pauseable components read Simulation time, everything else real time. `timeAbsolute` is fed Simulation time, wrapped on the CPU.
+- **Actions per channel.** Every device is evaluated every frame. Window and Headset get distinct actions (`Pause` on `GamepadStart`, `PauseXr` on `XrPrimaryRight`). Navigation triggers gain the gamepad D-pad and stick directions; new XR triggers carry thumbstick directions. Analog values stay direct reads.
+- **Input domains and targets.** `InputDomain::Window` and `InputDomain::Headset`, each with one target: `InputTargetScene` or `InputTargetSurface`. The target gates camera device reads, surface pointers and navigation, and headset reach and grab. The cursor lock follows the `Window` target.
+- **AppState pause.** `StateMachineState` gains `isPausable`, non-virtual `SetPaused` / `TogglePause` setting the scene pause flag and the Simulation clock, then `OnPaused` / `OnResumed`. The AppState sets its context, both targets, its screens and panels itself. A state swap resets the global parts without calling the leaving AppState.
+- **Engine hands.** Pointing and grab move out of `AppStateXrDemo`. Rays are submitted every frame; the router filters by the `Headset` target. Grab is live only under a Scene target, and held objects are released when the target leaves Scene. The pause panel places itself 1 m in front of the head, at head height, facing the player, once when shown. Ray only; direct touch is future work.
+- **Removals.** `InteractionMode` and its three predicates, `InputManager::SetPaused`, the world-focus opt-in, the per-AppState cursor-lock copies. `SetXrOwnsInput` stays as a bridge, setting the `Window` target while a session runs.
+
+**Not in this milestone:** the XR session lifecycle across AppStates — what the headset shows while an AppState without XR support runs, and how an AppState learns a session started or stopped.
+
+**XR pause moves to the A button** — `XrPrimaryRight`, currently unbound. Replaces M5's secondary face button on either hand. The menu button stays reserved for the runtime's dashboard.
+
+---
+
 ## Multi-pass versus single-pass stereo
 
 **This plan is multi-pass.** Single-pass is not in plan.

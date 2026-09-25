@@ -5,6 +5,8 @@
 
 namespace CC
 {
+    class UiSurface;
+
     // Something a world pointer can reach. It answers whether a ray reaches
     // it and at what distance, and then what the hit means.
     //
@@ -30,6 +32,12 @@ namespace CC
         // Called when a pointer that was on this target no longer is,
         // whether it moved on to another or stopped submitting.
         virtual void OnPointerLeft(int pointerId) = 0;
+
+        // The surface this target delivers pointers into, if any. When the
+        // Headset domain targets one surface, only targets answering with it
+        // are offered rays. Null for a target that is not a surface, which
+        // is then reachable only while the Headset target is the scene.
+        virtual const UiSurface* GetPointerSurface() const { return nullptr; }
     };
 }
 

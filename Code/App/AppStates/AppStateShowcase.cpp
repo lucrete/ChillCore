@@ -23,16 +23,14 @@
 
 AppStateShowcase::AppStateShowcase()
     : currentMode(InWorld)
-    , isPaused(false)
     , pendingTogglePause(false)
     , gradePresetIndex(0)
-    , wasMouseLocked(false)
-    , elapsedTime(0.0f)
     , procArtController(nullptr)
     , cameraStatic(nullptr)
     , quad01Object(nullptr)
     , cube01Object(nullptr)
 {
+    isPausable = true;
 }
 
 AppStateShowcase::~AppStateShowcase()
@@ -51,15 +49,19 @@ void AppStateShowcase::Init()
 
     CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateShowcase::Init()");
 
+    // Paused binds only what resumes; menu navigation comes with every
+    // context. Created first so the play context is the one left active.
     CC::InputActionMap& actionMap = CC::InputManager::Get()->GetActionMap();
+    actionMap.CreateContext("AppStateShowcasePaused");
+    actionMap.RegisterAction(CC::ActionDef(Pause, "Pause", CC::InputTrigger::GamepadStart));
+
     actionMap.CreateContext("AppStateShowcase");
     actionMap.RegisterAction(CC::ActionDef(Pause, "Pause", CC::InputTrigger::GamepadStart));
     actionMap.RegisterAction(CC::ActionDef(CycleGradePreset, "CycleGradePreset", CC::InputTrigger::GamepadFaceRight));
 
     CC::UiScreenSystem& screens = CC::UiManager::Get()->GetWindowSurface()->Screens();
     screens.RegisterScreen("ShowcaseHud", "Data/Ui/ShowcaseHud.html", "Data/Ui/ShowcaseHud.css",
-        new ShowcaseHudController(
-            [this]() { pendingTogglePause = true; }));
+        new ShowcaseHudController([this]() { pendingTogglePause = true; }));
     screens.RegisterScreen("PauseMenu", "Data/Ui/PauseMenu.html", "Data/Ui/PauseMenu.css",
         new PauseMenuController(
             [this]() { pendingTogglePause = true; },
@@ -70,13 +72,11 @@ void AppStateShowcase::Init()
         new OptionsController());
     screens.SetScreen("ShowcaseHud");
 
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
+    ApplyPlayInputTarget();
     CC::InputManager::Get()->LockMouseCursor(true);
 
-    isPaused = false;
     pendingTogglePause = false;
     currentMode = InWorld;
-    elapsedTime = 0.0f;
     gradePresetIndex = 0;
 }
 
@@ -123,7 +123,6 @@ void AppStateShowcase::InitControls()
 
 void AppStateShowcase::Update()
 {
-
     if (pendingTogglePause)
     {
         pendingTogglePause = false;
@@ -135,7 +134,9 @@ void AppStateShowcase::Update()
         TogglePause();
     }
 
-    if (CC::InputManager::Get()->EdgePositive(CycleGradePreset))
+    // The paused context binds nothing else, so play actions are read only
+    // while playing.
+    if (!IsPaused() && CC::InputManager::Get()->EdgePositive(CycleGradePreset))
     {
         ApplyNextGradePreset();
     }
@@ -146,7 +147,7 @@ void AppStateShowcase::Update()
         SceneInit();
     }
 
-    if (CC::InputManager::Get()->EdgePositive(CC::InputAction::DevToggleFullscreenQuad))
+    if (!IsPaused() && CC::InputManager::Get()->EdgePositive(CC::InputAction::DevToggleFullscreenQuad))
     {
         switch (currentMode)
         {
@@ -169,10 +170,8 @@ void AppStateShowcase::Update()
         CC::RenderManager::Get()->ToggleFullscreenQuad();
     }
 
-    if (!isPaused)
+    if (!IsPaused())
     {
-        elapsedTime += CC::FrameTimer::Get()->DeltaTime();
-
         switch (currentMode)
         {
             case ProceduralArt:
@@ -183,7 +182,7 @@ void AppStateShowcase::Update()
             {
                 if (quad01Object != nullptr)
                 {
-                    float time = CC::FrameTimer::Get()->TimeSinceStartup();
+                    float time = CC::FrameTimer::Get()->SimulationTime();
                     quad01Object->GetTransform().SetPosition(CC::Vector3((float)sin(time), 2.0f, 0.0f));
                     quad01Object->GetTransform().SetRotation(CC::Vector3(0.0f, 180 * (float)sin(time * 2), 0.0f));
                     float scale = 0.5f + 0.25f * (float)sin(time * 0.3f);
@@ -197,31 +196,41 @@ void AppStateShowcase::Update()
                 break;
         }
     }
-
-    UpdateTimerDisplay();
 }
 
-void AppStateShowcase::TogglePause()
+void AppStateShowcase::OnPaused()
 {
-    isPaused = !isPaused;
-    CC::SceneHierarchy::Get()->SetPaused(isPaused);
+    CC::InputManager* input = CC::InputManager::Get();
+    CC::UiSurface* windowSurface = CC::UiManager::Get()->GetWindowSurface();
 
-    if (isPaused)
-    {
-        wasMouseLocked = CC::InputManager::Get()->IsMouseCursorLocked();
-        CC::InputManager::Get()->LockMouseCursor(false);
-        CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
-        CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("PauseMenu");
-    }
-    else
-    {
-        CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
-        CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("ShowcaseHud");
-        if (wasMouseLocked)
-        {
-            CC::InputManager::Get()->LockMouseCursor(true);
-        }
-    }
+    resumeContextName = input->GetActionMap().GetContext();
+    input->GetActionMap().SetContext("AppStateShowcasePaused");
+
+    // A finger on a stick when the menu opens never lifts off that stick,
+    // so its last deflection would keep steering behind the menu.
+    input->ClearAllJoystickOverrides();
+
+    input->SetInputTargetSurface(CC::InputDomain::Window, windowSurface);
+    windowSurface->Screens().SetScreen("PauseMenu");
+}
+
+void AppStateShowcase::OnResumed()
+{
+    CC::InputManager::Get()->GetActionMap().SetContext(resumeContextName);
+    ApplyPlayInputTarget();
+    CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("ShowcaseHud");
+}
+
+void AppStateShowcase::ApplyPlayInputTarget()
+{
+    // On a touch device every input is a touch on the HUD, and the sticks
+    // there steer; on the desktop the devices steer the scene directly.
+#ifdef __ANDROID__
+    CC::InputManager::Get()->SetInputTargetSurface(CC::InputDomain::Window,
+                                                   CC::UiManager::Get()->GetWindowSurface());
+#else
+    CC::InputManager::Get()->SetInputTargetScene(CC::InputDomain::Window);
+#endif
 }
 
 void AppStateShowcase::ApplyNextGradePreset()
@@ -241,21 +250,6 @@ void AppStateShowcase::ApplyNextGradePreset()
         postProcess->ApplyPreset(presetName);
 
         CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateShowcase: grade preset '%s'", presetName);
-    }
-}
-
-void AppStateShowcase::UpdateTimerDisplay()
-{
-    CC::UiElement* timerElement = CC::UiManager::Get()->GetWindowSurface()->GetElementById("timer");
-    if (timerElement != nullptr)
-    {
-        int totalSeconds = static_cast<int>(elapsedTime);
-        int minutes = totalSeconds / 60;
-        int seconds = totalSeconds % 60;
-
-        char timeBuffer[16];
-        snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", minutes, seconds);
-        timerElement->SetTextContent(std::string(timeBuffer));
     }
 }
 

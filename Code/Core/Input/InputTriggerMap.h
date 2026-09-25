@@ -95,6 +95,14 @@ namespace CC
             XrSecondaryRight,
             XrMenu,
 
+            // Either hand's thumbstick pushed past a threshold, read as a
+            // direction. Hand-neutral: navigating a menu is not a question of
+            // which hand is holding the stick.
+            XrThumbstickUp,
+            XrThumbstickDown,
+            XrThumbstickLeft,
+            XrThumbstickRight,
+
             TriggerMax
         };
     }
@@ -108,10 +116,21 @@ namespace CC
 
         static constexpr float GAMEPAD_AXIS_ACTIVATION_THRESHOLD = 0.3f;
 
+        // How far a stick has to be pushed before it reads as a navigation
+        // direction. Well clear of the rest position, so a stick that drifts
+        // does not walk a menu selection.
+        static constexpr float NAVIGATION_STICK_THRESHOLD = 0.5f;
+
         InputTriggerMap(PlatformInput* physicalInput);
 
         void RegisterKeyboardTrigger(int trigger, const std::string& triggerName, std::vector<KeyboardTriggerDef> keys);
+
+        // A trigger's gamepad binding is a list of alternatives, each a chord
+        // of buttons or axes that must all be held. Registering replaces the
+        // list with one alternative; adding appends another, so the D-pad and
+        // a stick direction can fire the same trigger.
         void RegisterGamepadTrigger(int trigger, const std::string& triggerName, std::vector<GamepadTriggerDef> buttons);
+        void AddGamepadTriggerAlternative(int trigger, std::vector<GamepadTriggerDef> buttons);
 
         // XR button state is pushed in rather than polled out: the trigger map
         // has no way to reach a runtime, and the same inversion already serves
@@ -138,16 +157,18 @@ namespace CC
 
         std::string triggerNames[InputTrigger::TriggerMax];
         std::vector<KeyboardTriggerDef> keyboardBindings[InputTrigger::TriggerMax];
-        std::vector<GamepadTriggerDef> gamepadBindings[InputTrigger::TriggerMax];
+        std::vector<std::vector<GamepadTriggerDef>> gamepadBindings[InputTrigger::TriggerMax];
 
+        // Every device is evaluated every frame and a trigger fires from
+        // whichever one holds it. The active input type decides only what a
+        // prompt names and which on-screen controls show, never which device
+        // is listened to: a keyboard has to pause while a headset is the
+        // device in use.
         bool keyboardTriggersCurrent[InputTrigger::TriggerMax];
         bool gamepadTriggersCurrent[InputTrigger::TriggerMax];
         bool xrTriggersCurrent[InputTrigger::TriggerMax];
         bool xrTriggersPending[InputTrigger::TriggerMax];
-        // Kept alongside the shared previous-state array so a developer key
-        // still resolves an edge while another device owns the active set.
-        bool keyboardTriggersPrevious[InputTrigger::TriggerMax];
-        bool* triggersCurrent;
+        bool triggersCurrent[InputTrigger::TriggerMax];
         bool triggersPrevious[InputTrigger::TriggerMax];
 
         ActiveInputType activeInputType;
@@ -165,13 +186,6 @@ namespace CC
         bool EvaluateGamepadTrigger(int trigger);
 
         bool DetectMouseActivity();
-
-        // Developer keys are the escape hatch, and are read from the keyboard
-        // whatever device is active. A headset session that has taken over
-        // input is exactly when releasing the mouse or leaving fullscreen
-        // from the keyboard matters, and it is the one case where the player
-        // cannot see the screen to find another way out.
-        static bool IsDeveloperTrigger(int trigger);
     };
 }
 

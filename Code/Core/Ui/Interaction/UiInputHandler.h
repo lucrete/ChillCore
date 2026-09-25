@@ -100,7 +100,7 @@ namespace CC
         void SelectElement(int index);
         void ActivateElement(UiElement* element);
 
-        UiElement* HitTest(UiElement* element, float px, float py, bool joystickOnly);
+        UiElement* HitTest(UiElement* element, float px, float py);
         void CollectNavigableElements(UiElement* element);
         void UpdateSliderFromPointer(class UiSlider* slider, float pointerX);
         void UpdateJoystickFromPointer(class UiJoystick* joystick, float pointerX, float pointerY);

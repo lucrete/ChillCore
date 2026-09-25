@@ -9,8 +9,9 @@
 namespace CC
 {
     // Resolves world pointers to targets. A ray can reach several panels, so
-    // something has to take the nearest; that is all this does. It holds no
-    // geometry of its own and only compares distances.
+    // something has to take the nearest. It holds no geometry of its own and
+    // only compares distances, among the targets the Headset domain's input
+    // target allows: every target under Scene, one surface's under Surface.
     class UiPointerRouter
     {
     public:
@@ -30,6 +31,9 @@ namespace CC
         // Dispatches each submitted pointer to the nearest target it reached
         // and releases the targets of pointers that submitted nothing.
         void Resolve();
+
+        // Whether this pointer reached a target when it was last resolved.
+        bool IsPointerOnTarget(int pointerId) const;
 
     private:
         struct PointerSubmission

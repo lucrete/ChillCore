@@ -57,6 +57,28 @@ namespace CC
         float TimeSinceStartup() const;
         float GetFramesPerSecond() const;
 
+        // ========================
+        // Simulation clock
+        // ========================
+        // The world's own time. It advances with real time scaled by the time
+        // scale, and stands still while paused. Components that pause read
+        // this clock; everything that runs through a pause reads real time,
+        // so a paused component resumes from where it stopped rather than
+        // jumping to where it would have been.
+        float SimulationDeltaTime() const { return simulationDeltaTime; }
+        float SimulationTime() const { return simulationTime; }
+
+        void SetSimulationPaused(bool isPaused) { isSimulationPaused = isPaused; }
+        bool IsSimulationPaused() const { return isSimulationPaused; }
+
+        void SetSimulationTimeScale(float timeScale);
+        float GetSimulationTimeScale() const { return simulationTimeScale; }
+
+        // Simulation time wrapped to a fixed period for shaders. A float of
+        // seconds loses precision as it grows, and fast periodic animation
+        // visibly steps after a long session.
+        float ShaderSimulationTime() const;
+
         void AddTimestamp(const char* label);
         void AddTimestamp(StandardTimestamp id, const char* label);
         float GetDeltaTimestamp(StandardTimestamp idStart, StandardTimestamp idEnd) const;
@@ -98,6 +120,15 @@ namespace CC
         static FrameTimer* instance;
 
         static constexpr float MAX_DELTA_TIME_SECONDS = 0.1f;
+
+        // A power of two, so the wrapped value keeps sub-millisecond
+        // resolution across the whole period.
+        static constexpr float SHADER_TIME_WRAP_SECONDS = 4096.0f;
+
+        float simulationTime = 0.0f;
+        float simulationDeltaTime = 0.0f;
+        float simulationTimeScale = 1.0f;
+        bool  isSimulationPaused = false;
 
         float currentTime = 0.0f;
         float previousTime = 0.0f;

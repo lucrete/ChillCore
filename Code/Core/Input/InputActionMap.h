@@ -45,7 +45,24 @@ namespace CC
             UiNavigateRight,
             UiConfirm,
             UiCancel,
-            UiActionMax
+            UiActionMax,
+
+            // Navigation from the headset's controllers. Distinct from the
+            // window's, so which of the two fired says which domain it came
+            // from.
+            UiNavigateUpXr = 210,
+            UiNavigateDownXr,
+            UiNavigateLeftXr,
+            UiNavigateRightXr,
+            UiXrActionMax,
+
+            // The engine's own hand interactions: pointing at interface
+            // objects and grabbing simulation objects.
+            XrSelectLeft = 220,
+            XrSelectRight,
+            XrGrabLeft,
+            XrGrabRight,
+            XrHandActionMax
         };
     }
 

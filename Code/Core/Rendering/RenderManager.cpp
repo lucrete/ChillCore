@@ -273,7 +273,7 @@ namespace CC
         frameUniforms.cameraPositionAndTime[0] = cameraPosition.x;
         frameUniforms.cameraPositionAndTime[1] = cameraPosition.y;
         frameUniforms.cameraPositionAndTime[2] = cameraPosition.z;
-        frameUniforms.cameraPositionAndTime[3] = FrameTimer::Get()->TimeSinceStartup();
+        frameUniforms.cameraPositionAndTime[3] = FrameTimer::Get()->ShaderSimulationTime();
 
         Vector3 ambientColor = lightManager->GetAmbientLightColor();
         frameUniforms.ambientLightColorAndIntensity[0] = ambientColor.x;

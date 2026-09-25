@@ -2,6 +2,7 @@
 
 #include "CCAssert.h"
 #include "GfxRenderApi.h"
+#include "InputManager.h"
 #include "PlatformFileSystem.h"
 #include "PlatformWindow.h"
 #include "PrintManager.h"
@@ -35,6 +36,8 @@ namespace CC
 
         windowSurface = new UiSurface("Window", windowKind, width, height);
         surfaces.push_back(windowSurface);
+
+        InputManager::Get()->SetWindowSurface(windowSurface);
     }
 
     UiManager::~UiManager()
@@ -45,6 +48,7 @@ namespace CC
         }
         surfaces.clear();
         windowSurface = nullptr;
+        InputManager::Get()->SetWindowSurface(nullptr);
 
         instance = nullptr;
     }

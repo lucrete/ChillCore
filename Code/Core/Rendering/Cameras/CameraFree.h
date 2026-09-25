@@ -12,7 +12,10 @@ namespace CC
         ~CameraFree();
 
         void Update();
-        void UpdateTransform();
+        // Devices are read only while the scene holds the Window target.
+        // On-screen sticks are read either way: a value exists only while a
+        // surface holding the target sets one.
+        void UpdateTransform(bool isReadingDevices);
 
     private:
         float velocityMove;

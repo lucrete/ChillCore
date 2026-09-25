@@ -32,7 +32,8 @@ void AppStateAudioTest::Init()
     screens.RegisterScreen("AudioTest", "Data/Ui/AudioTest.html", "Data/Ui/AudioTest.css",
         new AudioTestController());
     screens.SetScreen("AudioTest");
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
+    CC::InputManager::Get()->SetInputTargetSurface(CC::InputDomain::Window,
+                                                   CC::UiManager::Get()->GetWindowSurface());
 }
 
 void AppStateAudioTest::Update()

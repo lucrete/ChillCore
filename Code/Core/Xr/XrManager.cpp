@@ -318,6 +318,26 @@ namespace CC
         return eyeViews[index];
     }
 
+    TrackedPose XrManager::GetHeadPose() const
+    {
+        TrackedPose head;
+
+        if (viewCount > 0 && eyeViews[0].pose.isTracked)
+        {
+            Vector3 positionSum;
+            for (int eye = 0; eye < viewCount; eye++)
+            {
+                positionSum = positionSum + eyeViews[eye].pose.position;
+            }
+
+            head.position = positionSum * (1.0f / (float)viewCount);
+            head.orientation = eyeViews[0].pose.orientation;
+            head.isTracked = true;
+        }
+
+        return head;
+    }
+
     // ========================
     // Tracked controllers
     // ========================
@@ -662,8 +682,8 @@ namespace CC
                 PollEvents();
             }
 
-            // The desktop drives nothing while a session has input, except
-            // when paused, which is the only way back out of one.
+            // While a session runs the window is a mirror, and its input
+            // target is held on the window surface.
             InputManager::Get()->SetXrOwnsInput(isSessionRunning);
 
             // The frame is ticked either way. A session that has not started,

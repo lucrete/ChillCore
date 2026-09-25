@@ -8,10 +8,8 @@ namespace CC
     InputTriggerMap::InputTriggerMap(PlatformInput* physicalInput)
         : physicalInput(physicalInput)
 #ifdef __ANDROID__
-        , triggersCurrent(gamepadTriggersCurrent)
         , activeInputType(ActiveInputType::Touch)
 #else
-        , triggersCurrent(keyboardTriggersCurrent)
         , activeInputType(ActiveInputType::KeyboardMouse)
 #endif
         , touchActivityPending(false)
@@ -23,7 +21,7 @@ namespace CC
         memset(gamepadTriggersCurrent, 0, sizeof(gamepadTriggersCurrent));
         memset(xrTriggersCurrent, 0, sizeof(xrTriggersCurrent));
         memset(xrTriggersPending, 0, sizeof(xrTriggersPending));
-        memset(keyboardTriggersPrevious, 0, sizeof(keyboardTriggersPrevious));
+        memset(triggersCurrent, 0, sizeof(triggersCurrent));
         memset(triggersPrevious, 0, sizeof(triggersPrevious));
 
         // Dev keyboard bindings
@@ -84,6 +82,17 @@ namespace CC
         RegisterGamepadTrigger(InputTrigger::GamepadSelect, "GamepadSelect", { { GamepadButton::Select, "Back" } });
         RegisterGamepadTrigger(InputTrigger::GamepadStart, "GamepadStart", { { GamepadButton::Start, "Start" } });
 
+        // UI navigation on a gamepad: the D-pad, or the left stick pushed
+        // past a threshold. Stick Y reads negative when pushed up.
+        RegisterGamepadTrigger(InputTrigger::DevArrowUp,    "KeyboardArrowUp",    { { GamepadButton::DpadUp,    "DPad Up" } });
+        RegisterGamepadTrigger(InputTrigger::DevArrowDown,  "KeyboardArrowDown",  { { GamepadButton::DpadDown,  "DPad Down" } });
+        RegisterGamepadTrigger(InputTrigger::DevArrowLeft,  "KeyboardArrowLeft",  { { GamepadButton::DpadLeft,  "DPad Left" } });
+        RegisterGamepadTrigger(InputTrigger::DevArrowRight, "KeyboardArrowRight", { { GamepadButton::DpadRight, "DPad Right" } });
+        AddGamepadTriggerAlternative(InputTrigger::DevArrowUp,    { { GamepadAxis::LeftStickY, "Left Stick Up",    -NAVIGATION_STICK_THRESHOLD } });
+        AddGamepadTriggerAlternative(InputTrigger::DevArrowDown,  { { GamepadAxis::LeftStickY, "Left Stick Down",   NAVIGATION_STICK_THRESHOLD } });
+        AddGamepadTriggerAlternative(InputTrigger::DevArrowLeft,  { { GamepadAxis::LeftStickX, "Left Stick Left",  -NAVIGATION_STICK_THRESHOLD } });
+        AddGamepadTriggerAlternative(InputTrigger::DevArrowRight, { { GamepadAxis::LeftStickX, "Left Stick Right",  NAVIGATION_STICK_THRESHOLD } });
+
         // XR triggers carry a name only. There is no binding list to fill:
         // the runtime owns the mapping from physical control to action, and
         // the state arrives through SetXrTriggerState.
@@ -98,6 +107,10 @@ namespace CC
         triggerNames[InputTrigger::XrSecondaryLeft]        = "XrSecondaryLeft";
         triggerNames[InputTrigger::XrSecondaryRight]       = "XrSecondaryRight";
         triggerNames[InputTrigger::XrMenu]                 = "XrMenu";
+        triggerNames[InputTrigger::XrThumbstickUp]         = "XrThumbstickUp";
+        triggerNames[InputTrigger::XrThumbstickDown]       = "XrThumbstickDown";
+        triggerNames[InputTrigger::XrThumbstickLeft]       = "XrThumbstickLeft";
+        triggerNames[InputTrigger::XrThumbstickRight]      = "XrThumbstickRight";
     }
 
     void InputTriggerMap::RegisterKeyboardTrigger(int trigger, const std::string& triggerName, std::vector<KeyboardTriggerDef> keys)
@@ -111,7 +124,14 @@ namespace CC
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
         triggerNames[trigger] = triggerName;
-        gamepadBindings[trigger] = buttons;
+        gamepadBindings[trigger].clear();
+        gamepadBindings[trigger].push_back(buttons);
+    }
+
+    void InputTriggerMap::AddGamepadTriggerAlternative(int trigger, std::vector<GamepadTriggerDef> buttons)
+    {
+        CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
+        gamepadBindings[trigger].push_back(buttons);
     }
 
     void InputTriggerMap::Update()
@@ -123,12 +143,9 @@ namespace CC
 
         bool devUiCapturingKeyboard = DevUi::Get()->IsCapturingKeyboard();
 
-        // Evaluate all triggers for both input types
         for (int i = 0; i < InputTrigger::TriggerMax; i++)
         {
             triggersPrevious[i] = triggersCurrent[i];
-
-            keyboardTriggersPrevious[i] = keyboardTriggersCurrent[i];
 
             bool suppressKeyboard = devUiCapturingKeyboard && i >= InputTrigger::DevKeysMax;
             keyboardTriggersCurrent[i] = suppressKeyboard ? false : EvaluateKeyboardTrigger(i);
@@ -137,6 +154,10 @@ namespace CC
             // Taken up here rather than written straight through, so
             // triggersPrevious above still holds last frame's value.
             xrTriggersCurrent[i] = xrTriggersPending[i];
+
+            triggersCurrent[i] = keyboardTriggersCurrent[i]
+                              || gamepadTriggersCurrent[i]
+                              || xrTriggersCurrent[i];
 
             if (keyboardTriggersCurrent[i])
             {
@@ -184,22 +205,7 @@ namespace CC
             target = ActiveInputType::KeyboardMouse;
         }
 
-        if (target != activeInputType)
-        {
-            activeInputType = target;
-            if (target == ActiveInputType::KeyboardMouse)
-            {
-                triggersCurrent = keyboardTriggersCurrent;
-            }
-            else if (target == ActiveInputType::Xr)
-            {
-                triggersCurrent = xrTriggersCurrent;
-            }
-            else
-            {
-                triggersCurrent = gamepadTriggersCurrent;
-            }
-        }
+        activeInputType = target;
     }
 
     void InputTriggerMap::NotifyTouchActivity()
@@ -239,82 +245,51 @@ namespace CC
 
     bool InputTriggerMap::EvaluateGamepadTrigger(int trigger)
     {
-        if (gamepadBindings[trigger].empty())
-        {
-            return false;
-        }
+        bool isAnyAlternativeHeld = false;
 
-        if (physicalInput->GetConnectedGamepadIndex() < 0)
+        if (physicalInput->GetConnectedGamepadIndex() >= 0)
         {
-            return false;
-        }
+            for (size_t alternative = 0; alternative < gamepadBindings[trigger].size() && !isAnyAlternativeHeld; alternative++)
+            {
+                const std::vector<GamepadTriggerDef>& chord = gamepadBindings[trigger][alternative];
+                bool isChordHeld = !chord.empty();
 
-        bool allPressed = true;
-        for (const GamepadTriggerDef& def : gamepadBindings[trigger])
-        {
-            bool pressed = false;
-            if (def.isAxis)
-            {
-                pressed = IsGamepadAxisTriggered(static_cast<GamepadAxis::Axis>(def.id), def.axisThreshold);
-            }
-            else
-            {
-                pressed = IsGamepadButtonPressed(static_cast<GamepadButton::Button>(def.id));
-            }
+                for (size_t i = 0; i < chord.size() && isChordHeld; i++)
+                {
+                    const GamepadTriggerDef& def = chord[i];
+                    if (def.isAxis)
+                    {
+                        isChordHeld = IsGamepadAxisTriggered(static_cast<GamepadAxis::Axis>(def.id), def.axisThreshold);
+                    }
+                    else
+                    {
+                        isChordHeld = IsGamepadButtonPressed(static_cast<GamepadButton::Button>(def.id));
+                    }
+                }
 
-            if (!pressed)
-            {
-                allPressed = false;
-                break;
+                isAnyAlternativeHeld = isChordHeld;
             }
         }
-        return allPressed;
-    }
 
-    bool InputTriggerMap::IsDeveloperTrigger(int trigger)
-    {
-        return trigger < InputTrigger::DevKeysMax
-            || (trigger >= InputTrigger::DevArrowUp && trigger <= InputTrigger::DevEscape);
+        return isAnyAlternativeHeld;
     }
 
     bool InputTriggerMap::IsTriggered(int trigger)
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
-
-        bool result = triggersCurrent[trigger];
-        if (IsDeveloperTrigger(trigger))
-        {
-            result = result || keyboardTriggersCurrent[trigger];
-        }
-        return result;
+        return triggersCurrent[trigger];
     }
 
     bool InputTriggerMap::EdgePositive(int trigger)
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
-
-        bool current = triggersCurrent[trigger];
-        bool previous = triggersPrevious[trigger];
-        if (IsDeveloperTrigger(trigger))
-        {
-            current = current || keyboardTriggersCurrent[trigger];
-            previous = previous || keyboardTriggersPrevious[trigger];
-        }
-        return current && !previous;
+        return triggersCurrent[trigger] && !triggersPrevious[trigger];
     }
 
     bool InputTriggerMap::EdgeNegative(int trigger)
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
-
-        bool current = triggersCurrent[trigger];
-        bool previous = triggersPrevious[trigger];
-        if (IsDeveloperTrigger(trigger))
-        {
-            current = current || keyboardTriggersCurrent[trigger];
-            previous = previous || keyboardTriggersPrevious[trigger];
-        }
-        return !current && previous;
+        return !triggersCurrent[trigger] && triggersPrevious[trigger];
     }
 
     bool InputTriggerMap::IsKeyboardKeyPressed(KeyCode::Key key)
@@ -430,12 +405,14 @@ namespace CC
     {
         CC_ASSERT(trigger >= 0 && trigger < InputTrigger::TriggerMax, "Trigger out of range");
 
-        const std::vector<GamepadTriggerDef>& buttons = gamepadBindings[trigger];
-
-        if (buttons.empty())
+        if (gamepadBindings[trigger].empty() || gamepadBindings[trigger][0].empty())
         {
             return "(unbound)";
         }
+
+        // The first alternative names the binding. The rest are other ways
+        // to press the same thing, and a prompt names one.
+        const std::vector<GamepadTriggerDef>& buttons = gamepadBindings[trigger][0];
 
         std::string result;
         for (size_t i = 0; i < buttons.size(); i++)

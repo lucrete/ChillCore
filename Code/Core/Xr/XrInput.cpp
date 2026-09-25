@@ -430,7 +430,30 @@ namespace CC
                     InputManager::Get()->NotifyXrActivity();
                 }
             }
+
+            PushThumbstickDirections();
         }
+    }
+
+    void XrInput::PushThumbstickDirections()
+    {
+        bool isUp    = false;
+        bool isDown  = false;
+        bool isLeft  = false;
+        bool isRight = false;
+
+        for (int hand = 0; hand < HAND_COUNT; hand++)
+        {
+            isUp    = isUp    || thumbstickY[hand] >=  THUMBSTICK_DIRECTION_THRESHOLD;
+            isDown  = isDown  || thumbstickY[hand] <= -THUMBSTICK_DIRECTION_THRESHOLD;
+            isLeft  = isLeft  || thumbstickX[hand] <= -THUMBSTICK_DIRECTION_THRESHOLD;
+            isRight = isRight || thumbstickX[hand] >=  THUMBSTICK_DIRECTION_THRESHOLD;
+        }
+
+        InputManager::Get()->SetXrTriggerState(InputTrigger::XrThumbstickUp,    isUp);
+        InputManager::Get()->SetXrTriggerState(InputTrigger::XrThumbstickDown,  isDown);
+        InputManager::Get()->SetXrTriggerState(InputTrigger::XrThumbstickLeft,  isLeft);
+        InputManager::Get()->SetXrTriggerState(InputTrigger::XrThumbstickRight, isRight);
     }
 
     void XrInput::ReadFloat(XrAction action, XrHand hand, float& outValue)

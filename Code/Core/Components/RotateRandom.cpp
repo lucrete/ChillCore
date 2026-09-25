@@ -36,7 +36,7 @@ namespace CC
             return;
         }
 
-        float time = FrameTimer::Get()->TimeSinceStartup();
+        float time = FrameTimer::Get()->SimulationTime();
 
         Vector3 rotation(
             rotationMultiplier.x * sinf(time * rotationSpeed.x),

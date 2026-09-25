@@ -2,6 +2,7 @@
 #define SHOWCASEHUDCONTROLLER_H
 
 #include <functional>
+
 #include "UiScreenController.h"
 
 namespace CC
@@ -18,12 +19,20 @@ public:
     void OnUpdate() override;
 
 private:
-    std::function<void()> onPauseCallback;
     CC::UiElement* moveStick = nullptr;
     CC::UiElement* lookStick = nullptr;
     CC::UiElement* trackingLabel = nullptr;
-    bool joysticksVisible = false;
+    CC::UiElement* timerLabel = nullptr;
+    CC::UiElement* pauseButton = nullptr;
+    std::function<void()> onPauseCallback;
+    bool areTouchControlsVisible = false;
     bool isTrackingLabelVisible = false;
+
+    // Simulation time since this HUD was registered, which is the state's
+    // own start. It stops with the world.
+    float elapsedTime = 0.0f;
+
+    void UpdateTimerDisplay();
 };
 
 #endif // SHOWCASEHUDCONTROLLER_H

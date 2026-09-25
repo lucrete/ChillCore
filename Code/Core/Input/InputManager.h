@@ -6,13 +6,26 @@
 
 namespace CC
 {
-    enum class InteractionMode
+    class UiSurface;
+
+    // A group of devices with one consumer at a time. Window is everything
+    // that arrives through the platform: keyboard, mouse, gamepad, touch.
+    // Headset is everything that arrives through the XR runtime's
+    // controllers. Head tracking belongs to neither; it always drives the XR
+    // camera.
+    enum class InputDomain
     {
-        Ui,
-        World,
-        // Nothing on the desktop is interactive. What the mouse would drive
-        // is being driven from somewhere else, currently an XR session.
-        None
+        Window = 0,
+        Headset,
+        Max
+    };
+
+    // What a domain's input goes to. Scene steers the world; Surface names
+    // one UI surface that takes the domain's pointers and navigation.
+    enum class InputTarget
+    {
+        Scene = 0,
+        Surface
     };
 
     class InputManager
@@ -81,25 +94,45 @@ namespace CC
         void ClearJoystickOverride(AnalogStick stick);
         void ClearAllJoystickOverrides();
 
-        // ========================
-        // Input routing
-        // ========================
-        // The state's preference. What the desktop actually gets is derived
-        // from it along with the two facts below, so a state cannot assert a
-        // mode that contradicts them.
-        void SetInteractionMode(InteractionMode mode);
-        InteractionMode GetEffectiveInteractionMode() const;
+        // A value is only ever set by a UI control that holds the input, so
+        // reading one is safe whatever the Window target is.
+        bool IsJoystickOverrideSet(AnalogStick stick) const;
 
-        // An XR session takes the desktop out of the loop while it is
-        // running, except when paused, which is when the desktop menu is the
-        // only way to act.
-        void SetXrOwnsInput(bool doesXrOwnInput);
-        void SetPaused(bool isPaused);
-        bool IsPaused() const { return isPaused; }
+        // ========================
+        // Input targets
+        // ========================
+        // Each domain has exactly one target, set by the AppState. The cursor
+        // lock follows the Window target: a Surface target frees the cursor,
+        // and a Scene target puts back what it was before.
+        void SetInputTargetScene(InputDomain domain);
+        void SetInputTargetSurface(InputDomain domain, UiSurface* surface);
 
-        bool IsUiInteractable() const;
-        bool IsHudInteractable() const;
-        bool IsWorldInteractable() const;
+        // Back to Scene for every domain, discarding the remembered cursor
+        // lock. What an AppState swap does: the outgoing AppState's targets
+        // mean nothing to the incoming one, which sets its own in Init.
+        void ResetInputTargets();
+
+        // The target in effect, which is the one requested unless an XR
+        // session has taken the window over.
+        InputTarget GetInputTarget(InputDomain domain) const;
+        UiSurface* GetInputTargetSurface(InputDomain domain) const;
+
+        // Whether the scene or a given surface takes this domain's input
+        // right now. For the Window domain this also answers false while
+        // input is blocked or the developer overlay has the mouse.
+        bool DoesSceneReceiveInput(InputDomain domain) const;
+        bool DoesSurfaceReceiveInput(InputDomain domain, const UiSurface* surface) const;
+
+        // The surface the window draws to. The XR bridge below points the
+        // Window target at it.
+        void SetWindowSurface(UiSurface* surface);
+
+        // While an XR session runs, the window is a mirror: its target is the
+        // window surface whatever the AppState asked for, so a click only
+        // focuses the window and never captures the cursor. Stands in for
+        // AppStates learning when a session starts and stops.
+        void SetXrOwnsInput(bool _doesXrOwnInput);
+        bool DoesXrOwnInput() const { return doesXrOwnInput; }
 
         void SetInputBlocked(bool blocked);
         bool IsInputBlocked() const;
@@ -130,10 +163,24 @@ namespace CC
         float joystickOverrideY[STICK_MAX];
         bool joystickOverrideSet[STICK_MAX];
 
-        InteractionMode interactionMode = InteractionMode::World;
+        struct RequestedInputTarget
+        {
+            InputTarget target = InputTarget::Scene;
+            UiSurface*  surface = nullptr;
+        };
+
+        RequestedInputTarget requestedTargets[(int)InputDomain::Max];
+        UiSurface* windowSurface = nullptr;
         bool doesXrOwnInput = false;
-        bool isPaused = false;
         bool isInputBlocked = false;
+
+        // The Window target the cursor was last set for, and the lock it had
+        // before a Surface target freed it.
+        InputTarget appliedWindowTarget = InputTarget::Scene;
+        bool wasMouseLockedBeforeSurface = false;
+
+        bool IsWindowInputOpen() const;
+        void ApplyWindowTargetToCursor();
 
         void UpdateMouseAsAnalogStick();
         void ResetMouseToCenter();

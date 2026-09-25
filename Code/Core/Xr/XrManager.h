@@ -58,6 +58,10 @@ namespace CC
         int GetViewCount() const;
         const XrEyeView& GetEyeView(int index) const;
 
+        // The head as the midpoint between the eyes, facing where they face.
+        // Not tracked while no view has been located this session.
+        TrackedPose GetHeadPose() const;
+
         bool IsSessionRunning() const;
 
         // Running is not the same as focused. Only a focused session delivers

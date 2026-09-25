@@ -19,6 +19,7 @@
 - **World panel** — a scene component pairing a surface with a quad in the world.
 - **Pointer** — a position, a pressed flag, and whether it is on the surface at all, in surface-space pixels.
 - **Pointer source** — where a surface's pointers come from: the platform, or whatever is pointing at it.
+- **World-focus reachable** — an element a pointer reaches while the world, rather than the interface, has focus. Declared per element and off by default.
 - **Pointer target** — something a world ray can reach. Answers whether a ray reaches it and at what distance, then what the hit means.
 - **Content dirty** — a surface has something new to draw.
 
@@ -52,6 +53,8 @@ Per frame, in order:
 **The mouse is pointer zero and extra fingers take the slots above it.** Both go through the same path from there, so multi-touch is not a case of its own.
 
 **Directional navigation and cancel stay on the surface reading the platform.** They are one input stream with no spatial origin, so only one surface can consume them. Panels are pointed at.
+
+**While the world has focus, a pointer reaches only the elements that declare they belong there.** Everything else needs full interface focus. An external pointer is exempt: it exists because something is deliberately aiming at a surface, which is interface focus by definition whatever the desktop is doing.
 
 **Redraw marking is automatic**, in the element setters and in the input handler's hover and press transitions. A transition marks every frame it runs, because a fade changes every frame.
 
@@ -111,6 +114,14 @@ Each pointer keeps its own hover and press, so two hands can use one panel and a
 
 Tracking a single hovered and pressed element was what made multi-touch a special path: extra fingers could only reach joysticks, because anything else would have fought over the one slot. With per-pointer state that restriction disappears and the platform's fingers, the mouse and a controller ray are all the same thing.
 
+### An element declares whether it is reachable while the world has focus
+
+A heads-up display is drawn over a scene the pointer is also driving — in that mode a click is a camera look as much as a press. So elements are unreachable there unless they say otherwise, and the ones that say otherwise are those whose whole purpose is to be operated during play: an on-screen stick, a pause control on a device with no keyboard.
+
+The alternative, keying it off element type, is what this replaced. Allowing only sticks through made every other on-screen control silently inert — drawn, hovered by nothing, pressed by nothing — and the failure was invisible, because the control looked right and simply never fired. Type is also the wrong question: two buttons in the same display can want opposite answers.
+
+Declaring it per element keeps the guard while making the exception explicit and greppable. The cost is that a new always-available control has to remember to opt in, and the symptom if it does not is a control that draws and does nothing.
+
 ### Directional navigation stays on the window
 
 It is one input stream with no spatial origin, so only one surface can consume it. Panels are pointed at.
@@ -142,4 +153,5 @@ CPU timing stays aggregate. The standard phases are a fixed set and the graph ho
 - Per-surface CPU timings do not exist. When the question becomes "which panel is redrawing when it should not", that is when to add them.
 - A world panel's plane is rebuilt from its owner's transform during the scene update, so a panel moved after that point is hit-tested against where it was for one frame.
 - A surface's screen stack is its own. Two panels showing the same markup register it on each; there is no shared screen definition.
+- A control that opts into world focus but is only shown for one input type has two independent conditions to get right, and the failure of either is a control that draws and does not respond.
 - Interface elements are regions on a flat surface. The pointer target interface is shaped so a reactive three-dimensional element does not require the router to change, but no such element exists.

@@ -150,6 +150,17 @@ namespace CC
         contextBindings[InputAction::UiNavigateRight] = { InputTrigger::DevArrowRight, "UiNavigateRight" };
         contextBindings[InputAction::UiConfirm] = { InputTrigger::DevEnter, "UiConfirm" };
         contextBindings[InputAction::UiCancel] = { InputTrigger::DevEscape, "UiCancel" };
+
+        contextBindings[InputAction::UiNavigateUpXr]    = { InputTrigger::XrThumbstickUp,    "UiNavigateUpXr" };
+        contextBindings[InputAction::UiNavigateDownXr]  = { InputTrigger::XrThumbstickDown,  "UiNavigateDownXr" };
+        contextBindings[InputAction::UiNavigateLeftXr]  = { InputTrigger::XrThumbstickLeft,  "UiNavigateLeftXr" };
+        contextBindings[InputAction::UiNavigateRightXr] = { InputTrigger::XrThumbstickRight, "UiNavigateRightXr" };
+
+        // Trigger selects, squeeze grabs, on either hand.
+        contextBindings[InputAction::XrSelectLeft]  = { InputTrigger::XrTriggerLeft,  "XrSelectLeft" };
+        contextBindings[InputAction::XrSelectRight] = { InputTrigger::XrTriggerRight, "XrSelectRight" };
+        contextBindings[InputAction::XrGrabLeft]    = { InputTrigger::XrSqueezeLeft,  "XrGrabLeft" };
+        contextBindings[InputAction::XrGrabRight]   = { InputTrigger::XrSqueezeRight, "XrGrabRight" };
     }
 
     void InputActionMap::UpdateMaxActionIndex()

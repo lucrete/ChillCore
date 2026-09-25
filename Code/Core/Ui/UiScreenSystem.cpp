@@ -162,7 +162,7 @@ namespace CC
                 // screen. Cancel is one input stream with no spatial origin,
                 // so only the window consumes it; panels are pointed at.
                 if (stackDepth > 1 && surface->GetKind() == UiSurfaceKind::Window
-                    && InputManager::Get()->IsUiInteractable()
+                    && InputManager::Get()->DoesSurfaceReceiveInput(InputDomain::Window, surface)
                     && InputManager::Get()->EdgePositive(InputAction::UiCancel))
                 {
                     TransitionBack();

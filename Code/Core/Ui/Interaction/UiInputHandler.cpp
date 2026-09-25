@@ -129,8 +129,9 @@ namespace CC
 
             // Directional navigation is one input stream with no spatial
             // origin, so only the surface reading the platform consumes it.
-            // Panels are pointed at.
-            if (pointerSource == UiPointerSource::Platform && InputManager::Get()->IsUiInteractable())
+            // Panels are pointed at. The window only reaches here while it
+            // holds the Window target.
+            if (pointerSource == UiPointerSource::Platform)
             {
                 UpdateNavigation();
             }
@@ -186,17 +187,6 @@ namespace CC
         }
         else
         {
-            InputManager* input = InputManager::Get();
-
-            // A HUD running in World mode only accepts joystick
-            // interactions; buttons and sliders need full UI focus. An
-            // external pointer is the exception: it exists because something
-            // is deliberately pointing at a surface, which is UI focus by
-            // definition whatever the desktop is doing.
-            bool joystickOnly = pointerSource == UiPointerSource::External
-                ? false
-                : !input->IsUiInteractable();
-
             const float pointerX = pointer.state.x;
             const float pointerY = pointer.state.y;
             const bool isDown = pointer.state.isDown;
@@ -205,8 +195,8 @@ namespace CC
 
             bool isDropdownConsumed = false;
 
-            // Expanded dropdown hover and clicks (UI focus only).
-            if (expandedDropdown != nullptr && !joystickOnly)
+            // Expanded dropdown hover and clicks.
+            if (expandedDropdown != nullptr)
             {
                 int optionIndex = HitTestDropdownOptions(expandedDropdown, pointerX, pointerY);
                 if (optionIndex != expandedDropdown->GetHoveredOption())
@@ -243,7 +233,7 @@ namespace CC
 
             if (!isDropdownConsumed)
             {
-                pointer.hoveredElement = HitTest(rootElement, pointerX, pointerY, joystickOnly);
+                pointer.hoveredElement = HitTest(rootElement, pointerX, pointerY);
 
                 // Keyboard focus follows the platform pointer, so a click
                 // after a hover carries on from where the hand was.
@@ -365,7 +355,7 @@ namespace CC
         statedElements.swap(nextStated);
     }
 
-    UiElement* UiInputHandler::HitTest(UiElement* element, float px, float py, bool joystickOnly)
+    UiElement* UiInputHandler::HitTest(UiElement* element, float px, float py)
     {
         UiElement* result = nullptr;
 
@@ -375,17 +365,13 @@ namespace CC
             const std::vector<UiElement*>& children = element->GetChildren();
             for (int i = (int)children.size() - 1; i >= 0 && result == nullptr; i--)
             {
-                result = HitTest(children[i], px, py, joystickOnly);
+                result = HitTest(children[i], px, py);
             }
 
             // Test this element
             if (result == nullptr && element->IsNavigable() && element->layoutRect.Contains(px, py))
             {
-                bool typeAllowed = !joystickOnly || element->GetType() == UiElementType::Joystick;
-                if (typeAllowed)
-                {
-                    result = element;
-                }
+                result = element;
             }
         }
 

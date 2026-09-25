@@ -1,6 +1,7 @@
 #include "UiPointerRouter.h"
 
 #include "CCAssert.h"
+#include "InputManager.h"
 
 namespace CC
 {
@@ -47,6 +48,10 @@ namespace CC
 
     void UiPointerRouter::Resolve()
     {
+        InputManager* input = InputManager::Get();
+        const bool isSurfaceTargeted = input->GetInputTarget(InputDomain::Headset) == InputTarget::Surface;
+        const UiSurface* targetedSurface = input->GetInputTargetSurface(InputDomain::Headset);
+
         for (int pointer = 0; pointer < MAX_POINTERS; pointer++)
         {
             PointerSubmission& submission = submissions[pointer];
@@ -58,8 +63,10 @@ namespace CC
             {
                 for (UiPointerTarget* target : targets)
                 {
+                    bool isOffered = !isSurfaceTargeted || target->GetPointerSurface() == targetedSurface;
+
                     float distance = 0.0f;
-                    if (target->IntersectPointerRay(submission.origin, submission.direction,
+                    if (isOffered && target->IntersectPointerRay(submission.origin, submission.direction,
                                                     submission.maxDistance, distance))
                     {
                         if (nearestTarget == nullptr || distance < nearestDistance)
@@ -85,5 +92,17 @@ namespace CC
 
             submission.isSubmitted = false;
         }
+    }
+
+    bool UiPointerRouter::IsPointerOnTarget(int pointerId) const
+    {
+        bool result = false;
+
+        if (pointerId >= 0 && pointerId < MAX_POINTERS)
+        {
+            result = currentTarget[pointerId] != nullptr;
+        }
+
+        return result;
     }
 }

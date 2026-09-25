@@ -42,7 +42,8 @@ void AppStateBoot::Init()
     screens.RegisterScreen("About", "Data/Ui/About.html", "Data/Ui/About.css", new AboutController());
     screens.RegisterScreen("Showcase", "Data/Ui/Showcase.html", "Data/Ui/Showcase.css", new ShowcaseController());
     screens.SetScreen("MainMenu");
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
+    CC::InputManager::Get()->SetInputTargetSurface(CC::InputDomain::Window,
+                                                   CC::UiManager::Get()->GetWindowSurface());
 }
 
 void AppStateBoot::SceneInit()

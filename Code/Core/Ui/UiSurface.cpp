@@ -264,11 +264,11 @@ namespace CC
                 SetSize(windowWidth, windowHeight);
             }
 
-            // The window answers to the desktop's interaction mode. A panel
-            // has only the pointers something deliberately put on it, so
-            // there is nothing for a mode to gate.
+            // The window takes input only while it is the Window domain's
+            // target. A panel has only the pointers the router put on it,
+            // and the router already offers them by the Headset target.
             bool isInteractable = kind != UiSurfaceKind::Window
-                || InputManager::Get()->IsHudInteractable();
+                || InputManager::Get()->DoesSurfaceReceiveInput(InputDomain::Window, this);
 
             if (rootElement != nullptr && isInteractable && !screens.IsTransitioning())
             {

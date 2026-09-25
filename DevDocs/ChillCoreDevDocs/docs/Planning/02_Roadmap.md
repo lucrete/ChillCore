@@ -19,6 +19,7 @@ Rendering leads. The whole rendering block runs ahead of every other workstream,
 | 11 | Automated testing | Build pipeline | `BuildPipelinePlan.md` | `RunTests.sh` beside `Build.sh` / `Run.sh`. First tests: engine starts, loads a scene, shuts down clean. |
 | 12 | Packaged distribution | Build pipeline | `BuildPipelinePlan.md` | Archive of the self-contained output directory, labelled builds only. Cheapest once the output dir stands alone. |
 | 13 | OpenXR support, PCVR | XR | `XrPlan.md` | Five milestones. Index through SteamVR, Quest 2 over Link. The first is engine work with no XR dependency: per-camera projection, a render view loop, and a native graphics-binding accessor. The last states who owns input between the headset and the desktop, and makes sessions startable and stoppable at runtime. |
+| 14 | Input domains, AppState pause and engine hands | XR | `XrPlan.md` | M6. A Simulation clock, per-channel actions, an input target per domain replacing interaction mode, pause as a base-class AppState feature, and pointing and grab moved into the engine. Follows 13; replaces its derived desktop mode. |
 
 ## Sequencing notes
 
@@ -29,5 +30,6 @@ Rendering leads. The whole rendering block runs ahead of every other workstream,
 - **5 is last in the block on preference alone.** It depends on no other rendering row. It is placed after the optimisation work because it adds fill cost rather than removing it, and a fill-bound scene is easier to reason about once overdraw and culling are already handled. A GPU-driven version would want 1; the first cut does not.
 - **AudioTracker (6–8) is independent** and can run in parallel with any other row. It is sequenced behind rendering by preference; nothing in it waits on a rendering row.
 - **Across workstreams, one hard dependency: 10 before any Android context-loss hardening.** The recovery policy is a deliberate cold restart on the premise that persistence restores the user's place.
+- **14 depends on 13.** It replaces machinery 13 introduced, so it runs after it.
 - **XR (13) is last by sequencing, not by dependency.** It blocks nothing and nothing blocks it. Its first milestone touches the camera, the rendering frontend and the platform layer, so it does not want to run concurrently with other rendering work.
 - **Within a workstream the order is dependency and cost.** Across workstreams it is a preference and can be reordered freely.

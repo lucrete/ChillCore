@@ -12,7 +12,6 @@
 #include "PrintManager.h"
 #include "PostProcess.h"
 #include "RenderManager.h"
-#include "RenderableCube.h"
 #include "RenderableSphere.h"
 #include "SceneHierarchy.h"
 #include "StateMachine.h"
@@ -24,7 +23,10 @@
 #include "ShowcaseHudController.h"
 #include "PauseMenuController.h"
 #include "XrModeController.h"
+#include "XrGrabbable.h"
+#include "XrHands.h"
 #include "XrManager.h"
+#include "XrPausePanel.h"
 
 namespace
 {
@@ -72,25 +74,21 @@ void XrPanelController::SetReadout(const std::string& text)
 }
 
 AppStateXrDemo::AppStateXrDemo()
-    : panelObject(nullptr)
+    : handsObject(nullptr)
+    , hands(nullptr)
+    , panelObject(nullptr)
     , panelComponent(nullptr)
+    , panelPosition(PANEL_WORLD_POSITION)
+    , pausePanelObject(nullptr)
+    , pausePanel(nullptr)
+    , isXrActive(false)
+    , pendingTogglePause(false)
     , panelController(nullptr)
     , lastReadoutTime(0.0f)
     , gradePresetIndex(0)
-    , panelPosition(PANEL_WORLD_POSITION)
-    , isXrActive(false)
-    , isPaused(false)
-    , pendingTogglePause(false)
 {
     isXrSupported = true;
-
-    for (int hand = 0; hand < HAND_COUNT; hand++)
-    {
-        handObject[hand] = nullptr;
-        rayObject[hand] = nullptr;
-        heldObject[hand] = nullptr;
-        wasHoveringPanel[hand] = false;
-    }
+    isPausable = true;
 
     for (int i = 0; i < GRABBABLE_COUNT; i++)
     {
@@ -143,8 +141,19 @@ void AppStateXrDemo::Init()
     panelSurface->RegisterButtonAction("xrExit", []() { CC::StateMachine::Get()->GotoState("Boot"); });
     panelSurface->RegisterButtonAction("xrCyclePreset", [this]() { ApplyNextGradePreset(); });
 
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::World);
-    CC::InputManager::Get()->SetPaused(false);
+    // The headset's pause menu is its own screen on its own surface, not a
+    // copy of the window's: the two are operated independently.
+    CC::UiSurface* pauseSurface = pausePanel->GetSurface();
+    pauseSurface->Screens().RegisterScreen("XrPauseMenu", "Data/Ui/XrPauseMenu.html", "Data/Ui/XrPauseMenu.css",
+        new PauseMenuController(
+            [this]() { pendingTogglePause = true; },
+            []() { CC::StateMachine::Get()->GotoState("Boot"); },
+            []() { CC::CoreMain::Get()->RequestQuit(); }));
+    pauseSurface->Screens().SetScreen("XrPauseMenu");
+
+    CC::InputManager::Get()->SetInputTargetScene(CC::InputDomain::Window);
+    CC::InputManager::Get()->SetInputTargetScene(CC::InputDomain::Headset);
+    pendingTogglePause = false;
 
     CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "AppStateXrDemo::Init() (xr %s)",
             isXrActive ? "active" : "inactive");
@@ -152,23 +161,21 @@ void AppStateXrDemo::Init()
 
 void AppStateXrDemo::InitControls()
 {
+    // Escape on the keyboard, Start on a gamepad, and A on the right
+    // controller. The XR menu button stays unbound and reserved for the
+    // runtime's own dashboard. Pointing and grabbing are the engine's and
+    // bound in every context.
+    //
+    // Paused binds only what resumes; menu navigation comes with every
+    // context. Created first so the play context is the one left active.
     CC::InputActionMap& actionMap = CC::InputManager::Get()->GetActionMap();
+    actionMap.CreateContext("AppStateXrDemoPaused");
+    actionMap.RegisterAction(CC::ActionDef(Pause,   "Pause",   CC::InputTrigger::GamepadStart));
+    actionMap.RegisterAction(CC::ActionDef(PauseXr, "PauseXr", CC::InputTrigger::XrPrimaryRight));
+
     actionMap.CreateContext("AppStateXrDemo");
-
-    // Squeeze grabs, trigger selects. Both hands bind the same pair of
-    // actions to their own trigger, so either hand drives either.
-    actionMap.RegisterAction(CC::ActionDef(Grab,            "Grab",            CC::InputTrigger::XrSqueezeLeft));
-    actionMap.RegisterAction(CC::ActionDef(GrabSecondary,   "GrabSecondary",   CC::InputTrigger::XrSqueezeRight));
-    actionMap.RegisterAction(CC::ActionDef(Select,          "Select",          CC::InputTrigger::XrTriggerLeft));
-    actionMap.RegisterAction(CC::ActionDef(SelectSecondary, "SelectSecondary", CC::InputTrigger::XrTriggerRight));
-    // Escape on the keyboard, Start on a gamepad, and the secondary face
-    // button on either controller. The XR menu button stays unbound and
-    // reserved for the runtime's own dashboard.
-    actionMap.RegisterAction(CC::ActionDef(Pause,        "Pause",        CC::InputTrigger::GamepadStart));
-    actionMap.RegisterAction(CC::ActionDef(PauseXrLeft,  "PauseXrLeft",  CC::InputTrigger::XrSecondaryLeft));
-    actionMap.RegisterAction(CC::ActionDef(PauseXrRight, "PauseXrRight", CC::InputTrigger::XrSecondaryRight));
-
-    actionMap.SetContext("AppStateXrDemo");
+    actionMap.RegisterAction(CC::ActionDef(Pause,   "Pause",   CC::InputTrigger::GamepadStart));
+    actionMap.RegisterAction(CC::ActionDef(PauseXr, "PauseXr", CC::InputTrigger::XrPrimaryRight));
 }
 
 void AppStateXrDemo::SceneInit()
@@ -176,23 +183,15 @@ void AppStateXrDemo::SceneInit()
     CC::SceneHierarchy::Get()->LoadFromFile("Data/Scenes/ExampleScene.yaml");
 
     CC::MaterialManager* materials = CC::MaterialManager::Get();
-    materials->CreateMaterial("XrHand", "LitColour", "", CC::Vector3(0.7f, 0.75f, 0.9f));
-    materials->CreateMaterial("XrRay",  "LitColour", "", CC::Vector3(0.3f, 0.9f, 1.0f));
-    materials->CreateMaterial("XrGrabbable", "LitColour", "", CC::Vector3(0.9f, 0.5f, 0.2f));
-
-    for (int hand = 0; hand < HAND_COUNT; hand++)
+    if (!materials->HasMaterial("XrGrabbable"))
     {
-        handObject[hand] = new CC::SceneObject(hand == 0 ? "XrHandLeft" : "XrHandRight");
-        handObject[hand]->AddComponent(new CC::RenderableCube(materials->GetMaterial("XrHand")));
-        handObject[hand]->GetTransform().SetScale(CC::Vector3(0.05f, 0.05f, 0.09f));
-        CC::SceneHierarchy::Get()->AddRootObject(handObject[hand]);
-
-        // A stretched cube rather than a line: there is no line renderable,
-        // and at this thickness the difference is not visible.
-        rayObject[hand] = new CC::SceneObject(hand == 0 ? "XrRayLeft" : "XrRayRight");
-        rayObject[hand]->AddComponent(new CC::RenderableCube(materials->GetMaterial("XrRay")));
-        CC::SceneHierarchy::Get()->AddRootObject(rayObject[hand]);
+        materials->CreateMaterial("XrGrabbable", "LitColour", "", CC::Vector3(0.9f, 0.5f, 0.2f));
     }
+
+    handsObject = new CC::SceneObject("XrHands");
+    hands = new CC::XrHands();
+    handsObject->AddComponent(hands);
+    CC::SceneHierarchy::Get()->AddRootObject(handsObject);
 
     for (int i = 0; i < GRABBABLE_COUNT; i++)
     {
@@ -200,6 +199,7 @@ void AppStateXrDemo::SceneInit()
 
         grabbableObject[i] = new CC::SceneObject(GRABBABLE_NAME[i]);
         grabbableObject[i]->AddComponent(new CC::RenderableSphere(materials->GetMaterial("XrGrabbable")));
+        grabbableObject[i]->AddComponent(new CC::XrGrabbable());
         grabbableObject[i]->GetTransform().SetScale(CC::Vector3(0.08f, 0.08f, 0.08f));
         grabbableObject[i]->GetTransform().SetPosition(grabbableHomePosition[i]);
         CC::SceneHierarchy::Get()->AddRootObject(grabbableObject[i]);
@@ -224,6 +224,14 @@ void AppStateXrDemo::SceneInit()
     panelObject->GetTransform().SetScale(CC::Vector3(PANEL_WIDTH, PANEL_HEIGHT, 1.0f));
     CC::SceneHierarchy::Get()->AddRootObject(panelObject);
 
+    // Hidden until pause shows it in front of the head.
+    pausePanelObject = new CC::SceneObject("XrPausePanel");
+    pausePanelObject->AddComponent(new CC::UiWorldPanel("XrPausePanel", PANEL_SURFACE_WIDTH, PANEL_SURFACE_HEIGHT));
+    pausePanel = new CC::XrPausePanel();
+    pausePanelObject->AddComponent(pausePanel);
+    pausePanelObject->GetTransform().SetScale(CC::Vector3(PAUSE_PANEL_WIDTH, PAUSE_PANEL_HEIGHT, 1.0f));
+    CC::SceneHierarchy::Get()->AddRootObject(pausePanelObject);
+
     CC::SceneHierarchy::Get()->Init();
     CC::SceneHierarchy::Get()->SetEnabled(true);
 }
@@ -232,22 +240,20 @@ void AppStateXrDemo::SceneShutdown()
 {
     CC::SceneHierarchy::Get()->Shutdown();
 
-    for (int hand = 0; hand < HAND_COUNT; hand++)
-    {
-        handObject[hand] = nullptr;
-        rayObject[hand] = nullptr;
-        heldObject[hand] = nullptr;
-    }
+    handsObject = nullptr;
+    hands = nullptr;
     for (int i = 0; i < GRABBABLE_COUNT; i++)
     {
         grabbableObject[i] = nullptr;
     }
     panelObject = nullptr;
+    pausePanelObject = nullptr;
 
-    // The component's Shutdown ran with the hierarchy and took its surface,
-    // and the controller registered on that surface went with it.
+    // The panels' Shutdown ran with the hierarchy and took their surfaces,
+    // and the controllers registered on those surfaces went with them.
     panelComponent = nullptr;
     panelController = nullptr;
+    pausePanel = nullptr;
 }
 
 void AppStateXrDemo::Shutdown()
@@ -271,7 +277,7 @@ void AppStateXrDemo::Update()
 
     if (isXrActive != wasXrActive)
     {
-        if (!isPaused)
+        if (!IsPaused())
         {
             ShowSceneScreen();
         }
@@ -281,168 +287,17 @@ void AppStateXrDemo::Update()
 
     UpdatePauseInput();
 
-    // Hands and the world-space pointer stop with the world. The eye views
-    // do not: they are published outside this call, so the headset keeps
-    // tracking while the scene stands still.
-    if (isXrActive && !isPaused)
+    if (isXrActive && !IsPaused())
     {
-        UpdateHands();
         UpdateReadout();
     }
-}
-
-void AppStateXrDemo::UpdateHands()
-{
-    CC::XrManager* xr = CC::XrManager::Get();
-
-    for (int hand = 0; hand < HAND_COUNT; hand++)
-    {
-        const CC::XrHand handEnum = (CC::XrHand)hand;
-        const CC::TrackedPose& gripPose = xr->GetHandPose(handEnum, CC::XrPoseKind::Grip);
-        const CC::TrackedPose& aimPose  = xr->GetHandPose(handEnum, CC::XrPoseKind::Aim);
-
-        handObject[hand]->SetEnabled(gripPose.isTracked);
-        rayObject[hand]->SetEnabled(aimPose.isTracked);
-
-        if (gripPose.isTracked)
-        {
-            handObject[hand]->GetTransform().SetPosition(gripPose.position);
-            handObject[hand]->GetTransform().SetRotationQuaternion(gripPose.orientation);
-            UpdateGrab(handEnum, gripPose);
-        }
-
-        if (aimPose.isTracked)
-        {
-            UpdateRay(handEnum, aimPose);
-            SubmitPanelPointer(handEnum, aimPose);
-        }
-    }
-}
-
-void AppStateXrDemo::UpdateRay(CC::XrHand hand, const CC::TrackedPose& aimPose)
-{
-    const int handIndex = (int)hand;
-
-    // Forward is -Z in the pose's own frame, the same convention the eye
-    // views use.
-    CC::Vector3 forward = aimPose.orientation.RotateVector(CC::Vector3(0.0f, 0.0f, -1.0f));
-
-    // The cube is centred on its origin, so the bar sits half its length
-    // along the ray to start at the hand.
-    CC::Vector3 aimPosition = aimPose.position;
-    CC::Vector3 centre = aimPosition + forward * (RAY_LENGTH * 0.5f);
-
-    rayObject[handIndex]->GetTransform().SetPosition(centre);
-    rayObject[handIndex]->GetTransform().SetRotationQuaternion(aimPose.orientation);
-    rayObject[handIndex]->GetTransform().SetScale(CC::Vector3(RAY_THICKNESS, RAY_THICKNESS, RAY_LENGTH));
-}
-
-void AppStateXrDemo::UpdateGrab(CC::XrHand hand, const CC::TrackedPose& gripPose)
-{
-    const int handIndex = (int)hand;
-    const int grabAction = (hand == CC::XrHand::Left) ? Grab : GrabSecondary;
-
-    CC::InputManager* input = CC::InputManager::Get();
-    CC::XrManager* xr = CC::XrManager::Get();
-
-    // Vector3's operators are not const-qualified, so the pose's vectors are
-    // copied before use rather than read through the const reference.
-    CC::Vector3 gripPosition = gripPose.position;
-
-    if (input->EdgePositive(grabAction) && heldObject[handIndex] == nullptr)
-    {
-        // Nearest wins. Two objects within reach of one hand is common once
-        // they have been piled up, and taking the first found would pick by
-        // spawn order rather than by what the hand is closest to.
-        CC::SceneObject* nearest = nullptr;
-        float nearestDistanceSquared = GRAB_RADIUS * GRAB_RADIUS;
-
-        for (int i = 0; i < GRABBABLE_COUNT; i++)
-        {
-            if (grabbableObject[i]->GetParent() == nullptr)
-            {
-                CC::Vector3 offset = grabbableObject[i]->GetWorldPosition() - gripPosition;
-                float distanceSquared = offset.Dot(offset);
-                if (distanceSquared < nearestDistanceSquared)
-                {
-                    nearestDistanceSquared = distanceSquared;
-                    nearest = grabbableObject[i];
-                }
-            }
-        }
-
-        if (nearest != nullptr)
-        {
-            // Held in the hand's frame, so the object keeps the offset and
-            // angle it was picked up at instead of snapping to the palm.
-            CC::Quaternion inverseGrip = gripPose.orientation.Inverse();
-            CC::Vector3 worldOffset = nearest->GetWorldPosition() - gripPosition;
-
-            nearest->SetParent(handObject[handIndex]);
-            nearest->GetTransform().SetPosition(inverseGrip.RotateVector(worldOffset));
-            nearest->GetTransform().SetRotationQuaternion(
-                inverseGrip * nearest->GetTransform().GetRotationQuaternion());
-
-            heldObject[handIndex] = nearest;
-            xr->TriggerHaptic(hand, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);
-        }
-    }
-
-    if (input->EdgeNegative(grabAction) && heldObject[handIndex] != nullptr)
-    {
-        CC::SceneObject* released = heldObject[handIndex];
-
-        // Put back where it visibly is, not where its local offset would put
-        // it once the parent is gone.
-        CC::Vector3 worldPosition = released->GetWorldPosition();
-        CC::Quaternion worldRotation = gripPose.orientation
-                                     * released->GetTransform().GetRotationQuaternion();
-
-        released->SetParent(nullptr);
-        released->GetTransform().SetPosition(worldPosition);
-        released->GetTransform().SetRotationQuaternion(worldRotation);
-
-        heldObject[handIndex] = nullptr;
-        xr->TriggerHaptic(hand, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);
-    }
-}
-
-// ========================
-// Panel pointer
-// ========================
-void AppStateXrDemo::SubmitPanelPointer(CC::XrHand hand, const CC::TrackedPose& aimPose)
-{
-    const int handIndex = (int)hand;
-    const int selectAction = (hand == CC::XrHand::Left) ? Select : SelectSecondary;
-
-    // Vector3's arithmetic is not const-qualified, so the pose is copied
-    // before use rather than read through the const reference.
-    CC::Vector3 aimPosition = aimPose.position;
-    CC::Vector3 forward = aimPose.orientation.RotateVector(CC::Vector3(0.0f, 0.0f, -1.0f));
-
-    CC::UiManager::Get()->GetPointerRouter().SubmitRay(
-        handIndex, aimPosition, forward, RAY_LENGTH,
-        CC::InputManager::Get()->IsPressed(selectAction));
-
-    // A pulse as the ray crosses onto a panel. Without it there is no way to
-    // feel the edge, and the ray has no shadow to judge it by. What the
-    // router decided last frame, because this frame's ray has not been
-    // resolved yet.
-    bool isOnPanel = panelComponent->IsPointerOn(handIndex);
-    if (isOnPanel && !wasHoveringPanel[handIndex])
-    {
-        CC::XrManager::Get()->TriggerHaptic(hand, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);
-    }
-    wasHoveringPanel[handIndex] = isOnPanel;
 }
 
 void AppStateXrDemo::UpdatePauseInput()
 {
     CC::InputManager* input = CC::InputManager::Get();
 
-    bool isPausePressed = input->EdgePositive(Pause)
-                       || input->EdgePositive(PauseXrLeft)
-                       || input->EdgePositive(PauseXrRight);
+    bool isPausePressed = input->EdgePositive(Pause) || input->EdgePositive(PauseXr);
 
     if (isPausePressed || pendingTogglePause)
     {
@@ -451,31 +306,40 @@ void AppStateXrDemo::UpdatePauseInput()
     }
 }
 
-void AppStateXrDemo::TogglePause()
+void AppStateXrDemo::OnPaused()
 {
-    isPaused = !isPaused;
+    CC::InputManager* input = CC::InputManager::Get();
+    CC::UiSurface* windowSurface = CC::UiManager::Get()->GetWindowSurface();
 
-    // Paused, not disabled. Renderables submit to the render list from their
-    // own component update, so disabling the hierarchy stops the scene being
-    // drawn at all rather than stopping it moving. Pausing skips only the
-    // components that declare themselves pauseable.
-    //
-    // The world stops; the camera does not. A scene that stops tracking the
-    // head while the head moves is what makes people ill.
-    CC::SceneHierarchy::Get()->SetPaused(isPaused);
-    CC::InputManager::Get()->SetPaused(isPaused);
+    input->GetActionMap().SetContext("AppStateXrDemoPaused");
 
-    if (isPaused)
+    // A finger on a stick when the menu opens never lifts off that stick,
+    // so its last deflection would keep steering behind the menu.
+    input->ClearAllJoystickOverrides();
+
+    // The window and the headset each get their own menu. The world panel
+    // keeps showing what it was showing, and stops taking rays because the
+    // Headset target is now the pause panel alone.
+    input->SetInputTargetSurface(CC::InputDomain::Window, windowSurface);
+    windowSurface->Screens().SetScreen("PauseMenu");
+
+    if (isXrActive)
     {
-        // Only the window's screen changes. The panel in the world keeps its
-        // own surface and carries on showing what it was showing.
-        CC::UiManager::Get()->GetWindowSurface()->Screens().SetScreen("PauseMenu");
-        CC::InputManager::Get()->LockMouseCursor(false);
+        pausePanel->Show();
+        input->SetInputTargetSurface(CC::InputDomain::Headset, pausePanel->GetSurface());
     }
-    else
-    {
-        ShowSceneScreen();
-    }
+}
+
+void AppStateXrDemo::OnResumed()
+{
+    CC::InputManager* input = CC::InputManager::Get();
+
+    input->GetActionMap().SetContext("AppStateXrDemo");
+    input->SetInputTargetScene(CC::InputDomain::Window);
+    input->SetInputTargetScene(CC::InputDomain::Headset);
+
+    pausePanel->Hide();
+    ShowSceneScreen();
 }
 
 void AppStateXrDemo::ShowSceneScreen()
@@ -522,8 +386,8 @@ void AppStateXrDemo::UpdateReadout()
                  leftGrip.isTracked ? 1 : 0,
                  rightGrip.isTracked ? 1 : 0,
                  nearestReach,
-                 heldObject[(int)CC::XrHand::Left] != nullptr ? 1 : 0,
-                 heldObject[(int)CC::XrHand::Right] != nullptr ? 1 : 0);
+                 hands->IsHolding(CC::XrHand::Left) ? 1 : 0,
+                 hands->IsHolding(CC::XrHand::Right) ? 1 : 0);
         readout = buffer;
     }
 
@@ -604,6 +468,8 @@ void AppStateXrDemo::ApplyNextGradePreset()
 
 void AppStateXrDemo::RecentreGrabbables()
 {
+    hands->ReleaseAll();
+
     for (int i = 0; i < GRABBABLE_COUNT; i++)
     {
         if (grabbableObject[i] != nullptr)
@@ -615,7 +481,6 @@ void AppStateXrDemo::RecentreGrabbables()
 
     for (int hand = 0; hand < HAND_COUNT; hand++)
     {
-        heldObject[hand] = nullptr;
         if (isXrActive)
         {
             CC::XrManager::Get()->TriggerHaptic((CC::XrHand)hand, HAPTIC_AMPLITUDE, HAPTIC_DURATION_SECONDS);

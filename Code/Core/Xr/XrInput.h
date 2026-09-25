@@ -71,6 +71,11 @@ namespace CC
         // exactly zero, and a scene reading the raw value drifts.
         static constexpr float THUMBSTICK_DEAD_ZONE = 0.15f;
 
+        // How far a thumbstick has to be pushed before it reads as a
+        // navigation direction. Well clear of the dead zone, so a resting
+        // thumb does not walk a menu selection.
+        static constexpr float THUMBSTICK_DIRECTION_THRESHOLD = 0.5f;
+
         XrInstance instance;
         XrSession  session;
 
@@ -113,6 +118,10 @@ namespace CC
         void ReadBoolean(XrAction action, XrHand hand, int trigger);
         void ReadVector2(XrAction action, XrHand hand, float& outX, float& outY);
         void ReadPose(XrHand hand, XrPoseKind kind, XrSpace baseSpace, XrTime predictedDisplayTime);
+
+        // Either hand's stick past the threshold, as hand-neutral direction
+        // triggers.
+        void PushThumbstickDirections();
     };
 }
 

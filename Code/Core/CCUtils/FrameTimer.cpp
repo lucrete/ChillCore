@@ -1,4 +1,5 @@
 #include "FrameTimer.h"
+#include <math.h>
 #include <string.h>
 #include "CCAssert.h"
 #include "CCMath.h"
@@ -49,6 +50,9 @@ namespace CC
         currentTime = hasExternalFrameTime ? externalFrameTime : GetCurrentTime();
         deltaTime = currentTime - previousTime;
         deltaTimeClamped = Math::Clamp(0.0f, MAX_DELTA_TIME_SECONDS, deltaTime);
+
+        simulationDeltaTime = isSimulationPaused ? 0.0f : deltaTimeClamped * simulationTimeScale;
+        simulationTime += simulationDeltaTime;
 
         // Cache previous frame timestamps before reset
         memcpy(previousFrameTimestamps, timestamps, sizeof(Timestamp) * timestampCount);
@@ -114,6 +118,17 @@ namespace CC
     float FrameTimer::GetFramesPerSecond() const
     {
         return framesPerSecond;
+    }
+
+    void FrameTimer::SetSimulationTimeScale(float timeScale)
+    {
+        CC_ASSERT(timeScale >= 0.0f, "Simulation time cannot run backwards");
+        simulationTimeScale = timeScale;
+    }
+
+    float FrameTimer::ShaderSimulationTime() const
+    {
+        return fmodf(simulationTime, SHADER_TIME_WRAP_SECONDS);
     }
 
     void FrameTimer::AddTimestamp(const char* label)

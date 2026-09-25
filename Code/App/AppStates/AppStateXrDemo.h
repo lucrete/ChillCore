@@ -14,6 +14,8 @@ namespace CC
 {
     class UiElement;
     class UiWorldPanel;
+    class XrHands;
+    class XrPausePanel;
 }
 
 // The panel's screen controller. Holds the readout line so the state can say
@@ -32,9 +34,9 @@ private:
     std::string    pendingReadout;
 };
 
-// Tracked controllers driving a scene: two hands, a pointer ray from each,
-// objects that can be picked up and put down, and a UI panel standing in the
-// world that the ray operates.
+// Tracked controllers driving a scene: the engine's hands, objects that can
+// be picked up and put down, a UI panel standing in the world that the rays
+// operate, and a pause panel that appears in front of the head.
 //
 // Boots directly. Nothing here assumes a menu ran first.
 class AppStateXrDemo : public StateMachineState
@@ -47,46 +49,37 @@ public:
     virtual void Update();
     virtual void Shutdown();
 
+protected:
+    virtual void OnPaused() override;
+    virtual void OnResumed() override;
+
 private:
     enum XrDemoActions
     {
-        Grab = CC::InputAction::GameActionStart,
-        GrabSecondary,
-        Select,
-        SelectSecondary,
-        Pause,
-        PauseXrLeft,
-        PauseXrRight,
+        Pause = CC::InputAction::GameActionStart,
+        PauseXr,
         XrDemoActionMax
     };
 
     static const int HAND_COUNT = (int)CC::XrHand::Max;
     static const int GRABBABLE_COUNT = 4;
 
-    // How close the grip has to be to pick something up. Generous: the grip
-    // pose sits inside the fist, so a hand that looks like it is touching an
-    // object is already some way inside it.
-    static constexpr float GRAB_RADIUS = 0.25f;
-
-    static constexpr float RAY_LENGTH = 3.0f;
-    static constexpr float RAY_THICKNESS = 0.006f;
-
-    // The panel in world space, in metres, and the surface behind it. The
-    // surface is far denser than the panel is wide because text read from
-    // half a metre away shows every pixel.
+    // The panels in world space, in metres, and the surfaces behind them.
+    // The surfaces are far denser than the panels are wide because text read
+    // from half a metre away shows every pixel.
     static constexpr float PANEL_WIDTH = 1.2f;
     static constexpr float PANEL_HEIGHT = 0.9f;
     static const int PANEL_SURFACE_WIDTH = 1024;
     static const int PANEL_SURFACE_HEIGHT = 768;
 
+    static constexpr float PAUSE_PANEL_WIDTH = 0.8f;
+    static constexpr float PAUSE_PANEL_HEIGHT = 0.6f;
+
     static constexpr float HAPTIC_AMPLITUDE = 0.4f;
     static constexpr float HAPTIC_DURATION_SECONDS = 0.03f;
 
-    // Hand state
-    CC::SceneObject* handObject[HAND_COUNT];
-    CC::SceneObject* rayObject[HAND_COUNT];
-    CC::SceneObject* heldObject[HAND_COUNT];
-    bool             wasHoveringPanel[HAND_COUNT];
+    CC::SceneObject* handsObject;
+    CC::XrHands*     hands;
 
     CC::SceneObject* grabbableObject[GRABBABLE_COUNT];
     CC::Vector3      grabbableHomePosition[GRABBABLE_COUNT];
@@ -97,9 +90,12 @@ private:
     CC::UiWorldPanel*  panelComponent;
     CC::Vector3        panelPosition;
 
+    CC::SceneObject*   pausePanelObject;
+    CC::XrPausePanel*  pausePanel;
+
     bool isXrActive;
-    bool isPaused;
     bool pendingTogglePause;
+
     XrPanelController* panelController;
 
     // What the readout last said. Rewriting the same string every frame
@@ -117,17 +113,9 @@ private:
     void SceneInit();
     void SceneShutdown();
 
-    void UpdateHands();
-    void UpdateRay(CC::XrHand hand, const CC::TrackedPose& aimPose);
-    void UpdateGrab(CC::XrHand hand, const CC::TrackedPose& gripPose);
-    // Offers each hand's aim ray to the pointer router, which decides which
-    // panel — if any — the ray reaches. Nothing here knows where a panel is.
-    void SubmitPanelPointer(CC::XrHand hand, const CC::TrackedPose& aimPose);
-
     void RecentreGrabbables();
     void ApplyNextGradePreset();
     void UpdateReadout();
-    void TogglePause();
     void ShowSceneScreen();
     void UpdatePauseInput();
 

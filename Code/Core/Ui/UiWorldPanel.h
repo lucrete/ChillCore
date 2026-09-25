@@ -53,6 +53,7 @@ namespace CC
         virtual void OnPointerHit(int pointerId, const Vector3& origin, const Vector3& direction,
                                   float distance, bool isPressed) override;
         virtual void OnPointerLeft(int pointerId) override;
+        virtual const UiSurface* GetPointerSurface() const override { return surface; }
 
     private:
         std::string surfaceName;

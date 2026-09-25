@@ -90,7 +90,8 @@ void AppStateAudioTracker::Init()
     screens.RegisterScreen("AudioTracker", "Data/Ui/AudioTracker.html", "Data/Ui/AudioTracker.css",
         new AudioTrackerController(&project));
     screens.SetScreen("AudioTracker");
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
+    CC::InputManager::Get()->SetInputTargetSurface(CC::InputDomain::Window,
+                                                   CC::UiManager::Get()->GetWindowSurface());
 }
 
 void AppStateAudioTracker::Update()
