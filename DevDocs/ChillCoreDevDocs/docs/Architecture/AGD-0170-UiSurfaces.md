@@ -8,7 +8,8 @@
 - The engine owns the window's surface. Application code never branches on whether a window exists.
 - A panel in the world is a scene component. It owns a surface, the offscreen target behind it, and the quad that shows it.
 - A surface accepts several pointers at once, each with its own hover and press. Two hands drive one panel independently.
-- A world pointer reaches a surface through a router that takes the nearest hit-testable target. The router holds no geometry.
+- A world pointer reaches a surface through a router that takes the nearest hit-testable target the headset's input target allows. The router holds no geometry.
+- A surface takes input only while it is its domain's input target. Every element on its current screen is then reachable.
 - A panel redraws only when something changes. A static panel nobody is pointing at submits no work at all.
 
 ## Concepts
@@ -19,7 +20,6 @@
 - **World panel** — a scene component pairing a surface with a quad in the world.
 - **Pointer** — a position, a pressed flag, and whether it is on the surface at all, in surface-space pixels.
 - **Pointer source** — where a surface's pointers come from: the platform, or whatever is pointing at it.
-- **World-focus reachable** — an element a pointer reaches while the world, rather than the interface, has focus. Declared per element and off by default.
 - **Pointer target** — something a world ray can reach. Answers whether a ray reaches it and at what distance, then what the hit means.
 - **Content dirty** — a surface has something new to draw.
 
@@ -35,15 +35,15 @@
 
 `UiWorldPanel` is a scene component and a pointer target. It creates its surface, its material, and the quad that shows it, and registers itself with the router. Its size in metres is its owner's transform scale; the surface knows only pixels. It is factory-registered, so panels are authorable in scene files rather than hardcoded per state.
 
-`UiPointerRouter` compares distances and nothing else. Rays are submitted for a frame, then resolved together, so every target has been offered a ray before the nearest is chosen. A pointer that submits nothing releases whatever it was on.
+`UiPointerRouter` compares distances and nothing else, among the targets the headset's input target allows: every registered target while it is the scene, and only one surface's while it names that surface. A target says which surface it delivers into; one that is not a surface is reachable only under a scene target. Rays are submitted for a frame, then resolved together, so every target has been offered a ray before the nearest is chosen. A pointer that submits nothing releases whatever it was on.
 
 ## Runtime flow
 
 Per frame, in order:
 
 1. **Screen stacks update**, every enabled surface, driving its own transition and fade.
-2. **Pointers resolve.** Each submitted ray goes to the nearest target that answered it; each target converts its hit into surface pixels and hands the result to that surface's input handler.
-3. **Surfaces update.** The window re-reads its size from the platform. Each surface runs its input handler over all its pointers.
+2. **Pointers resolve.** Each submitted ray goes to the nearest allowed target that answered it; each target converts its hit into surface pixels and hands the result to that surface's input handler.
+3. **Surfaces update.** The window re-reads its size from the platform, and runs its input handler only while it is the window's input target. Each panel runs its input handler over the pointers the router gave it.
 4. **Offscreen surfaces render**, each into its own target and only when dirty. This runs before the scene, because the scene samples what they drew.
 5. **The scene renders.**
 6. **The window surface draws** directly into whatever the frame has bound.
@@ -54,7 +54,7 @@ Per frame, in order:
 
 **Directional navigation and cancel stay on the surface reading the platform.** They are one input stream with no spatial origin, so only one surface can consume them. Panels are pointed at.
 
-**While the world has focus, a pointer reaches only the elements that declare they belong there.** Everything else needs full interface focus. An external pointer is exempt: it exists because something is deliberately aiming at a surface, which is interface focus by definition whatever the desktop is doing.
+**A surface holding its domain's input target reaches every element on its current screen.** The screen being shown decides what exists to press: a heads-up display with on-screen sticks during play on a touch device, a pause menu while paused.
 
 **Redraw marking is automatic**, in the element setters and in the input handler's hover and press transitions. A transition marks every frame it runs, because a fade changes every frame.
 
@@ -68,7 +68,9 @@ Per frame, in order:
 
 **Reach a surface from a controller.** Ask the controller for its own surface. Never assume which one it is.
 
-**Drive a panel from a world pointer.** Submit a ray to the router each frame with an identifier for the hand. The router decides which panel it reaches; nothing on the submitting side knows where a panel is.
+**Drive a panel from a world pointer.** Submit a ray to the router each frame with an identifier for the hand. The router decides which panel it reaches; nothing on the submitting side knows where a panel is. In XR the engine's hands already do this for both controllers.
+
+**Make one panel the only thing the headset can reach.** Set the headset's input target to that panel's surface. Rays then reach it alone until the target is set back to the scene.
 
 **Add a new kind of pointer target.** Implement the target interface. A reactive three-dimensional element implements it against its own geometry and drives its own hover and press with no surface involved.
 
@@ -114,13 +116,17 @@ Each pointer keeps its own hover and press, so two hands can use one panel and a
 
 Tracking a single hovered and pressed element was what made multi-touch a special path: extra fingers could only reach joysticks, because anything else would have fought over the one slot. With per-pointer state that restriction disappears and the platform's fingers, the mouse and a controller ray are all the same thing.
 
-### An element declares whether it is reachable while the world has focus
+### What a pointer can reach is decided by the input target, not per element
 
-A heads-up display is drawn over a scene the pointer is also driving — in that mode a click is a camera look as much as a press. So elements are unreachable there unless they say otherwise, and the ones that say otherwise are those whose whole purpose is to be operated during play: an on-screen stick, a pause control on a device with no keyboard.
+A surface either holds its domain's input target, and every element on its screen is reachable, or it does not, and nothing on it is.
 
-The alternative, keying it off element type, is what this replaced. Allowing only sticks through made every other on-screen control silently inert — drawn, hovered by nothing, pressed by nothing — and the failure was invisible, because the control looked right and simply never fired. Type is also the wrong question: two buttons in the same display can want opposite answers.
+This replaced two earlier guards. The first let only joysticks through while the world had input, which left every other on-screen control — a touch pause button included — drawn and silently inert. The second made reachability a per-element opt-in, which kept the guard but meant every always-available control had to remember to opt in, with the same invisible failure when it did not.
 
-Declaring it per element keeps the guard while making the exception explicit and greppable. The cost is that a new always-available control has to remember to opt in, and the symptom if it does not is a control that draws and does nothing.
+Both existed because a heads-up display was drawn over a scene the same pointer was driving, where a click was a camera look as much as a press. With a target per domain that overlap does not arise: on a touch device the display is the target and its sticks steer the camera; on the desktop the scene is the target and the display takes no pointers at all. The screen being shown decides what exists to press.
+
+### The router filters by the headset's input target
+
+Pointing has to keep working while the world is paused, because the pause panel is pointed at — but only the pause panel. Filtering in the router means hands submit rays every frame without knowing about pause, and a panel becomes unreachable without being told.
 
 ### Directional navigation stays on the window
 
@@ -142,7 +148,9 @@ It draws directly rather than into a target, so skipping a frame's draw would sh
 
 ## Profiling
 
-GPU scopes are named for the surface that emitted them and group under one phase, so any number of panels leaves the phase budget alone and adding or removing one does not discard the graph's history, while a capture still names each. **A clean panel emits no scope at all**, so the detail names vary between frames.
+GPU scopes are named for the surface that emitted them and group under one phase, so any number of panels leaves the phase budget alone, while a capture still names each. **A clean panel emits no scope of its own**, so the detail names vary between frames.
+
+That group's phase is opened every frame, before any surface renders, whether or not one redraws. A phase that appeared only on frames with a redraw changed the frame's phase set each time, and a changed phase set discards the profiler's history — in a headset, where a panel's readout rewrites itself several times a second, the graphs never filled.
 
 CPU timing stays aggregate. The standard phases are a fixed set and the graph holds a small number of them, which a surface count that changes at runtime cannot fit. Interface update and interface render mean all surfaces together.
 
@@ -153,5 +161,5 @@ CPU timing stays aggregate. The standard phases are a fixed set and the graph ho
 - Per-surface CPU timings do not exist. When the question becomes "which panel is redrawing when it should not", that is when to add them.
 - A world panel's plane is rebuilt from its owner's transform during the scene update, so a panel moved after that point is hit-tested against where it was for one frame.
 - A surface's screen stack is its own. Two panels showing the same markup register it on each; there is no shared screen definition.
-- A control that opts into world focus but is only shown for one input type has two independent conditions to get right, and the failure of either is a control that draws and does not respond.
+- A heads-up display on the desktop takes no pointers while the scene is the window's target, so a clickable control there needs the target moved to the window surface first.
 - Interface elements are regions on a flat surface. The pointer target interface is shaped so a reactive three-dimensional element does not require the router to change, but no such element exists.

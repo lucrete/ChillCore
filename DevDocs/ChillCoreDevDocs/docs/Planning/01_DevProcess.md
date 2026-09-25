@@ -24,7 +24,7 @@ The per-workstream plans are collectively "the planning docs". Completed work le
 `02_Roadmap.md` and `03_TechBacklog.md` are mutually exclusive. Every item is in exactly one.
 
 - In the roadmap — it is planned. Detail lives in a planning doc. It is not in the backlog.
-- In the backlog — it is not planned. It has no planning-doc section yet. It is not in the roadmap.
+- In the backlog — it is not planned. It could optionally have a planning-doc. It is not in the roadmap.
 
 ## References between documents
 

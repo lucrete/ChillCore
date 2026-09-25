@@ -8,13 +8,15 @@
 - Any state can be the first state. Booting straight into a work-in-progress state is a one-line change.
 - Transitions fade the whole frame to black, swap states while nothing is visible, and fade back in.
 - Input is blocked for the duration of a transition, so nothing interacts with a state that is being torn down.
-- Pausing freezes gameplay while the scene keeps rendering. It is opt-in per component.
+- Pausing freezes gameplay while the scene keeps rendering. A state says whether it pauses at all; components say whether they freeze.
 
 ## Concepts
 
 - **App state** — a named unit of application behaviour with an initialise, update, and shut down lifecycle. Registered once, activated by name.
 - **Transition** — the fade-out, swap, fade-in sequence that separates two states.
-- **Pauseable** — a property of a component, not of a state. A pauseable component stops updating while the scene is paused; everything else keeps running.
+- **Pausable state** — a state that has a world to freeze. The default is not pausable; a state such as the audio tracker has no pause.
+- **Pauseable** — a property of a component. A pauseable component stops updating while the scene is paused; everything else keeps running.
+- **Simulation time** — the world's own clock. It stops while paused and can be scaled; pauseable components read it rather than real time.
 - **XR support** — a property of a state. Whether its scene can be entered in a headset, declared by the state and false unless it says otherwise.
 
 ## Architecture
@@ -23,11 +25,13 @@
 
 Because it is a singleton, a state requests a transition by naming the target. It holds no reference to the machine and knows nothing about which state it is handing off to.
 
-`StateMachineState` is the base contract: initialise, update, shut down, and whether the state supports XR. It is deliberately unaware of transitions, fading, and pause — a state cannot observe or interfere with the machinery moving it.
+`StateMachineState` is the base contract: initialise, update, shut down, whether the state supports XR, and whether it pauses. It is deliberately unaware of transitions and fading — a state cannot observe or interfere with the machinery moving it.
+
+Pausing goes through the base contract. Setting a pausable state paused freezes the Simulation — the scene hierarchy's pause flag and the frame timer's Simulation clock, together — and then calls the state's paused hook; resuming reverses both and calls its resumed hook. The hooks are where the state does everything particular to it: its action context, its input targets, its screens and its panels.
 
 The fade overlay is not owned here. `StateMachine` sets a fade level on the render subsystem, which owns a fullscreen quad drawn after everything else. The state machine carries no knowledge of how the fade is drawn.
 
-Pause is owned by the scene hierarchy as a single flag, with a matching one on input. Components declare whether they respond to it. The decision to pause is per state; the mechanism is global, so the machine clears both flags at a state swap rather than trusting each state to.
+The mechanism behind pause is global: one flag on the scene hierarchy and one Simulation clock. Components declare whether they respond to it. The decision to pause is per state, so the machine resets the global parts at a state swap rather than trusting each state to.
 
 ## Runtime flow
 
@@ -43,7 +47,7 @@ Pause is owned by the scene hierarchy as a single flag, with a matching one on i
 
 The scene hierarchy keeps updating throughout, even while the active state does not. That is deliberate: renderables must keep submitting themselves or the scene would vanish behind the fade rather than being covered by it.
 
-**Pause** is checked once per scene object per frame. Pauseable components are skipped while paused; the rest update as normal. Renderables are not pauseable, which is what keeps a paused scene visible.
+**Pause** is checked once per scene object per frame. Pauseable components are skipped while paused; the rest update as normal. Renderables are not pauseable, which is what keeps a paused scene visible. The Simulation clock stops at the same moment, so a pauseable component that reads Simulation time resumes from where it stopped rather than jumping to where it would have been, and shaders animating on frame time freeze with it.
 
 ## Working with it
 
@@ -53,7 +57,7 @@ The scene hierarchy keeps updating throughout, even while the active state does 
 
 **Make a component freeze on pause.** Mark it pauseable, normally in its constructor. The default is not pauseable, so a component that should freeze but was never marked will keep running while the rest of the scene is frozen.
 
-**Pause from a state.** Set the paused flag on the scene hierarchy. States that also run their own logic outside components must guard that logic themselves; the flag only governs component updates.
+**Make a state pausable.** Mark it pausable in its constructor. Poll its own pause action and call the base contract's toggle. In the paused hook, switch to a paused action context, move the input targets to the pause menu's surfaces, and show the menu; in the resumed hook, put back what it changed. Logic the state runs outside components must check whether the state is paused itself; pause only governs component updates.
 
 ## Design decisions
 
@@ -65,15 +69,31 @@ Acting immediately would mean shutting down a state from inside its own update, 
 
 The one exception is the first transition, when no state is active. There is nothing to defer, so it executes immediately.
 
-### The state machine clears pause at a swap
+### The state machine resets pause at a swap, without calling the leaving state
 
-Pause is a per-state decision acting on a global mechanism — one flag on the scene hierarchy, one on input. A state that is left *while paused* would otherwise hand its pause to whatever runs next.
+Pause is a per-state decision acting on a global mechanism. A state that is left *while paused* would otherwise hand its pause to whatever runs next.
 
-That failure is quiet and lands somewhere else. A paused input manager outranks the interaction mode a state asks for, so the next state sets up normally, reports the mode it wanted, and simply never receives world input: the camera stops responding to the mouse with nothing in the log and no crash.
+That failure is quiet and lands somewhere else. When pause also forced the input manager into interface mode, a state left through its pause menu handed the next state a paused input manager, and the camera stopped responding to the mouse with nothing in the log and no crash.
 
-Clearing at the swap rather than in each state's shut-down is deliberate. Requiring every state to reset both flags is a rule that holds only while everyone remembers, and the states that most need it are the ones whose exit path *is* the pause menu. The machine already owns the boundary, so it owns the reset.
+At the swap the machine clears the scene's pause flag, restarts the Simulation clock at normal speed, resets every input target to the scene, and marks the leaving state unpaused. It does not call the leaving state's resumed hook: that would bring back its play screen, its panels and anything else it does on resume, all of which its shut-down is about to destroy. The state is reused the next time it is entered, so its paused flag is cleared rather than left for then.
 
-The incoming state's initialisation still runs after the reset, so a state that wants to begin paused can say so.
+Resetting at the swap rather than in each state's shut-down is deliberate. The states that most need it are the ones whose exit path *is* the pause menu, and the machine already owns the boundary.
+
+The incoming state's initialisation runs after the reset, so it sets its own targets and can begin paused if it wants to.
+
+### Pause is part of the base contract; what it shows belongs to the state
+
+The engine freezes the Simulation; the state decides what pausing looks like. Everything global — the scene's flag and the Simulation clock — is set in one place, together, so they cannot disagree. Everything particular — which context, which targets, which screens, which panels — is the state's own, in its hooks.
+
+Pausing used to be several things every pausing state had to remember: the scene flag, a flag on input, a screen swap, and a saved cursor lock. Each failure was quiet. The cursor now follows the window's input target, and the flags are one call.
+
+The cost is that restoring on resume is still each state's job. Nothing records what a state changed on pause; it puts back what it knows it changed.
+
+### The Simulation clock stops with the scene
+
+Skipping a component's update on pause is not enough on its own. A component that computes its pose from elapsed time jumps on resume to where it would have been, because time kept running while it was skipped. The Simulation clock stops with the pause flag, so anything reading it resumes from where it stopped. It also carries a time scale.
+
+Components that keep running through a pause read real time. Which clock a component reads is fixed by whether it is pauseable, never switched at runtime.
 
 ### The fade is a full-frame overlay, not a UI element
 
@@ -131,6 +151,8 @@ The cost is vigilance: the policy holds only as long as new global setup is put 
 
 - State initialisation is synchronous, and runs during the black frame. A state with heavy loading holds a black screen for as long as it takes, with no progress indication.
 - Components default to not pauseable, so a gameplay component that should freeze will keep running unless explicitly marked.
+- Pause applies to the whole scene. An object or subtree cannot be paused on its own.
+- Which clock a component reads is a convention, not enforced: a pauseable component that reads real time still jumps on resume.
 - Pause is cleared at a state swap but not on any other path. Anything else that sets it globally and outlives its setter has the same failure.
 - Two independent fade systems exist with different durations and scopes.
 - States cannot be unregistered, and there is no mechanism for a state to hand data to its successor.

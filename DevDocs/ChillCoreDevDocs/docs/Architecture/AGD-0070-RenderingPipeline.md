@@ -32,7 +32,7 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 ## Runtime flow
 
-**Frame start.** Camera state updates, then the frame-wide uniform buffer is filled and bound. It holds the view-projection transform, camera position, time, and the ambient and directional lighting — everything constant for the whole frame.
+**Frame start.** Camera state updates, then the frame-wide uniform buffer is filled and bound. It holds the view-projection transform, camera position, time, and the ambient and directional lighting — everything constant for the whole frame. The time is the world's Simulation time, wrapped to a fixed period, so shader animation freezes when the world is paused.
 
 **Submission.** During the scene update, each renderable adds itself to the opaque or transparent list according to its material's transparency.
 

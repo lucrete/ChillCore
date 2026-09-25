@@ -1,10 +1,13 @@
 # AGD-0100: Frame Timing and Profiling
 
-- **Scope:** Measuring where frame time goes, on both processor and graphics hardware, and getting that measurement out for analysis. Covers delta time, the frame-rate figure, phase timestamps, the profile history, and capture. Does not cover the developer UI that displays it.
+- **Scope:** Measuring where frame time goes, on both processor and graphics hardware, and getting that measurement out for analysis. Covers the frame clock and delta time, the Simulation clock, the frame-rate figure, phase timestamps, the profile history, and capture. Does not cover the developer UI that displays it.
 
 ## Overview
 
-- One clock reading per frame produces the delta time every other system uses. Nothing else queries the clock for frame timing.
+- One frame-clock reading per frame produces the delta time every other system uses. Nothing else queries the clock for frame timing.
+- The frame clock is the platform's, unless something that paces frames itself supplies one — an XR runtime's predicted display time while a session runs.
+- A separate Simulation clock is the world's own time. It stops while the world is paused, can be scaled, and is what shaders animate on.
+- Profiling measures on the platform clock throughout, whichever clock drives the frame.
 - That shared figure is capped, so a stalled frame cannot be integrated against. The true elapsed time stays available for measurement.
 - Named timestamps at phase boundaries produce the processor-side breakdown. The frame loop's structure and the profiler's breakdown are the same thing.
 - Graphics-side timing comes from the graphics abstraction as an ordered sequence of named spans, read back some frames later.
@@ -12,7 +15,10 @@
 
 ## Concepts
 
+- **Frame clock** — the clock delta time is taken from. The platform's by default; an external clock while something else paces the frame.
 - **Delta time** — seconds elapsed since the previous frame, sampled once and reused by everything. Capped before it is handed out.
+- **Simulation time** — the world's elapsed time and its per-frame delta: delta time scaled by the time scale, and zero while paused.
+- **Platform frame time** — the frame's start and length on the platform clock, the clock every profiling timestamp is taken on.
 - **Unclamped delta time** — the same measurement without the cap, for anything reporting on time rather than advancing with it.
 - **Timestamp** — a labelled instant recorded during the frame. The span between consecutive timestamps is one phase.
 - **Standard phase** — one of a fixed set of timestamps identified by an enumerator rather than only by label, so its duration can be looked up directly.
@@ -21,7 +27,7 @@
 
 ## Architecture
 
-`FrameTimer` is a singleton owning the clock, the delta time, the frame-rate figure, the per-frame timestamp array, and the profile history ring.
+`FrameTimer` is a singleton owning the frame clock, the delta time, the Simulation clock, the frame-rate figure, the per-frame timestamp array, and the profile history ring.
 
 It reads the clock through the platform layer rather than any windowing library directly, so the dependency that time introduces is the platform's, not a graphics library's.
 
@@ -33,13 +39,15 @@ The history is a fixed-size ring holding total frame time, processor phases, gra
 
 ## Runtime flow
 
-**At frame start**, the clock is read once. Delta time is the difference from the previous reading, and that single value serves every system for the rest of the frame. The timestamp array is reset.
+**At frame start**, the frame clock is read once. Delta time is the difference from the previous reading, and that single value serves every system for the rest of the frame. The Simulation clock advances by the capped delta times the time scale, or not at all while paused. The platform clock is read for the frame's platform start and length. The timestamp array is reset.
+
+**The frame-wide shader time** is Simulation time, wrapped to a fixed period, so shader animation freezes and scales with the world.
 
 **During the frame**, each phase boundary records a timestamp. These are the same boundaries the frame loop is built from, so the breakdown reflects the loop's real structure rather than a parallel description of it.
 
-**At frame end**, the previous frame's graphics spans — now available, having had time to complete — are read back by index, and the whole set is written into the history ring.
+**At frame end**, the previous frame's graphics spans — now available, having had time to complete — are read back by index and grouped into phases, and the whole set is written into the history ring. Contiguous spans whose names share a group prefix fold into one phase, so passes that come and go inside a group leave the phase set alone. If the phase set differs from the stored one, the history is discarded first, because phase *n* would otherwise mean two different things in one graph.
 
-**The frame-rate figure** accumulates frames over a one-second window and averages. It updates once per second rather than every frame.
+**The frame-rate figure** accumulates frames over a one-second window of platform time and averages. It updates once per second rather than every frame.
 
 **Capture** records for a requested duration and writes the history out, taking column headings from the span names themselves rather than from a hard-coded list.
 
@@ -58,6 +66,22 @@ The history is a fixed-size ring holding total frame time, processor phases, gra
 Before this existed, components queried the clock independently and derived their own timing. Now one reading at frame start produces a delta time that everything shares.
 
 Beyond removing redundant work, this makes the frame coherent: every system sees exactly the same elapsed time, so two components animating at the same rate stay in step. Independent clock reads within a frame drift apart by however long the work between them took.
+
+### An external clock can drive the frame
+
+Something that paces frames itself can hand the frame timer its own clock, and delta time is then taken from that. An XR runtime predicts when each frame will actually be displayed, and animation advanced against any other clock lands at the wrong moment in the headset.
+
+The external clock has its own origin, so taking it up moves the baseline with it rather than producing a first delta equal to the distance between two unrelated clocks. It is released when the pacer stops — for an XR session, when the runtime stops it, not only when it ends. A clock that is held but no longer advanced freezes everything driven by frame time.
+
+### Profiling stays on the platform clock
+
+Timestamps are read from the platform clock, so the frame total and the last phase are measured on it too, whatever clock drives the frame. Mixing them subtracted a runtime display time from a platform timestamp — two clocks with unrelated origins — and produced a meaningless value every frame, on top of the stack, under an external clock. The frame-rate figure counts platform time for the same reason, and so it keeps moving while an external clock is held but not advanced.
+
+### The Simulation clock is separate from the frame clock
+
+The world's time stops when it is paused and can be scaled; the frame's time cannot, because the camera, the interface and the headset keep running through a pause. Components that freeze read Simulation time, so they resume from where they stopped rather than jumping; everything else reads real time. The frame-wide shader time is Simulation time, so materials freeze with the world; a material that must keep animating through a pause is given real time through a uniform of its own.
+
+The shader time is wrapped to a fixed power-of-two period. A float of elapsed seconds loses precision as it grows, and fast periodic animation visibly steps after a long session.
 
 ### Delta time is capped, and the raw measurement stays reachable
 
@@ -113,6 +137,8 @@ The measurement is an approximation. Where in the frame this stall lands is driv
 - The shared delta time is capped, so across a stall world time falls behind wall-clock rather than catching up. The cap is a fixed compile-time value, not derived from the frame rate in use.
 - Graphics timing results lag by a few frames, so processor and graphics figures in the same row are not from the same frame.
 - The presentation wait measurement is an approximation whose accuracy depends on driver behaviour.
-- Timestamps per frame, history length, and phase counts are all fixed at compile time. Exceeding any is silent truncation.
+- Timestamps per frame, history length, and phase counts are all fixed at compile time. Exceeding any is silent truncation. All graphics spans are grouped; only the number of groups is capped.
+- Any change to the graphics phase set discards the history. A pass that appears on some frames and not others — a frame the XR runtime says not to render, for instance — resets the graphs.
+- Shader time wraps at a fixed period, so a shader animation that does not repeat on that period jumps once each time it wraps.
 - Graphics spans are a flat sequence, so a phase cannot be broken into measured sub-spans.
 - The developer console and on-screen display are desktop-only, so on other platforms the data is collected but only reachable through capture.

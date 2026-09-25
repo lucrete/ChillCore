@@ -69,10 +69,14 @@ The window is what actually loses and regains these resources, and it is the onl
 
 Both default to doing nothing, so a platform that never loses either implements neither.
 
+### Vsync can be suspended at runtime
+
+The window is created with or without vsync, and the choice can be suspended while something else paces the frame — an XR runtime while its session runs. Two pacers at different rates make the loop miss the deadline that matters. Clearing the suspension restores what the window was configured with rather than a value the caller supplies, so nothing else has to remember it. The default does nothing, so a platform whose swap is paced elsewhere implements none of it.
+
 ## Limitations
 
 - Directory listing and file copying are unimplemented on some backends, which blocks any feature needing to enumerate files there.
 - The atomic write guarantee is not met on every backend; where it is unavailable it silently degrades to a plain write rather than failing.
-- Touch input is captured into multiple pointer slots, but nothing consumes more than the first, so multi-touch gestures are unavailable despite the data being present.
+- Touch input is captured into multiple pointer slots and each reaches the interface as its own pointer, but there is no gesture recognition.
 - No streaming file access, by design. Large assets must fit in memory.
 - Platform selection is build-time only.
