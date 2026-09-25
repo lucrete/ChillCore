@@ -148,6 +148,13 @@ namespace CC
 
     void UiManager::RenderSurfaces()
     {
+        // Opened every frame whether or not any surface redraws. A surface
+        // only emits its own scope on the frames it draws, and a phase that
+        // comes and goes changes the frame's phase set, which discards the
+        // profiler's history each time. The surfaces' scopes group under
+        // this one.
+        Gfx::RenderApi::Get()->AddGpuTimestamp("UI/Surfaces");
+
         for (UiSurface* surface : surfaces)
         {
             if (surface != windowSurface)

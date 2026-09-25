@@ -44,6 +44,7 @@ namespace CC
     PlatformWindowGlfw::PlatformWindowGlfw()
         : window(nullptr)
         , isFullscreen(false)
+        , isVsyncConfigured(true)
         , windowedMode{ 0, 0, 0, 0 }
     {
     }
@@ -97,7 +98,8 @@ namespace CC
         glfwSetDropCallback(window, GlfwDropCallback);
 
         glfwMakeContextCurrent(window);
-        glfwSwapInterval(config.vsync ? 1 : 0);
+        isVsyncConfigured = config.vsync;
+        glfwSwapInterval(isVsyncConfigured ? 1 : 0);
     }
 
     bool PlatformWindowGlfw::GetNativeGraphicsBinding(NativeGraphicsBinding& outBinding) const
@@ -198,5 +200,11 @@ namespace CC
     bool PlatformWindowGlfw::IsFocused() const
     {
         return glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+    }
+
+    void PlatformWindowGlfw::SetVsyncSuspended(bool isSuspended)
+    {
+        bool isVsyncOn = isVsyncConfigured && !isSuspended;
+        glfwSwapInterval(isVsyncOn ? 1 : 0);
     }
 }

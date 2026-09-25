@@ -63,6 +63,12 @@ namespace CC
 
         virtual bool IsFocused() const = 0;
 
+        // Stops buffer swaps waiting for the display's refresh while
+        // something else paces the frame, such as an XR runtime. Two pacers
+        // at different rates make the loop miss the one that matters.
+        // Clearing it restores the vsync the window was configured with.
+        virtual void SetVsyncSuspended(bool isSuspended) { (void)isSuspended; }
+
         // Fills outBinding with the handles the graphics context was created
         // against. Returns false where the platform cannot supply them, which
         // is the default: a platform opts in by overriding.

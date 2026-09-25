@@ -686,6 +686,16 @@ namespace CC
             // target is held on the window surface.
             InputManager::Get()->SetXrOwnsInput(isSessionRunning);
 
+            // The runtime paces a running session. A window swap still
+            // waiting on the monitor's refresh as well makes frames miss the
+            // headset's deadline and halve its rate; the mirror may tear
+            // instead.
+            if (isSessionRunning != isWindowVsyncSuspended && PlatformWindow::Get() != nullptr)
+            {
+                PlatformWindow::Get()->SetVsyncSuspended(isSessionRunning);
+                isWindowVsyncSuspended = isSessionRunning;
+            }
+
             // The frame is ticked either way. A session that has not started,
             // or has stopped because the headset was set down, otherwise
             // leaves the window frozen with no input running.
@@ -750,6 +760,16 @@ namespace CC
                 else if (changed.state == XR_SESSION_STATE_STOPPING)
                 {
                     isSessionRunning = false;
+
+                    // The runtime stops a session when the headset is taken
+                    // off, and no more display times arrive until it begins
+                    // again. Left in place, the frame clock would stand still
+                    // for the desktop frames that run meanwhile.
+                    if (state->hasFirstDisplayTime)
+                    {
+                        FrameTimer::Get()->ClearExternalFrameTime();
+                        state->hasFirstDisplayTime = false;
+                    }
                     xrEndSession(state->session);
                 }
                 else if (changed.state == XR_SESSION_STATE_EXITING

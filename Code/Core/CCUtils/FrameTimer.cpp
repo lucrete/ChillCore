@@ -25,6 +25,7 @@ namespace CC
 
         currentTime = GetCurrentTime();
         previousTime = currentTime;
+        platformFrameStartTime = currentTime;
 
         memset(profileTotalMs, 0, sizeof(profileTotalMs));
         memset(profileCpuPhases, 0, sizeof(profileCpuPhases));
@@ -54,6 +55,10 @@ namespace CC
         simulationDeltaTime = isSimulationPaused ? 0.0f : deltaTimeClamped * simulationTimeScale;
         simulationTime += simulationDeltaTime;
 
+        float platformNow = GetCurrentTime();
+        platformDeltaTime = platformNow - platformFrameStartTime;
+        platformFrameStartTime = platformNow;
+
         // Cache previous frame timestamps before reset
         memcpy(previousFrameTimestamps, timestamps, sizeof(Timestamp) * timestampCount);
         previousFrameTimestampCount = timestampCount;
@@ -66,7 +71,9 @@ namespace CC
 
         // FPS averaging over 1-second intervals
         frameCount++;
-        fpsAccumulator += deltaTime;
+        // The platform interval, so the count keeps moving while an external
+        // frame clock is set but not being advanced.
+        fpsAccumulator += platformDeltaTime;
         if (fpsAccumulator >= 1.0f)
         {
             framesPerSecond = frameCount / fpsAccumulator;
@@ -204,13 +211,15 @@ namespace CC
 
     void FrameTimer::RecordProfileData()
     {
-        float frameTimeMs = deltaTime * 1000.0f;
+        // Platform clock throughout, matching the phase timestamps, so the
+        // phases stack to the total whatever clock drives the frame.
+        float frameTimeMs = platformDeltaTime * 1000.0f;
 
         if (frameTimeMs <= MAX_RECORDABLE_FRAME_TIME_MS)
         {
             // Phases 0..4 are bounded entirely within the previous frame's
             // data. Phase 5 (SwapBuffers) ends at the *next* frame's
-            // FrameStart, which is the currentTime captured in FrameStart()
+            // FrameStart, which is the platform frame start captured in FrameStart()
             // for this frame — handled as a special case below.
             static const StandardTimestamp mainPhaseStart[] = {
                 CC::FrameStart, CC::AppMain, CC::UiScreen,
@@ -233,7 +242,7 @@ namespace CC
             float swapPhaseMs = 0.0f;
             if (swapIdx >= 0)
             {
-                swapPhaseMs = (currentTime - previousFrameTimestamps[swapIdx].time) * 1000.0f;
+                swapPhaseMs = (platformFrameStartTime - previousFrameTimestamps[swapIdx].time) * 1000.0f;
             }
             profileCpuPhases[PROFILE_CPU_PHASES - 1][profileWriteIndex] = swapPhaseMs;
 
@@ -249,10 +258,6 @@ namespace CC
                 if (renderScopeCount < 0)
                 {
                     renderScopeCount = 0;
-                }
-                if (renderScopeCount > PROFILE_MAX_GPU_PHASES)
-                {
-                    renderScopeCount = PROFILE_MAX_GPU_PHASES;
                 }
 
                 // Contiguous scopes sharing a group fold into one phase, so

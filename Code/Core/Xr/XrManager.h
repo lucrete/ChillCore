@@ -101,6 +101,10 @@ namespace CC
         bool isStartRequested;
         bool isEndRequested;
 
+        // Whether the window's vsync is currently suspended for a running
+        // session, so the switch happens once per transition.
+        bool isWindowVsyncSuspended = false;
+
         // ========================
         // Frame
         // ========================

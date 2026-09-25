@@ -82,7 +82,7 @@ namespace CC
         char line[256];
         std::string result;
 
-        float totalMs = FrameTimer::Get()->DeltaTimeUnclamped() * 1000.0f;
+        float totalMs = FrameTimer::Get()->PlatformDeltaTime() * 1000.0f;
         result += "=== Frame Timing Snapshot ===\n";
         snprintf(line, sizeof(line), "Total Frame Time: %.3f ms\n", totalMs);
         result += line;
@@ -93,7 +93,8 @@ namespace CC
         // Each timestamp is emitted *before* the work it labels, so the
         // duration on each row is the wall time from that timestamp to the
         // next one. The final timestamp (SwapBuffers) bounds work that ends
-        // at the next frame's FrameStart — use currentTime for that.
+        // at the next frame's FrameStart — the platform frame start, the
+        // clock the timestamps are on.
         for (int i = 0; i < count - 1; i++)
         {
             float deltaMs = (timestamps[i + 1].time - timestamps[i].time) * 1000.0f;
@@ -103,7 +104,7 @@ namespace CC
         }
 
         const char* lastLabel = timestamps[count - 1].label ? timestamps[count - 1].label : "?";
-        float lastDeltaMs = (FrameTimer::Get()->TimeSinceStartup() - timestamps[count - 1].time) * 1000.0f;
+        float lastDeltaMs = (FrameTimer::Get()->PlatformFrameStartTime() - timestamps[count - 1].time) * 1000.0f;
         snprintf(line, sizeof(line), "  %-22s %7.3f ms\n", lastLabel, lastDeltaMs);
         result += line;
 

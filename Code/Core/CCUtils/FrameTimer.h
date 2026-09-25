@@ -79,6 +79,13 @@ namespace CC
         // visibly steps after a long session.
         float ShaderSimulationTime() const;
 
+        // The frame start and frame interval on the platform clock, which is
+        // the clock every profiling timestamp is taken on. Under an external
+        // frame clock these differ from TimeSinceStartup and DeltaTime, and a
+        // profile mixing the two subtracts one clock from another.
+        float PlatformFrameStartTime() const { return platformFrameStartTime; }
+        float PlatformDeltaTime() const { return platformDeltaTime; }
+
         void AddTimestamp(const char* label);
         void AddTimestamp(StandardTimestamp id, const char* label);
         float GetDeltaTimestamp(StandardTimestamp idStart, StandardTimestamp idEnd) const;
@@ -132,6 +139,8 @@ namespace CC
 
         float currentTime = 0.0f;
         float previousTime = 0.0f;
+        float platformFrameStartTime = 0.0f;
+        float platformDeltaTime = 0.0f;
         float deltaTime = 0.0f;
         float deltaTimeClamped = 0.0f;
         float framesPerSecond = 0.0f;
