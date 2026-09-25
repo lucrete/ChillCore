@@ -4,6 +4,11 @@
 #include "UiScreenController.h"
 #include <functional>
 
+namespace CC
+{
+    class UiElement;
+}
+
 class PauseMenuController : public CC::UiScreenController
 {
 public:
@@ -11,8 +16,11 @@ public:
                         std::function<void()> onQuit);
 
     void Init() override;
+    void OnEnter() override;
 
 private:
+    CC::UiElement* xrModeElement = nullptr;
+
     std::function<void()> onResumeCallback;
     std::function<void()> onBackToMenuCallback;
     std::function<void()> onQuitCallback;

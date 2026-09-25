@@ -1,8 +1,15 @@
 #include "ShowcaseHudController.h"
 
-#include "UiManager.h"
+#include "UiSurface.h"
 #include "UiElement.h"
+#include "FrameTimer.h"
 #include "InputManager.h"
+
+#ifdef CC_ENABLE_XR
+#include "XrManager.h"
+#endif
+
+#include <cstdio>
 
 ShowcaseHudController::ShowcaseHudController(std::function<void()> onPause)
     : onPauseCallback(onPause)
@@ -12,12 +19,20 @@ ShowcaseHudController::ShowcaseHudController(std::function<void()> onPause)
 void ShowcaseHudController::Init()
 {
     CC::InputManager* input = CC::InputManager::Get();
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
     moveStick = ui->GetElementById("moveStick");
     lookStick = ui->GetElementById("lookStick");
+    trackingLabel = ui->GetElementById("trackingXr");
+    timerLabel = ui->GetElementById("timer");
+    pauseButton = ui->GetElementById("pauseButton");
 
     ui->RegisterButtonAction("pause", onPauseCallback);
+
+    if (trackingLabel != nullptr)
+    {
+        trackingLabel->SetVisible(false);
+    }
 
     // Initial visibility is platform-defined; ActiveInputType is unreliable
     // here because Init runs partway through MainMenu navigation on Android,
@@ -36,7 +51,11 @@ void ShowcaseHudController::Init()
     {
         lookStick->SetVisible(initialVisible);
     }
-    joysticksVisible = initialVisible;
+    if (pauseButton != nullptr)
+    {
+        pauseButton->SetVisible(initialVisible);
+    }
+    areTouchControlsVisible = initialVisible;
 
     ui->RegisterJoystickAction("move",
         [input](float x, float y)
@@ -57,9 +76,28 @@ void ShowcaseHudController::Init()
 void ShowcaseHudController::OnUpdate()
 {
     CC::InputManager* input = CC::InputManager::Get();
+
+    elapsedTime += CC::FrameTimer::Get()->SimulationDeltaTime();
+    UpdateTimerDisplay();
+
+    // The window is a mirror while an XR session is running.
+    bool isMirroring = false;
+#ifdef CC_ENABLE_XR
+    isMirroring = CC::XrManager::Get() != nullptr && CC::XrManager::Get()->IsSessionRunning();
+#endif
+    if (isMirroring != isTrackingLabelVisible)
+    {
+        if (trackingLabel != nullptr)
+        {
+            trackingLabel->SetVisible(isMirroring);
+        }
+        GetSurface()->InvalidateLayout();
+        isTrackingLabelVisible = isMirroring;
+    }
+
     bool isTouchActive = input->GetActiveInputType() == CC::ActiveInputType::Touch;
 
-    if (isTouchActive != joysticksVisible)
+    if (isTouchActive != areTouchControlsVisible)
     {
         if (moveStick != nullptr)
         {
@@ -69,10 +107,17 @@ void ShowcaseHudController::OnUpdate()
         {
             lookStick->SetVisible(isTouchActive);
         }
+        if (pauseButton != nullptr)
+        {
+            pauseButton->SetVisible(isTouchActive);
+        }
 
         // Layout skips invisible elements; toggling visible needs a re-run
         // so newly-shown elements get real rects instead of (0, 0, 0, 0).
-        CC::UiManager::Get()->InvalidateLayout();
+        // The navigation list was collected at activation, so it is rebuilt
+        // too or a hidden control stays reachable by gamepad.
+        GetSurface()->InvalidateLayout();
+        GetSurface()->GetInputHandler().BuildNavigationList();
 
         // Drop any cached override values when the user has switched away
         // from touch — otherwise the last drag value would persist as the
@@ -82,6 +127,23 @@ void ShowcaseHudController::OnUpdate()
             input->ClearAllJoystickOverrides();
         }
 
-        joysticksVisible = isTouchActive;
+        areTouchControlsVisible = isTouchActive;
+    }
+}
+
+void ShowcaseHudController::UpdateTimerDisplay()
+{
+    if (timerLabel != nullptr)
+    {
+        int totalSeconds = static_cast<int>(elapsedTime);
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+
+        char timeBuffer[16];
+        snprintf(timeBuffer, sizeof(timeBuffer), "%02d:%02d", minutes, seconds);
+
+        // Unchanged text is dropped by the setter, so this only marks the
+        // surface once a second rather than every frame.
+        timerLabel->SetTextContent(std::string(timeBuffer));
     }
 }

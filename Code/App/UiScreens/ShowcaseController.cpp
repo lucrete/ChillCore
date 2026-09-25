@@ -1,11 +1,10 @@
 #include "ShowcaseController.h"
-#include "UiManager.h"
-#include "UiScreenSystem.h"
+#include "UiSurface.h"
 #include "PrintManager.h"
 
 void ShowcaseController::Init()
 {
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
     // Button callbacks
     ui->RegisterButtonAction("primary", []()
@@ -41,9 +40,9 @@ void ShowcaseController::Init()
         CCPrint(CC::PrintManager::CHANNEL_ALWAYS, "Slice-9 button pressed!");
     });
 
-    ui->RegisterButtonAction("back", []()
+    ui->RegisterButtonAction("back", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionBack();
+        ui->Screens().TransitionBack();
     });
 
     // Slider callbacks

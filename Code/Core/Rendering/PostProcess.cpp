@@ -115,7 +115,6 @@ namespace CC
     // ========================
     // Effects
     // ========================
-
     PostProcessEffect& PostProcess::GetEffect(PostProcessEffectId id)
     {
         return effects[static_cast<int>(id)];
@@ -175,7 +174,6 @@ namespace CC
     // ========================
     // Grade presets
     // ========================
-
     void PostProcess::ResetEffectsToDefaults()
     {
         for (int i = 0; i < static_cast<int>(PostProcessEffectId::Max); i++)
@@ -403,7 +401,6 @@ namespace CC
     // ========================
     // Authoring
     // ========================
-
     void PostProcess::PrintYaml() const
     {
         CCPrint(PrintManager::CHANNEL_ALWAYS, "postProcess:");
@@ -434,11 +431,11 @@ namespace CC
     // ========================
     // Frame
     // ========================
-
     void PostProcess::Execute(Gfx::TextureHandle sceneColorTexture,
                               Gfx::SamplerHandle sampler,
                               int width,
-                              int height)
+                              int height,
+                              Gfx::RenderTargetHandle destinationTarget)
     {
         Gfx::RenderApi* gfxApi = Gfx::RenderApi::Get();
 
@@ -451,7 +448,7 @@ namespace CC
 
         UploadUberParameters();
 
-        gfxApi->BeginRenderPass(gfxApi->GetBackbuffer(), "PostProcess");
+        gfxApi->BeginRenderPass(destinationTarget, "PostProcess");
         gfxApi->InvalidateCachedState();
 
         fullscreenQuad->SetMaterial(uberMaterial);
@@ -470,7 +467,6 @@ namespace CC
     // ========================
     // Private
     // ========================
-
     // Every effect is on by default. The stack is the engine's output
     // transform, not a set of optional extras: the scene renders in
     // scene-linear light and only the fused pass encodes it for display, so a

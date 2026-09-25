@@ -29,7 +29,6 @@ namespace CC
     // ========================
     // Lifecycle
     // ========================
-
     void SceneHierarchy::Init()
     {
         for (SceneObject* object : rootObjects)
@@ -62,7 +61,6 @@ namespace CC
     // ========================
     // Root Object Management
     // ========================
-
     void SceneHierarchy::AddRootObject(SceneObject* object)
     {
         CC_ASSERT(object != nullptr, "Cannot add null object to SceneHierarchy");
@@ -89,7 +87,6 @@ namespace CC
     // ========================
     // Scene Loading
     // ========================
-
     bool SceneHierarchy::LoadFromFile(const std::string& filePath)
     {
         Clear();
@@ -110,7 +107,6 @@ namespace CC
     // ========================
     // Object Lookup
     // ========================
-
     SceneObject* SceneHierarchy::FindObjectByName(const std::string& name) const
     {
         auto it = objectLookup.find(name);
@@ -124,7 +120,6 @@ namespace CC
     // ========================
     // Internal Helpers
     // ========================
-
     void SceneHierarchy::RegisterObjectRecursive(SceneObject* object)
     {
         const std::string& name = object->GetName();

@@ -66,7 +66,6 @@ namespace CC
 // ========================
 // Factory Registration
 // ========================
-
 static CC::Component* CreateRenderableQuad(ryml::ConstNodeRef componentData)
 {
     CC::Material* material = nullptr;

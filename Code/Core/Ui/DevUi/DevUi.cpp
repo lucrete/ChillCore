@@ -13,6 +13,7 @@
 #include "DevUiViewCommandConsole.h"
 #include "DevUiViewAbout.h"
 #include "DevUiViewPostProcess.h"
+#include "GfxRenderApi.h"
 
 namespace CC
 {
@@ -188,6 +189,10 @@ namespace CC
     {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        // ImGui drives the graphics API directly, so whatever the backend
+        // recorded as bound no longer describes what is set.
+        Gfx::RenderApi::Get()->InvalidateCachedState();
     }
 
     bool DevUi::IsHovered()

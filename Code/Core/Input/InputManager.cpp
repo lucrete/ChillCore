@@ -202,7 +202,6 @@ namespace CC
     // ========================
     // Joystick override
     // ========================
-
     void InputManager::SetJoystickOverride(AnalogStick stick, float x, float y)
     {
         CC_ASSERT(stick >= 0 && stick < STICK_MAX, "Invalid stick");
@@ -224,6 +223,12 @@ namespace CC
         joystickOverrideX[stick] = 0.0f;
         joystickOverrideY[stick] = 0.0f;
         joystickOverrideSet[stick] = false;
+    }
+
+    bool InputManager::IsJoystickOverrideSet(AnalogStick stick) const
+    {
+        CC_ASSERT(stick >= 0 && stick < STICK_MAX, "Invalid stick");
+        return joystickOverrideSet[stick];
     }
 
     void InputManager::ClearAllJoystickOverrides()
@@ -311,31 +316,103 @@ namespace CC
         return actionMap->GetActiveInputType();
     }
 
+    void InputManager::SetXrTriggerState(int trigger, bool isPressed)
+    {
+        actionMap->SetXrTriggerState(trigger, isPressed);
+    }
+
+    void InputManager::NotifyXrActivity()
+    {
+        actionMap->NotifyXrActivity();
+    }
+
     // ========================
-    // Input routing
+    // Input targets
     // ========================
-
-    void InputManager::SetInteractionMode(InteractionMode mode)
+    void InputManager::SetInputTargetScene(InputDomain domain)
     {
-        interactionMode = mode;
+        CC_ASSERT(domain < InputDomain::Max, "Input domain out of range");
+        requestedTargets[(int)domain].target = InputTarget::Scene;
+        requestedTargets[(int)domain].surface = nullptr;
+        ApplyWindowTargetToCursor();
     }
 
-    bool InputManager::IsUiInteractable() const
+    void InputManager::SetInputTargetSurface(InputDomain domain, UiSurface* surface)
     {
-        bool result = !isInputBlocked && !DevUi::Get()->IsHovered() && interactionMode == InteractionMode::Ui;
+        CC_ASSERT(domain < InputDomain::Max, "Input domain out of range");
+        CC_ASSERT(surface != nullptr, "A Surface target needs a surface");
+        requestedTargets[(int)domain].target = InputTarget::Surface;
+        requestedTargets[(int)domain].surface = surface;
+        ApplyWindowTargetToCursor();
+    }
+
+    void InputManager::ResetInputTargets()
+    {
+        for (int domain = 0; domain < (int)InputDomain::Max; domain++)
+        {
+            requestedTargets[domain].target = InputTarget::Scene;
+            requestedTargets[domain].surface = nullptr;
+        }
+
+        wasMouseLockedBeforeSurface = false;
+        appliedWindowTarget = GetInputTarget(InputDomain::Window);
+    }
+
+    InputTarget InputManager::GetInputTarget(InputDomain domain) const
+    {
+        CC_ASSERT(domain < InputDomain::Max, "Input domain out of range");
+
+        InputTarget result = requestedTargets[(int)domain].target;
+        if (domain == InputDomain::Window && doesXrOwnInput && windowSurface != nullptr)
+        {
+            result = InputTarget::Surface;
+        }
         return result;
     }
 
-    bool InputManager::IsHudInteractable() const
+    UiSurface* InputManager::GetInputTargetSurface(InputDomain domain) const
     {
-        bool result = !isInputBlocked && !DevUi::Get()->IsHovered();
+        CC_ASSERT(domain < InputDomain::Max, "Input domain out of range");
+
+        UiSurface* result = requestedTargets[(int)domain].surface;
+        if (domain == InputDomain::Window && doesXrOwnInput && windowSurface != nullptr)
+        {
+            result = windowSurface;
+        }
         return result;
     }
 
-    bool InputManager::IsWorldInteractable() const
+    bool InputManager::DoesSceneReceiveInput(InputDomain domain) const
     {
-        bool result = !isInputBlocked && !DevUi::Get()->IsHovered() && interactionMode == InteractionMode::World;
+        bool result = GetInputTarget(domain) == InputTarget::Scene;
+        if (domain == InputDomain::Window)
+        {
+            result = result && IsWindowInputOpen();
+        }
         return result;
+    }
+
+    bool InputManager::DoesSurfaceReceiveInput(InputDomain domain, const UiSurface* surface) const
+    {
+        bool result = surface != nullptr
+                   && GetInputTarget(domain) == InputTarget::Surface
+                   && GetInputTargetSurface(domain) == surface;
+        if (domain == InputDomain::Window)
+        {
+            result = result && IsWindowInputOpen();
+        }
+        return result;
+    }
+
+    void InputManager::SetWindowSurface(UiSurface* surface)
+    {
+        windowSurface = surface;
+    }
+
+    void InputManager::SetXrOwnsInput(bool _doesXrOwnInput)
+    {
+        doesXrOwnInput = _doesXrOwnInput;
+        ApplyWindowTargetToCursor();
     }
 
     void InputManager::SetInputBlocked(bool blocked)
@@ -346,5 +423,33 @@ namespace CC
     bool InputManager::IsInputBlocked() const
     {
         return isInputBlocked;
+    }
+
+    // ========================
+    // Private helpers
+    // ========================
+    bool InputManager::IsWindowInputOpen() const
+    {
+        return !isInputBlocked && !DevUi::Get()->IsHovered();
+    }
+
+    void InputManager::ApplyWindowTargetToCursor()
+    {
+        InputTarget windowTarget = GetInputTarget(InputDomain::Window);
+
+        if (windowTarget != appliedWindowTarget)
+        {
+            if (windowTarget == InputTarget::Surface)
+            {
+                wasMouseLockedBeforeSurface = IsMouseCursorLocked();
+                LockMouseCursor(false);
+            }
+            else if (wasMouseLockedBeforeSurface)
+            {
+                LockMouseCursor(true);
+            }
+
+            appliedWindowTarget = windowTarget;
+        }
     }
 }

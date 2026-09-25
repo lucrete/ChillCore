@@ -25,13 +25,18 @@ namespace CC
     void CameraFree::Update()
     {
         CC::InputManager* input = CC::InputManager::Get();
-        if (input->IsWorldInteractable())
+        bool doesSceneReceiveInput = input->DoesSceneReceiveInput(InputDomain::Window);
+        bool isTouchStickSet = input->IsJoystickOverrideSet(InputManager::STICK_LEFT)
+                            || input->IsJoystickOverrideSet(InputManager::STICK_RIGHT);
+
+        if (doesSceneReceiveInput && input->EdgePositiveMouseButton(true))
         {
-            if (input->EdgePositiveMouseButton(true))
-            {
-                input->LockMouseCursor(true);
-            }
-            UpdateTransform();
+            input->LockMouseCursor(true);
+        }
+
+        if (doesSceneReceiveInput || isTouchStickSet)
+        {
+            UpdateTransform(doesSceneReceiveInput);
         }
         if (input->EdgePositive(InputAction::DevReleaseMouse))
         {
@@ -39,7 +44,7 @@ namespace CC
         }
     }
 
-    void CameraFree::UpdateTransform()
+    void CameraFree::UpdateTransform(bool isReadingDevices)
     {
         float deltaSeconds = FrameTimer::Get()->DeltaTime();
 
@@ -64,7 +69,10 @@ namespace CC
         ///////////////////
         float leftStickX = 0.0f;
         float leftStickY = 0.0f;
-        input->GetAnalogStickValues(CC::InputManager::STICK_LEFT, leftStickX, leftStickY);
+        if (isReadingDevices || input->IsJoystickOverrideSet(CC::InputManager::STICK_LEFT))
+        {
+            input->GetAnalogStickValues(CC::InputManager::STICK_LEFT, leftStickX, leftStickY);
+        }
 
         // strafe
         float xDelta = 0.0f;
@@ -72,11 +80,11 @@ namespace CC
         {
             xDelta = leftStickX * velocityMoveActive * deltaSeconds;
         }
-        else if (input->IsPressed(CC::InputAction::DevFreeCamMoveLeft))
+        else if (isReadingDevices && input->IsPressed(CC::InputAction::DevFreeCamMoveLeft))
         {
             xDelta = -velocityMoveActive * deltaSeconds;
         }
-        else if (input->IsPressed(CC::InputAction::DevFreeCamMoveRight))
+        else if (isReadingDevices && input->IsPressed(CC::InputAction::DevFreeCamMoveRight))
         {
             xDelta = velocityMoveActive * deltaSeconds;
         }
@@ -91,11 +99,11 @@ namespace CC
         {
             zDelta = leftStickY * velocityMoveActive * deltaSeconds;
         }
-        else if (input->IsPressed(CC::InputAction::DevFreeCamMoveForward))
+        else if (isReadingDevices && input->IsPressed(CC::InputAction::DevFreeCamMoveForward))
         {
             zDelta = velocityMoveActive * deltaSeconds;
         }
-        else if (input->IsPressed(CC::InputAction::DevFreeCamMoveBackward))
+        else if (isReadingDevices && input->IsPressed(CC::InputAction::DevFreeCamMoveBackward))
         {
             zDelta = -velocityMoveActive * deltaSeconds;
         }
@@ -108,11 +116,11 @@ namespace CC
 
         // Up/Down
         float yDelta = 0.0f;
-        if (input->IsPressed(CC::InputAction::DevFreeCamMoveUp))
+        if (isReadingDevices && input->IsPressed(CC::InputAction::DevFreeCamMoveUp))
         {
             yDelta = velocityMoveActive * deltaSeconds;
         }
-        else if (input->IsPressed(CC::InputAction::DevFreeCamMoveDown))
+        else if (isReadingDevices && input->IsPressed(CC::InputAction::DevFreeCamMoveDown))
         {
             yDelta = -velocityMoveActive * deltaSeconds;
         }
@@ -125,7 +133,10 @@ namespace CC
         ///////////////////
         float rightStickX = 0.0f;
         float rightStickY = 0.0f;
-        input->GetAnalogStickValues(CC::InputManager::STICK_RIGHT, rightStickX, rightStickY);
+        if (isReadingDevices || input->IsJoystickOverrideSet(CC::InputManager::STICK_RIGHT))
+        {
+            input->GetAnalogStickValues(CC::InputManager::STICK_RIGHT, rightStickX, rightStickY);
+        }
 
         // A stick is a rate input, so it scales by frame time. The mouse is a
         // displacement and is already frame-rate independent.

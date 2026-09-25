@@ -45,7 +45,7 @@ Interaction is routed by name. Interactive elements carry an action identifier i
 1. **Measure, bottom-up.** Leaves compute intrinsic size — text by measuring, widgets from minimums. Automatic sizing resolves to content size, percentages to a fraction of the parent, and explicit values to their scaled amount. Minimum and maximum constraints apply, then padding is added.
 2. **Arrange, top-down.** Free space along the main axis is computed and distributed according to the container's justification mode. Cross-axis alignment applies. Absolutely-positioned elements are placed from their parent's origin and excluded from flow. Each child then recurses with its computed rectangle as the constraint.
 
-**Invalidation** is coarse. A window resize marks layout dirty and triggers a full recompute, which also invalidates every cached text drawing. Text caches invalidate individually when content, font, size, position, or alignment changes.
+**Invalidation** is coarse. A surface resize marks layout dirty and triggers a full recompute, which also invalidates every cached text drawing. Text caches invalidate individually when content, font, size, position, or alignment changes.
 
 ## Working with it
 

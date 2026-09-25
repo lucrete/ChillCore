@@ -36,7 +36,6 @@ namespace CC::Gfx
         // ========================
         // Lifecycle
         // ========================
-
         virtual void Init()     = 0;
         virtual void Shutdown() = 0;
 
@@ -45,14 +44,12 @@ namespace CC::Gfx
         // ========================
         // Frame
         // ========================
-
         virtual void BeginFrame() = 0;
         virtual void EndFrame()   = 0;
 
         // ========================
         // Render pass
         // ========================
-
         // scopeName labels the pass on the GPU timeline: the pass opens a
         // timing scope under that name, so a frame with several passes reads
         // as several named phases rather than one repeated label.
@@ -68,7 +65,6 @@ namespace CC::Gfx
         // ========================
         // Resource creation / destruction
         // ========================
-
         [[nodiscard]] virtual BufferHandle       CreateBuffer(const BufferDescription& description)       = 0;
         virtual void                             DestroyBuffer(BufferHandle handle)                        = 0;
         virtual void                             UpdateBuffer(BufferHandle handle,
@@ -79,6 +75,12 @@ namespace CC::Gfx
                                                             void* destination)                             = 0;
 
         [[nodiscard]] virtual TextureHandle      CreateTexture(const TextureDescription& description)      = 0;
+
+        // Wraps storage another API owns in a handle this one accepts. The
+        // storage is not created here and is not freed by DestroyTexture;
+        // the owner outlives the handle. Returns an invalid handle where
+        // supportsExternalTextures is false.
+        [[nodiscard]] virtual TextureHandle      RegisterExternalTexture(const ExternalTextureDescription& description) = 0;
         virtual void                             DestroyTexture(TextureHandle handle)                       = 0;
         virtual void                             UpdateTexture(TextureHandle handle,
                                                                int mipLevel, int x, int y,
@@ -100,7 +102,6 @@ namespace CC::Gfx
         // ========================
         // Command recording
         // ========================
-
         virtual void BindPipeline(PipelineHandle pipeline)                           = 0;
         virtual void BindVertexBuffer(int slot, BufferHandle buffer,
                                       int offsetBytes, int strideBytes)              = 0;
@@ -124,7 +125,6 @@ namespace CC::Gfx
         // ========================
         // Compute
         // ========================
-
         virtual void DispatchCompute(int groupsX, int groupsY, int groupsZ)          = 0;
         virtual void DispatchComputeIndirect(BufferHandle argsBuffer, int offsetBytes) = 0;
 

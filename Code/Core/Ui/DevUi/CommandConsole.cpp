@@ -61,7 +61,6 @@ namespace CC
     // ========================
     // Built-in Commands
     // ========================
-
     void CommandConsole::RegisterBuiltInCommands()
     {
         RegisterCommand("help", "List all available commands", [this](const std::vector<std::string>&)
@@ -180,7 +179,6 @@ namespace CC
     // ========================
     // Parsing
     // ========================
-
     std::vector<std::string> CommandConsole::ParseCommandLine(const std::string& commandLine) const
     {
         std::vector<std::string> tokens;

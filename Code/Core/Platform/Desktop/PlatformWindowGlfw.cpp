@@ -2,6 +2,11 @@
 #include "CCAssert.h"
 #include "CoreMain.h"
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+#include <GLFW/glfw3native.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -39,6 +44,7 @@ namespace CC
     PlatformWindowGlfw::PlatformWindowGlfw()
         : window(nullptr)
         , isFullscreen(false)
+        , isVsyncConfigured(true)
         , windowedMode{ 0, 0, 0, 0 }
     {
     }
@@ -92,7 +98,27 @@ namespace CC
         glfwSetDropCallback(window, GlfwDropCallback);
 
         glfwMakeContextCurrent(window);
-        glfwSwapInterval(config.vsync ? 1 : 0);
+        isVsyncConfigured = config.vsync;
+        glfwSwapInterval(isVsyncConfigured ? 1 : 0);
+    }
+
+    bool PlatformWindowGlfw::GetNativeGraphicsBinding(NativeGraphicsBinding& outBinding) const
+    {
+        bool result = false;
+
+#ifdef _WIN32
+        if (window != nullptr)
+        {
+            outBinding.displayOrDeviceContext = GetDC(glfwGetWin32Window(window));
+            outBinding.renderContext          = glfwGetWGLContext(window);
+            result = outBinding.displayOrDeviceContext != nullptr
+                  && outBinding.renderContext != nullptr;
+        }
+#else
+        (void)outBinding;
+#endif
+
+        return result;
     }
 
     void PlatformWindowGlfw::GlfwDropCallback(GLFWwindow* window, int pathCount, const char* paths[])
@@ -174,5 +200,11 @@ namespace CC
     bool PlatformWindowGlfw::IsFocused() const
     {
         return glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+    }
+
+    void PlatformWindowGlfw::SetVsyncSuspended(bool isSuspended)
+    {
+        bool isVsyncOn = isVsyncConfigured && !isSuspended;
+        glfwSwapInterval(isVsyncOn ? 1 : 0);
     }
 }

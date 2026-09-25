@@ -38,12 +38,14 @@ namespace CC
     // ========================
     // Lifecycle
     // ========================
-
     void SceneObject::Init()
     {
-        for (Component* component : components)
+        // Indexed rather than ranged: a component may add another during its
+        // own Init, and the appended one is then initialised in turn instead
+        // of invalidating the iterator.
+        for (size_t i = 0; i < components.size(); i++)
         {
-            component->Init();
+            components[i]->Init();
         }
 
         for (SceneObject* child : children)
@@ -94,7 +96,6 @@ namespace CC
     // ========================
     // Hierarchy
     // ========================
-
     void SceneObject::SetParent(SceneObject* _parent)
     {
         if (parent != nullptr)
@@ -138,7 +139,6 @@ namespace CC
     // ========================
     // Transform
     // ========================
-
     void SceneObject::GetWorldMatrix(Mat4x4& worldMatrix) const
     {
         transform.GetModelMatrix(worldMatrix);
@@ -161,7 +161,6 @@ namespace CC
     // ========================
     // Components
     // ========================
-
     void SceneObject::AddComponent(Component* component)
     {
         CC_ASSERT(component != nullptr, "Cannot add null component to SceneObject");

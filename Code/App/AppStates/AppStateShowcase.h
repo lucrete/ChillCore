@@ -1,6 +1,8 @@
 #ifndef APPSTATESHOWCASE_H
 #define APPSTATESHOWCASE_H
 
+#include <string>
+
 #include "StateMachineState.h"
 #include "InputActionMap.h"
 #include "SceneObject.h"
@@ -17,6 +19,10 @@ public:
     virtual void Update();
     virtual void Shutdown();
 
+protected:
+    virtual void OnPaused() override;
+    virtual void OnResumed() override;
+
 private:
     enum Mode
     {
@@ -32,13 +38,14 @@ private:
         ShowcaseActionMax
     };
 
-    bool isPaused;
     bool pendingTogglePause;
     // Which grade preset the cycle key last applied. Held as an index because
     // the presets are loaded from a file and their names are not known here.
     int gradePresetIndex;
-    bool wasMouseLocked;
-    float elapsedTime;
+
+    // The context in use when pause began. Procedural-art mode has its own,
+    // so resuming cannot assume the in-world one.
+    std::string resumeContextName;
 
     ProceduralArtController* procArtController;
     CC::CameraStatic* cameraStatic;
@@ -48,9 +55,8 @@ private:
     void InitControls();
     void SceneInit();
     void SceneShutdown();
-    void TogglePause();
+    void ApplyPlayInputTarget();
     void ApplyNextGradePreset();
-    void UpdateTimerDisplay();
 };
 
 #endif // APPSTATESHOWCASE_H

@@ -1,6 +1,6 @@
 #include "AudioTestController.h"
 
-#include "UiManager.h"
+#include "UiSurface.h"
 #include "UiElement.h"
 #include "PrintManager.h"
 #include "AudioManager.h"
@@ -25,7 +25,7 @@ AudioTestController::~AudioTestController()
 
 void AudioTestController::Init()
 {
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
     loopButton = ui->GetElementById("loopButton");
 

@@ -12,6 +12,7 @@
 #include "GfxDescriptions.h"
 #include "PipelineCache.h"
 #include "PostProcess.h"
+#include "RenderView.h"
 #include "CCVector4.h"
 
 namespace CC
@@ -28,6 +29,18 @@ namespace CC
 
         void StartFrame();
         void EndFrame();
+
+        // The scene is rendered once per view. StartFrame builds a one-entry
+        // list naming the offscreen scene target and the backbuffer, which is
+        // a flat frame. A stereo caller replaces it with one entry per eye
+        // before Render runs; the renderable list is collected once and
+        // submitted per view.
+        void SetRenderViews(const RenderView* viewArray, int count);
+
+        // Returns to the built-in one-view frame. Call when the external
+        // source stops supplying views, or the last set stays in use.
+        void ClearRenderViews();
+        int GetRenderViewCount() const { return viewCount; }
         void AddRenderInfo(Renderable* renderable, void* info, int size);
         void Render();
 
@@ -108,6 +121,15 @@ namespace CC
         int                       postProcessTargetHeight;
         int                       postProcessTargetSamples;
 
+        void BuildDefaultViewList();
+        void RenderSingleView(const RenderView& view);
+
+        // Draws the first view into the backbuffer so the desktop window
+        // shows what the external target received. Ends with the default
+        // framebuffer bound, which UI and the developer overlay draw into.
+        void DrawMirrorPass();
+        void EnsureMirrorResources();
+
         void SortTransparentRenderables();
         void SortOpaqueRenderables();
         void UploadFrameUniforms();
@@ -122,8 +144,22 @@ namespace CC
         // the effect stack, which applies any enabled effects, encodes to
         // display space and draws into the backbuffer. Called from Render
         // after the scene passes end.
-        void DrawPostProcessPass();
+        void DrawPostProcessPass(const RenderView& view);
         Gfx::RenderTargetHandle SceneTargetForFrame() const;
+
+        // Two is stereo. Nothing today asks for more, and a fixed array
+        // keeps the per-frame list free of allocation.
+        static const int MAX_RENDER_VIEWS = 2;
+        RenderView views[MAX_RENDER_VIEWS];
+        int        viewCount;
+        // Whether the view list came from outside. The built-in list is
+        // rebuilt every StartFrame; an external one is left alone, and the
+        // scene target sizing that serves the built-in list is skipped
+        // because each external view brings its own targets.
+        bool       hasExternalViews;
+
+        RenderableFullscreenQuad* mirrorQuad;
+        Gfx::SamplerHandle        mirrorSampler;
 
         static const int MAX_RENDERABLES = 1024;
         Renderable** renderables;

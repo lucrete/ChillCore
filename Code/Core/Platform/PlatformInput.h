@@ -8,7 +8,6 @@ namespace CC
     // ========================
     // PlatformInput
     // ========================
-
     struct GamepadState
     {
         bool buttons[GamepadButton::ButtonMax];

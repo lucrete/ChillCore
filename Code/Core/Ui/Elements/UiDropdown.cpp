@@ -21,9 +21,28 @@ namespace CC
 
     void UiDropdown::SetSelectedOption(int index)
     {
-        if (index >= 0 && index < (int)options.size())
+        if (index >= 0 && index < (int)options.size() && index != selectedOption)
         {
             selectedOption = index;
+            MarkSurfaceDirty();
+        }
+    }
+
+    void UiDropdown::SetExpanded(bool expanded)
+    {
+        if (isExpanded != expanded)
+        {
+            isExpanded = expanded;
+            MarkSurfaceDirty();
+        }
+    }
+
+    void UiDropdown::SetHoveredOption(int index)
+    {
+        if (hoveredOption != index)
+        {
+            hoveredOption = index;
+            MarkSurfaceDirty();
         }
     }
 

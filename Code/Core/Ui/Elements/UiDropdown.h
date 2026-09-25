@@ -21,11 +21,11 @@ namespace CC
         const std::string& GetSelectedText() const;
 
         bool IsExpanded() const { return isExpanded; }
-        void SetExpanded(bool expanded) { isExpanded = expanded; }
-        void ToggleExpanded() { isExpanded = !isExpanded; }
+        void SetExpanded(bool expanded);
+        void ToggleExpanded() { SetExpanded(!isExpanded); }
 
         int GetHoveredOption() const { return hoveredOption; }
-        void SetHoveredOption(int index) { hoveredOption = index; }
+        void SetHoveredOption(int index);
 
     private:
         std::vector<std::string> options;

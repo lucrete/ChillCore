@@ -4,7 +4,8 @@
 #include "PrintManager.h"
 #include "CameraManager.h"
 #include "SceneHierarchy.h"
-#include "UiScreenSystem.h"
+#include "UiManager.h"
+#include "UiSurface.h"
 #include "StateMachine.h"
 #include "MainMenuController.h"
 #include "OptionsController.h"
@@ -34,14 +35,15 @@ void AppStateBoot::Init()
     actionMap.CreateContext("AppStateBoot");
     actionMap.RegisterAction(CC::ActionDef(Quit, "Quit", CC::InputTrigger::GamepadStart));
 
-    CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
-    screens->RegisterScreen("MainMenu", "Data/Ui/MainMenu.html", "Data/Ui/MainMenu.css",
+    CC::UiScreenSystem& screens = CC::UiManager::Get()->GetWindowSurface()->Screens();
+    screens.RegisterScreen("MainMenu", "Data/Ui/MainMenu.html", "Data/Ui/MainMenu.css",
         new MainMenuController([]() { CC::StateMachine::Get()->GotoState("Showcase"); }));
-    screens->RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css", new OptionsController());
-    screens->RegisterScreen("About", "Data/Ui/About.html", "Data/Ui/About.css", new AboutController());
-    screens->RegisterScreen("Showcase", "Data/Ui/Showcase.html", "Data/Ui/Showcase.css", new ShowcaseController());
-    screens->SetScreen("MainMenu");
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
+    screens.RegisterScreen("Options", "Data/Ui/Options.html", "Data/Ui/Options.css", new OptionsController());
+    screens.RegisterScreen("About", "Data/Ui/About.html", "Data/Ui/About.css", new AboutController());
+    screens.RegisterScreen("Showcase", "Data/Ui/Showcase.html", "Data/Ui/Showcase.css", new ShowcaseController());
+    screens.SetScreen("MainMenu");
+    CC::InputManager::Get()->SetInputTargetSurface(CC::InputDomain::Window,
+                                                   CC::UiManager::Get()->GetWindowSurface());
 }
 
 void AppStateBoot::SceneInit()
@@ -60,7 +62,7 @@ void AppStateBoot::SceneShutdown()
 void AppStateBoot::Update()
 {
     if (CC::InputManager::Get()->EdgePositive(Quit)
-        && CC::UiScreenSystem::Get()->GetStackDepth() <= 1)
+        && CC::UiManager::Get()->GetWindowSurface()->Screens().GetStackDepth() <= 1)
     {
         CC::CoreMain::Get()->RequestQuit();
     }
@@ -68,7 +70,7 @@ void AppStateBoot::Update()
 
 void AppStateBoot::Shutdown()
 {
-    CC::UiScreenSystem::Get()->ClearAllScreens();
+    CC::UiManager::Get()->GetWindowSurface()->Screens().ClearAllScreens();
     SceneShutdown();
 
     delete cameraStatic;

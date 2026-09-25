@@ -44,6 +44,21 @@ namespace CC
         }
     }
 
+    void CameraManager::SetActiveCamera(CameraBase* camera)
+    {
+        CC_ASSERT(camera != nullptr, "SetActiveCamera called with a null camera");
+
+        if (camera != nullptr)
+        {
+            activeCamera = camera;
+        }
+    }
+
+    CameraBase* CameraManager::GetActiveCamera() const
+    {
+        return activeCamera;
+    }
+
     CameraBase* CameraManager::FindCamera(const std::string& cameraName) const
     {
         CameraBase* camera = nullptr;
@@ -69,7 +84,7 @@ namespace CC
 
     void CameraManager::Update()
     {
-        if (InputManager::Get()->IsWorldInteractable()
+        if (InputManager::Get()->DoesSceneReceiveInput(InputDomain::Window)
             && InputManager::Get()->EdgePositive(InputAction::DevToggleFreeCam))
         {
             CameraBase* toggled = FindCamera(isFreeCameraActive ? activeCameraName : FREE_CAMERA_NAME);

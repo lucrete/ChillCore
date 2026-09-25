@@ -3,7 +3,8 @@
 #include "InputManager.h"
 #include "PrintManager.h"
 #include "CameraManager.h"
-#include "UiScreenSystem.h"
+#include "UiManager.h"
+#include "UiSurface.h"
 #include "AudioTestController.h"
 
 AppStateAudioTest::AppStateAudioTest()
@@ -27,17 +28,18 @@ void AppStateAudioTest::Init()
     actionMap.CreateContext("AppStateAudioTest");
     actionMap.RegisterAction(CC::ActionDef(Quit, "Quit", CC::InputTrigger::GamepadStart));
 
-    CC::UiScreenSystem* screens = CC::UiScreenSystem::Get();
-    screens->RegisterScreen("AudioTest", "Data/Ui/AudioTest.html", "Data/Ui/AudioTest.css",
+    CC::UiScreenSystem& screens = CC::UiManager::Get()->GetWindowSurface()->Screens();
+    screens.RegisterScreen("AudioTest", "Data/Ui/AudioTest.html", "Data/Ui/AudioTest.css",
         new AudioTestController());
-    screens->SetScreen("AudioTest");
-    CC::InputManager::Get()->SetInteractionMode(CC::InteractionMode::Ui);
+    screens.SetScreen("AudioTest");
+    CC::InputManager::Get()->SetInputTargetSurface(CC::InputDomain::Window,
+                                                   CC::UiManager::Get()->GetWindowSurface());
 }
 
 void AppStateAudioTest::Update()
 {
     if (CC::InputManager::Get()->EdgePositive(Quit)
-        && CC::UiScreenSystem::Get()->GetStackDepth() <= 1)
+        && CC::UiManager::Get()->GetWindowSurface()->Screens().GetStackDepth() <= 1)
     {
         CC::CoreMain::Get()->RequestQuit();
     }
@@ -45,7 +47,7 @@ void AppStateAudioTest::Update()
 
 void AppStateAudioTest::Shutdown()
 {
-    CC::UiScreenSystem::Get()->ClearAllScreens();
+    CC::UiManager::Get()->GetWindowSurface()->Screens().ClearAllScreens();
 
     delete cameraStatic;
     cameraStatic = nullptr;

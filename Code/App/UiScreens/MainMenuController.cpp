@@ -1,6 +1,5 @@
 #include "MainMenuController.h"
-#include "UiManager.h"
-#include "UiScreenSystem.h"
+#include "UiSurface.h"
 #include "StateMachine.h"
 #include "CoreMain.h"
 
@@ -15,16 +14,16 @@ MainMenuController::MainMenuController(std::function<void()> onEnterShowcase)
 
 void MainMenuController::Init()
 {
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
-    ui->RegisterButtonAction("gotoOptions", []()
+    ui->RegisterButtonAction("gotoOptions", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionForward("Options");
+        ui->Screens().TransitionForward("Options");
     });
 
-    ui->RegisterButtonAction("gotoShowcase", []()
+    ui->RegisterButtonAction("gotoShowcase", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionForward("Showcase");
+        ui->Screens().TransitionForward("Showcase");
     });
 
     ui->RegisterButtonAction("gotoAudioTest", []()
@@ -42,9 +41,9 @@ void MainMenuController::Init()
         ui->RegisterButtonAction("enterWorld", onEnterShowcaseCallback);
     }
 
-    ui->RegisterButtonAction("gotoAbout", []()
+    ui->RegisterButtonAction("gotoAbout", [ui]()
     {
-        CC::UiScreenSystem::Get()->TransitionForward("About");
+        ui->Screens().TransitionForward("About");
     });
 
     ui->RegisterButtonAction("quit", []()

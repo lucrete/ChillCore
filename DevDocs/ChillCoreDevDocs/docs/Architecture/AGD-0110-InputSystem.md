@@ -1,13 +1,14 @@
 # AGD-0110: Input System
 
-- **Scope:** How physical input becomes application-meaningful actions. Covers the layered model, contexts, the gamepad-first design, interaction modes, and developer-only bindings. Does not cover how any individual platform captures input.
+- **Scope:** How physical input becomes application-meaningful actions. Covers the layered model, contexts, the gamepad-first design, input domains and targets, and developer-only bindings. Does not cover how any individual platform captures input.
 
 ## Overview
 
 - Input passes through three layers: physical devices, logical triggers, and named actions. Each layer is remappable independently of the ones around it.
 - Triggers are gamepad-shaped even when driven by a keyboard, so application code never encounters a device-specific concept.
 - Actions are grouped into contexts. Switching context re-points every action at different triggers without the querying code changing.
-- An interaction mode decides whether the world, the interface, or neither is currently accepting input.
+- Every device is read every frame. An action fires from whichever device holds its trigger; the device most recently used only decides what prompts and on-screen controls show.
+- Input is split into domains — the window's devices and the headset's controllers — and each domain has one input target: the scene, or one interface surface.
 - Continuous input is either a rate or a displacement, and the two are paced differently against frame time. Both are presented through the same stick surface.
 - Developer bindings are keyboard-driven and separate from application bindings.
 
@@ -17,18 +18,22 @@
 - **Trigger** — a logical input in gamepad vocabulary: a direction, a face button, a shoulder. Bound to one or more physical inputs per platform.
 - **Action** — something the application means: jump, confirm, move forward. Bound to a trigger.
 - **Context** — a named set of action-to-trigger bindings. One is active at a time.
-- **Interaction mode** — whether input is currently directed at the interface or at the world.
+- **Input domain** — a group of devices with one consumer at a time. The window domain is everything arriving through the platform: keyboard, mouse, gamepad, touch. The headset domain is everything arriving through the XR controllers.
+- **Input target** — what a domain's input reaches: the scene, or one named surface.
+- **Active input type** — the kind of device used most recently. Decides prompts and which on-screen controls show; never decides which device is listened to.
 - **Edge** — the transition into or out of a pressed state, as distinct from the state itself.
 - **Rate input** — a held position standing for a speed: a stick's deflection, or a touch drag treated as one.
 - **Displacement input** — a reading standing for a distance already travelled: the mouse's movement since the previous frame.
 
 ## Architecture
 
-`InputTriggerMap` sits closest to the hardware. Each frame it reads physical state through the platform layer, evaluates every trigger's bindings, and keeps this frame's and last frame's results so edges can be derived. It supports modifier combinations — several inputs held together — but not ordered combinations or timing windows.
+`InputTriggerMap` sits closest to the hardware. Each frame it reads physical state through the platform layer, evaluates every trigger's keyboard and gamepad bindings, takes up the XR controller state pushed into it, and keeps this frame's and last frame's results so edges can be derived. A trigger is held if any device holds it. A trigger's gamepad binding is a list of alternatives, each a set of inputs held together, so the D-pad and a stick direction can fire one trigger. It supports modifier combinations but not ordered combinations or timing windows.
 
-`InputActionMap` maps actions to triggers within contexts. Actions are integers, so an application defines its own enumerations and registers them; the map knows nothing about what any action means. Contexts are created and populated at startup and selected at runtime.
+`InputActionMap` maps actions to triggers within contexts. Actions are integers, so an application defines its own enumerations and registers them; the map knows nothing about what any action means. Contexts are created and populated at startup and selected at runtime. Creating a context also binds the engine's own actions into it: developer actions, interface navigation for the window and for the headset, and the XR hands' select and grab.
 
-`InputManager` is the application-facing surface, and the only one application code should use. It answers whether an action is pressed and whether it changed this frame, exposes mouse and stick state, owns the interaction mode and the input-blocked flag, and provides stick overrides for driving input synthetically.
+`InputManager` is the application-facing surface, and the only one application code should use. It answers whether an action is pressed and whether it changed this frame, exposes mouse and stick state, owns the input target of each domain and the input-blocked flag, and provides stick overrides for driving input synthetically.
+
+The input target is the only gate left on where input goes. The camera reads devices directly only while the window's target is the scene. A surface takes pointers and navigation only while it is its domain's target. The interface's pointer router offers headset rays only to what the headset's target allows. Stick overrides are read whatever the target, because they are only ever set by an on-screen control that holds it.
 
 Every trigger and action carries a display label, used by the developer overlay to show current bindings.
 
@@ -43,7 +48,7 @@ Each frame, in order:
 
 The ordering between the second and third steps is load-bearing: the input system asks the overlay whether it is capturing input before deciding whether the application should see it. Reversing them would let clicks pass through the overlay into the world behind it.
 
-**Queries fold their conditions into the result** rather than returning early. When input is blocked, or the interaction mode excludes the querying system, the query answers false rather than being skipped.
+**Queries fold their conditions into the result** rather than returning early. When input is blocked the query answers false rather than being skipped. Asking whether the scene or a surface receives the window's input also answers false while the developer overlay has the mouse.
 
 ## Working with it
 
@@ -53,7 +58,7 @@ The ordering between the second and third steps is load-bearing: the input syste
 
 **Check for a press versus a hold.** Ask for the pressed state for a hold, or for the positive edge for a single activation. Using pressed state where an edge is meant produces an action that repeats every frame.
 
-**Route input between world and interface.** Set the interaction mode. Systems ask whether their category is currently interactable rather than testing the mode directly.
+**Route input between world and interface.** Set the domain's input target: the scene, or a surface. Systems ask whether the scene or their surface receives the domain's input rather than reading the target directly. The cursor follows the window's target: a surface frees it, and the scene puts back whatever lock it had before.
 
 **Drive input synthetically.** Override a stick's values to feed input from a source other than a device, and clear the override to return control.
 
@@ -93,7 +98,7 @@ Rebinding individually would leave the input system in a partially-updated state
 
 The cost is that contexts are static once built — there is no per-user rebinding at runtime, which a player-facing settings screen would need.
 
-### Blocking and mode checks fold into results, not early returns
+### Blocking checks fold into results, not early returns
 
 Where a query would be denied, it returns false as part of evaluating its expression rather than returning early.
 
@@ -111,6 +116,32 @@ What is frame-rate dependent about the mouse is its ceiling. The offset is clamp
 
 Two costs follow. Deflection derived from the mouse is no longer bounded to the stick range: a long frame legitimately yields a value above one, standing for more distance covered rather than a stick pushed past its limit, and a consumer that treats it as a stick position will overshoot. And the rate constants are now expressed per second rather than per frame, so any value tuned against the old per-frame pacing means something different and has to be re-tuned rather than carried across.
 
+### Every device is read every frame
+
+Keyboard, gamepad and XR triggers are all evaluated each frame, and an action fires from whichever device holds its trigger.
+
+Listening only to the most recently used device took input away from everything else. A tracked hand once claimed the active type for the life of a session, and every keyboard key — the developer escape hatch included — read nothing. Two domains in use at once, a keyboard pausing while a headset is on, need every device live.
+
+The active input type survives for what genuinely depends on the device in hand: which button a prompt names, which on-screen controls show, and whether a stick reading is a rate or a displacement.
+
+### A domain's input target names what receives it
+
+Each domain has exactly one target, set by the application state: the scene, or one surface.
+
+This replaced a single interaction mode — interface, world, or none — that answered three different questions: whether the world takes the mouse and sticks, whether the interface takes navigation, and whether the interface is alive at all. It could not say "the interface is alive while the world has input", which is what a heads-up display is, and needed a per-element opt-in to cover the gap. It also described only the desktop while being named as though it described everything, and panels in the world already sat outside it.
+
+Naming the receiver instead makes each consumer's question direct, and makes a panel an ordinary target rather than a special case. The cost is that an application state now sets targets itself, including back again on resume.
+
+**The window's target is held on the window surface while an XR session runs.** The desktop is then a mirror: a click only gives the window focus, and never captures the cursor into a window the player cannot see. This stands in for application states being told when a session starts and stops.
+
+### The cursor lock follows the window's target
+
+A surface target frees the cursor and remembers whether it was locked; a scene target puts that back. Every pausing state used to save and restore the lock itself, and a state that forgot resumed with the pointer free. Resetting the targets at a state swap discards the remembered lock, because the outgoing state's cursor means nothing to the incoming one.
+
+### Headset actions are distinct from window actions
+
+Navigation from the controllers binds to its own actions rather than sharing the window's. Which action fired then says which domain it came from, with no separate mechanism for the origin. Code that does not care checks both.
+
 ### Developer bindings are keyboard-based and separate
 
 Free camera, cursor release, and similar affordances are bound to keys and registered separately from application bindings, automatically when a context is created.
@@ -124,7 +155,9 @@ The cost is that they occupy keys applications might otherwise want, and nothing
 - Modifier combinations are supported; ordered combinations and timing windows are not. There is no sequence or chord system.
 - Contexts are fixed once created. There is no runtime rebinding and no persistence of user bindings.
 - Actions are integers, so using one context's enumerator against another resolves silently rather than failing.
-- Multiple touch pointers are captured but only the first is consumed, so gestures are unavailable.
+- Several touch pointers reach the interface at once, but there is no gesture recognition.
+- Stick directions used for navigation have no hysteresis and no repeat when held, and only the left gamepad stick navigates.
+- Headset navigation actions are bound but nothing consumes them yet.
 - Text entry does not fit the trigger model and has no first-class path.
 - Developer bindings are always registered, including in builds where they are not wanted.
 - Mouse-derived stick deflection can exceed the nominal stick range on a long frame, so a consumer assuming a bounded stick position is wrong for the mouse.

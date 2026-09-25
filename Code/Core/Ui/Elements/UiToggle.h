@@ -12,8 +12,8 @@ namespace CC
         virtual ~UiToggle();
 
         bool IsChecked() const { return isChecked; }
-        void SetChecked(bool checked) { isChecked = checked; }
-        void Toggle() { isChecked = !isChecked; }
+        void SetChecked(bool checked);
+        void Toggle() { SetChecked(!isChecked); }
 
     private:
         bool isChecked = false;

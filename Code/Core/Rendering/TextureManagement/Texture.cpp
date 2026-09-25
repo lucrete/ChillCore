@@ -13,7 +13,6 @@ namespace CC
     // ========================
     // Helpers
     // ========================
-
     static Gfx::TextureFormat FormatForColorSpace(TextureColorSpace colorSpace)
     {
         return colorSpace == TextureColorSpace::Srgb
@@ -36,7 +35,6 @@ namespace CC
     // ========================
     // Texture
     // ========================
-
     Texture::Texture(const std::string& filePath, bool generateMipmaps, TextureColorSpace colorSpace)
         : textureHandle(), filePath(filePath), width(0), height(0), bitsPerPixel(0)
     {

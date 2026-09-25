@@ -32,7 +32,7 @@ Renderables do not register permanently. Each one submits itself during its comp
 
 ## Runtime flow
 
-**Frame start.** Camera state updates, then the frame-wide uniform buffer is filled and bound. It holds the view-projection transform, camera position, time, and the ambient and directional lighting — everything constant for the whole frame.
+**Frame start.** Camera state updates, then the frame-wide uniform buffer is filled and bound. It holds the view-projection transform, camera position, time, and the ambient and directional lighting — everything constant for the whole frame. The time is the world's Simulation time, wrapped to a fixed period, so shader animation freezes when the world is paused.
 
 **Submission.** During the scene update, each renderable adds itself to the opaque or transparent list according to its material's transparency.
 
@@ -199,7 +199,7 @@ Limiting it to one shader keeps the per-frame check to a single file query. The 
 ## Limitations
 
 - The submission list has a fixed capacity. Exceeding it is a hard limit, not a growth.
-- Redundant material and texture binds are not eliminated, so objects sharing a material repeat that work per draw.
+- Redundant material and texture binds are still issued per draw. The frontend rebinds a material's uniform block and textures for every object; the graphics layer beneath drops the ones that would set what is already set, so what remains is the call cost, not the state change.
 - Effect order in the fused pass is fixed by the shader. A caller cannot reorder effects or insert one of its own.
 - A fullscreen quad cannot have any post-process effect applied to it, by construction. Bloom or a vignette over a procedurally drawn frame is not available.
 - Post-processing receives scene colour only. The depth attachment exists on the scene target but is not handed to the stack, so no effect can depend on depth.

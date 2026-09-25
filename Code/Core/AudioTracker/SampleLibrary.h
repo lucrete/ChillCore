@@ -9,7 +9,6 @@ namespace CC
     // ========================
     // Sample status
     // ========================
-
     // The four states a sample entry can be in after LoadAndVerify
     // walks Tracker.yaml against the on-disk Samples/ directory.
     enum class SampleStatus
@@ -23,7 +22,6 @@ namespace CC
     // ========================
     // Sample entry
     // ========================
-
     // One row in Tracker.yaml's samples list, paired with its current
     // verification state. The on-disk file is always at
     // TrackerPaths::GetSamplesPath() / fileName; absolute paths are
@@ -41,7 +39,6 @@ namespace CC
     // ========================
     // Sample library
     // ========================
-
     // Reads, writes, and verifies %PROGRAMDATA%/ChillCore/Tracker/Tracker.yaml.
     // Sole owner of the Tracker.yaml round-trip; consumers (the sample
     // panel UI, project loader, audition path) read entries via

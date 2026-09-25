@@ -1,4 +1,5 @@
 #include "FrameTimer.h"
+#include <math.h>
 #include <string.h>
 #include "CCAssert.h"
 #include "CCMath.h"
@@ -24,6 +25,7 @@ namespace CC
 
         currentTime = GetCurrentTime();
         previousTime = currentTime;
+        platformFrameStartTime = currentTime;
 
         memset(profileTotalMs, 0, sizeof(profileTotalMs));
         memset(profileCpuPhases, 0, sizeof(profileCpuPhases));
@@ -46,9 +48,16 @@ namespace CC
     void FrameTimer::FrameStart()
     {
         previousTime = currentTime;
-        currentTime = GetCurrentTime();
+        currentTime = hasExternalFrameTime ? externalFrameTime : GetCurrentTime();
         deltaTime = currentTime - previousTime;
         deltaTimeClamped = Math::Clamp(0.0f, MAX_DELTA_TIME_SECONDS, deltaTime);
+
+        simulationDeltaTime = isSimulationPaused ? 0.0f : deltaTimeClamped * simulationTimeScale;
+        simulationTime += simulationDeltaTime;
+
+        float platformNow = GetCurrentTime();
+        platformDeltaTime = platformNow - platformFrameStartTime;
+        platformFrameStartTime = platformNow;
 
         // Cache previous frame timestamps before reset
         memcpy(previousFrameTimestamps, timestamps, sizeof(Timestamp) * timestampCount);
@@ -62,12 +71,39 @@ namespace CC
 
         // FPS averaging over 1-second intervals
         frameCount++;
-        fpsAccumulator += deltaTime;
+        // The platform interval, so the count keeps moving while an external
+        // frame clock is set but not being advanced.
+        fpsAccumulator += platformDeltaTime;
         if (fpsAccumulator >= 1.0f)
         {
             framesPerSecond = frameCount / fpsAccumulator;
             frameCount = 0;
             fpsAccumulator = 0.0f;
+        }
+    }
+
+    void FrameTimer::SetExternalFrameTime(float seconds)
+    {
+        // The external clock has its own origin. Taking it up without moving
+        // the baseline with it makes the first frame's delta the distance
+        // between two unrelated clocks.
+        if (!hasExternalFrameTime)
+        {
+            currentTime = seconds;
+            previousTime = seconds;
+        }
+
+        hasExternalFrameTime = true;
+        externalFrameTime = seconds;
+    }
+
+    void FrameTimer::ClearExternalFrameTime()
+    {
+        if (hasExternalFrameTime)
+        {
+            hasExternalFrameTime = false;
+            currentTime = GetCurrentTime();
+            previousTime = currentTime;
         }
     }
 
@@ -89,6 +125,17 @@ namespace CC
     float FrameTimer::GetFramesPerSecond() const
     {
         return framesPerSecond;
+    }
+
+    void FrameTimer::SetSimulationTimeScale(float timeScale)
+    {
+        CC_ASSERT(timeScale >= 0.0f, "Simulation time cannot run backwards");
+        simulationTimeScale = timeScale;
+    }
+
+    float FrameTimer::ShaderSimulationTime() const
+    {
+        return fmodf(simulationTime, SHADER_TIME_WRAP_SECONDS);
     }
 
     void FrameTimer::AddTimestamp(const char* label)
@@ -145,7 +192,6 @@ namespace CC
     // ========================
     // Profile Data
     // ========================
-
     // A scope name is either a plain phase name or a "Group/Detail" pair. The
     // profiler shows the group, so several passes read as one phase, while
     // capture tools keep the full name and its per-pass detail.
@@ -165,13 +211,15 @@ namespace CC
 
     void FrameTimer::RecordProfileData()
     {
-        float frameTimeMs = deltaTime * 1000.0f;
+        // Platform clock throughout, matching the phase timestamps, so the
+        // phases stack to the total whatever clock drives the frame.
+        float frameTimeMs = platformDeltaTime * 1000.0f;
 
         if (frameTimeMs <= MAX_RECORDABLE_FRAME_TIME_MS)
         {
             // Phases 0..4 are bounded entirely within the previous frame's
             // data. Phase 5 (SwapBuffers) ends at the *next* frame's
-            // FrameStart, which is the currentTime captured in FrameStart()
+            // FrameStart, which is the platform frame start captured in FrameStart()
             // for this frame — handled as a special case below.
             static const StandardTimestamp mainPhaseStart[] = {
                 CC::FrameStart, CC::AppMain, CC::UiScreen,
@@ -194,7 +242,7 @@ namespace CC
             float swapPhaseMs = 0.0f;
             if (swapIdx >= 0)
             {
-                swapPhaseMs = (currentTime - previousFrameTimestamps[swapIdx].time) * 1000.0f;
+                swapPhaseMs = (platformFrameStartTime - previousFrameTimestamps[swapIdx].time) * 1000.0f;
             }
             profileCpuPhases[PROFILE_CPU_PHASES - 1][profileWriteIndex] = swapPhaseMs;
 
@@ -210,10 +258,6 @@ namespace CC
                 if (renderScopeCount < 0)
                 {
                     renderScopeCount = 0;
-                }
-                if (renderScopeCount > PROFILE_MAX_GPU_PHASES)
-                {
-                    renderScopeCount = PROFILE_MAX_GPU_PHASES;
                 }
 
                 // Contiguous scopes sharing a group fold into one phase, so
@@ -294,7 +338,6 @@ namespace CC
     // ========================
     // Capture
     // ========================
-
     void FrameTimer::StartCapture(float durationSeconds)
     {
         captureFrameCount = 0;
@@ -387,7 +430,6 @@ namespace CC
     // ========================
     // Profile Accessors
     // ========================
-
     int FrameTimer::GetProfileWriteIndex() const
     {
         return profileWriteIndex;

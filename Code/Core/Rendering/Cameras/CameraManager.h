@@ -15,6 +15,14 @@ namespace CC
 
         void Update();
         void SetActiveCamera(const std::string& cameraName);
+
+        // Activates a camera the caller already holds. Used per view when a
+        // frame renders the scene more than once, where the swap is
+        // transient and must not disturb the named active camera the free
+        // camera toggle restores to.
+        void SetActiveCamera(CameraBase* camera);
+
+        CameraBase* GetActiveCamera() const;
         void RegisterCamera(const std::string& cameraName, CameraBase* camera);
         Mat4x4& GetViewProjectionMatrix();
         Vector3 GetCameraPosition();

@@ -29,11 +29,16 @@ namespace CC
 
         virtual void SetFileDropCallback(std::function<void(const std::vector<std::string>&)> callback) override;
 
+        virtual bool GetNativeGraphicsBinding(NativeGraphicsBinding& outBinding) const override;
+
+        virtual void SetVsyncSuspended(bool isSuspended) override;
+
     private:
         static void GlfwDropCallback(GLFWwindow* window, int pathCount, const char* paths[]);
 
         GLFWwindow*                                                    window;
         bool                                                           isFullscreen;
+        bool                                                           isVsyncConfigured;
         std::function<void(const std::vector<std::string>&)>           fileDropCallback;
 
         struct WindowProperties

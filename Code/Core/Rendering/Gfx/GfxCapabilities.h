@@ -34,6 +34,10 @@ namespace CC::Gfx
         // needs EXT_color_buffer_half_float, so an HDR scene target cannot be
         // assumed. Without it, tone mapping has no range to compress.
         bool supportsHalfFloatRenderTargets = false;
+        // Whether a texture whose storage another API owns can be registered
+        // and used like any other. Required to render into an XR runtime's
+        // swapchain images.
+        bool supportsExternalTextures = false;
         bool supportsDebugMarkers      = false;
         bool supportsGpuTimestamps     = false;
 

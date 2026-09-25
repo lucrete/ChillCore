@@ -4,6 +4,7 @@
 #include "AppStateShowcase.h"
 #include "AppStateAudioTest.h"
 #include "AppStateAudioTracker.h"
+#include "AppStateXrDemo.h"
 #include "AudioManager.h"
 
 AppMain::AppMain()
@@ -25,7 +26,8 @@ void AppMain::Init()
     stateMachine->RegisterState("Showcase", new AppStateShowcase());
     stateMachine->RegisterState("AudioTest", new AppStateAudioTest());
     stateMachine->RegisterState("AudioTracker", new AppStateAudioTracker());
-    stateMachine->GotoState("Showcase");
+    stateMachine->RegisterState("XrDemo", new AppStateXrDemo());
+    stateMachine->GotoState("XrDemo");
 }
 
 // Global UI SFX must load before any AppState runs so any state can be the

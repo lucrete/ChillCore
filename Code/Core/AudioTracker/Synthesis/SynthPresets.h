@@ -6,7 +6,6 @@ namespace CC
     // ========================
     // Preset identifiers
     // ========================
-
     // Each preset corresponds to a generator translation unit under
     // Generators/. Adding a preset is: add an entry here, write a
     // matching parameter struct, add the generator, and dispatch from
@@ -22,7 +21,6 @@ namespace CC
     // ========================
     // Per-preset parameter structs
     // ========================
-
     // Default values reproduce the Phase 1 prototype synth output so
     // that the existing AudioTracker prototype loop sounds identical
     // after the synthesis extraction.
@@ -57,7 +55,6 @@ namespace CC
     // ========================
     // Tagged parameter container
     // ========================
-
     // A single value type carries any preset's parameters so callers
     // can pass one argument to RenderPreset. Only the field matching
     // presetId is read; the others are ignored. A union would save a

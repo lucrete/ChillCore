@@ -131,7 +131,6 @@ namespace CC
     // ========================
     // Private
     // ========================
-
     int PostProcessEffect::FindParamIndex(const char* paramName) const
     {
         int result = -1;

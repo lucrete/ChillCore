@@ -78,7 +78,6 @@ namespace CC
 // ========================
 // Factory Registration
 // ========================
-
 static CC::Component* CreateRenderableSphere(ryml::ConstNodeRef componentData)
 {
     CC::Material* material = nullptr;

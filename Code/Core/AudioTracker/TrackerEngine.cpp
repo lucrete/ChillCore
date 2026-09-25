@@ -23,7 +23,6 @@ namespace CC
     // ========================
     // Custom miniaudio node
     // ========================
-
     // miniaudio allocates the node's storage in-place via ma_node_init. The
     // ma_node_base member must be the first field; ma_node APIs cast back
     // and forth between ma_node_base* and our wrapper. The engine pointer
@@ -63,7 +62,6 @@ namespace CC
     // ========================
     // TrackerEngine
     // ========================
-
     TrackerEngine* TrackerEngine::instance = nullptr;
 
     TrackerEngine::TrackerEngine()
@@ -175,7 +173,6 @@ namespace CC
     // ========================
     // Public playback control
     // ========================
-
     void TrackerEngine::StartPrototypeLoop()
     {
         if (clock == nullptr || samples.empty())
@@ -269,7 +266,6 @@ namespace CC
     // ========================
     // Library sync + audition
     // ========================
-
     // miniaudio decoder. Decodes an arbitrary file (WAV PCM 16/24/32/float
     // and OGG Vorbis are the formats we currently expect, all natively
     // supported by miniaudio + linked stb_vorbis) into interleaved float
@@ -613,7 +609,6 @@ namespace CC
     // ========================
     // Audio thread
     // ========================
-
     // Trigger any events in the schedule whose loop-position equals the
     // exact frame about to be rendered, then mix every active voice into
     // the interleaved output buffer at this frame index. Voices are
@@ -700,7 +695,6 @@ namespace CC
     // ========================
     // Private helpers
     // ========================
-
     void TrackerEngine::SynthesizePrototypeSamples()
     {
         samples.clear();

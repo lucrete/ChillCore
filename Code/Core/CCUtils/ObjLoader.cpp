@@ -15,7 +15,6 @@ namespace CC
     // ========================
     // Public Methods
     // ========================
-
     RenderableMesh* ObjLoader::LoadObj(const std::string& filePath, Material* material)
     {
         std::vector<float> positions;
@@ -138,7 +137,6 @@ namespace CC
     // ========================
     // Private Methods
     // ========================
-
     bool ObjLoader::ParseObjFile(const std::string& filePath,
         std::vector<float>& positions,
         std::vector<float>& texCoords,

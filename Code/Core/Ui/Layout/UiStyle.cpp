@@ -33,7 +33,6 @@ namespace CC
     // ========================
     // Colour parsing
     // ========================
-
     static int HexCharToInt(char c)
     {
         if (c >= '0' && c <= '9') return c - '0';
@@ -180,7 +179,6 @@ namespace CC
     // ========================
     // Dimension parsing
     // ========================
-
     UiDimension ParseDimension(const std::string& value)
     {
         if (value.empty() || value == "auto")

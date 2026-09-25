@@ -36,7 +36,7 @@ namespace CC
             return;
         }
 
-        float time = FrameTimer::Get()->TimeSinceStartup();
+        float time = FrameTimer::Get()->SimulationTime();
 
         Vector3 rotation(
             rotationMultiplier.x * sinf(time * rotationSpeed.x),
@@ -51,7 +51,6 @@ namespace CC
 // ========================
 // Factory Registration
 // ========================
-
 static CC::Component* CreateRotateRandom(ryml::ConstNodeRef componentData)
 {
     return new CC::RotateRandom();

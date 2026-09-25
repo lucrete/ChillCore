@@ -8,6 +8,28 @@ Last reviewed against the source: 2026-09-01.
 
 ## Rendering
 
+Detail written while these were in plan is in `RenderingPlan.md`.
+
+### Compute shaders
+
+The backend surface is built. Gated on shader compilation recognising a `#shader compute` stage — that one change unblocks the rest. Ends with a compute demo state.
+
+### Frustum culling
+
+Nothing tests whether an object is on screen. Needs bounding volumes, which no renderable, mesh or scene object has. Best done before the depth pre-pass: it halves what the pre-pass doubles.
+
+### Depth pre-pass for opaque geometry
+
+Removes overdraw without giving up the pipeline sort — the two cannot coexist in a single pass. The largest rendering item after shadows, and the only one needing a graphics-abstraction change first: pipelines have no colour write mask.
+
+### Shadow maps
+
+The largest rendering item, and the only one that changes the frame sequence: the scene pass opens before geometry is submitted, so a shadow pass has nowhere to run today. **Depends on the depth pre-pass**, whose depth-only machinery — the colour write mask and depth-only pipelines — it reuses; building shadows first means building that twice.
+
+### Particle system
+
+The first thing in the engine to produce geometry per frame rather than load it once. Needs per-instance vertex attributes, which the vertex layout cannot describe, and a blend mode a material can choose, which none can. Open: how alpha particles are ordered within a system, and whether simulation is CPU or compute. A GPU-driven version would want compute shaders; a first cut does not.
+
 ### A caller-defined post-process effect chain
 
 Effects fuse into one pass in an order fixed by the shader. A caller can neither reorder them nor insert one of its own.
@@ -55,9 +77,9 @@ Needs a decision on whether depth is exposed as an ordinary sampled texture or a
 
 ### Occlusion culling
 
-Rejecting draws hidden behind other geometry, as opposed to draws outside the view. Frustum culling and the depth pre-pass are in plan (`RenderingPlan.md`); neither covers this.
+Rejecting draws hidden behind other geometry, as opposed to draws outside the view. Frustum culling and the depth pre-pass are separate items above; neither covers this.
 
-**Deferred deliberately, not blocked.** The two planned items take most of the value first. Frustum culling removes what is off screen, and the pre-pass removes the *shading* cost of what is occluded — the remainder here is the draw call and the vertex processing of hidden objects. That remainder is real at production scene complexity and small below it, and this is the most complex of the three by a distance.
+**Deferred deliberately, not blocked.** Frustum culling and the pre-pass take most of the value first. Frustum culling removes what is off screen, and the pre-pass removes the *shading* cost of what is occluded — the remainder here is the draw call and the vertex processing of hidden objects. That remainder is real at production scene complexity and small below it, and this is the most complex of the three by a distance.
 
 **Three approaches, none obviously right.**
 
@@ -200,6 +222,20 @@ A render graph, or any explicit declaration of passes and their resource depende
 
 ## AudioTracker
 
+Detail written while the first three were in plan is in `AudioTrackerPlan.md`. The workstream is independent of rendering, platform and build work.
+
+### Velocity editing
+
+The primary editing affordance still missing.
+
+### Missing commands
+
+Includes command coalescing — without it, drag-paint undo is unusable.
+
+### Project file handling
+
+New, Open and Save As, an in-engine project browser, and auto-save on exit.
+
 ### Editor first-cuts to replace
 
 - Track source assignment is a "Cycle Source" button (`AudioTrackerController.cpp:583`). The intended dropdown is blocked on `UiDropdown` supporting dynamically populated options.
@@ -222,6 +258,10 @@ Deferred as a group, none blocking anything. Each is a follow-up rather than par
 
 ## Platform and build
 
+### Android v1 ship-gate verification
+
+The cheapest remaining item. Closes out a port everything downstream assumes is good; worth running before more is built on that assumption. Also covers the offscreen render-target path on device, which is written but unverified there. Detail in `PlatformAndBuildPlan.md`.
+
 ### Android platform gaps
 
 Three file-system operations are unimplemented on Android (`PlatformFileSystemAndroid.cpp:158-172`). Deliberate — no Android consumer today.
@@ -232,6 +272,12 @@ Three file-system operations are unimplemented on Android (`PlatformFileSystemAn
 ### Android through the pipeline
 
 The pipeline builds the desktop target only; Android is still built by invoking Gradle directly. Adding it is a target-selection option and a Gradle invocation reporting into the same folder structure. Unblocked, low value until something other than a developer's machine builds the package.
+
+### XR on Quest standalone
+
+PCVR has landed and covers the desktop target only. Standalone means the GLES backend: an OpenXR loader AAR through the Gradle prefab mechanism, an EGL graphics binding, and loader initialisation against the activity and JavaVM.
+
+Deliberately deferred, not blocked. The PCVR work is designed so this is additive — the platform graphics-binding accessor and external-texture registration both have EGL analogues — and iterating on a device is far slower than on the desktop. Wants the Android v1 ship gate closed first.
 
 ### WebGL backend
 
@@ -247,9 +293,75 @@ Author in one language, compile to an intermediate representation, translate to 
 
 ---
 
+## Persistence
+
+### Persistence and lifecycle hooks
+
+Makes the Android context-loss cold restart honest, and is the foundation for settings and save games — to be built once with both consumers in mind. **Must precede any Android context-loss hardening**: the recovery policy is a deliberate cold restart on the premise that persistence restores the user's place. Detail in `PersistencePlan.md`.
+
+---
+
+## Build pipeline
+
+Detail written while these were in plan is in `BuildPipelinePlan.md`.
+
+### Automated testing
+
+`RunTests.sh` beside `Build.sh` and `Run.sh`. First tests: the engine starts, loads a scene, and shuts down clean.
+
+### Packaged distribution
+
+An archive of the self-contained output directory, for labelled builds only. Cheapest once the output directory stands alone.
+
+---
+
+## XR
+
+### Session lifecycle across AppStates
+
+What the headset shows while an AppState without XR support runs, and how an AppState learns that a session started or stopped. Today leaving the XR demo for the main menu during a session leaves the headset with nothing to point at, the main menu has no entry back into the demo, and an AppState has to watch the session rather than being told. Resolving it also retires two stand-ins: the input manager holding the window's target on the window surface while a session runs, and `EndSession` forcing the free camera active whatever the AppState was using. Includes showing the pause panel when XR is entered while already paused.
+
+### In-headset main menu
+
+Boot and the main menu are window-only. A standalone headset has no window, so it needs these as world panels before it can ship. Adjacent to the session lifecycle item.
+
+### Direct touch on interface objects
+
+Interface objects are reached by ray only. Touch needs a contact test at the fingertip or controller tip alongside the ray test, a press made by pushing past a depth with release hysteresis, and a rule that touch outranks the ray for the same hand. The pointer target interface was shaped with this in mind; the router compares ray distances only.
+
+### Headset navigation and confirm
+
+Thumbstick directions are bound to headset navigation actions in every context, and nothing consumes them. A surface targeted by the headset would need to run navigation from them, and there is no headset confirm action.
+
+### Navigation stick behaviour
+
+Stick directions fire navigation on the edge only: no repeat while held, and no release hysteresis, so a stick resting near the threshold can flicker. Only the left gamepad stick navigates.
+
+### Single-pass stereo
+
+Roughly halves draw submission cost in the headset. Needs a layered render target — layered plus multisampled is not covered today and needs shader-resolve work first — per-view matrices moved out of the per-draw uniforms, and every vertex shader changed. Wants a measurement showing draw submission is the bottleneck first.
+
+### Headset verification of the engine hands
+
+The hands, pointing, grabbing, dropping on pause, the pause panel's placement and the A-button pause moved into the engine and have been run only briefly in a headset. Worth a deliberate pass.
+
+---
+
+## Application
+
+### Procedural-art context shares action indices with Showcase
+
+`ProceduralArtController`'s context numbers its actions from the same base as Showcase's. While procedural-art mode is active, Showcase's pause query reads the D-pad-left binding and its grade-preset query reads the D-pad-right binding.
+
+---
+
 ## Open design questions
 
 Decisions nobody has needed to make yet, recorded so they are not rediscovered from scratch. Resolving one means writing the decision into the relevant AGD.
+
+### Whether Showcase supports XR
+
+Currently not: its procedural-art mode is a fullscreen 2D shader. Enabling it is two lines; the question is whether the scene makes sense in a headset.
 
 ### Material versus material instance
 

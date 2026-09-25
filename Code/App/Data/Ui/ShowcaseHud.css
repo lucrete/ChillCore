@@ -13,13 +13,8 @@
     padding: 8;
 }
 
-.hud-timer {
-    padding: 8 16;
-    font-size: 20;
-    color: rgba(255, 255, 255, 0.7);
-    background-color: rgba(0, 0, 0, 0.3);
-}
-
+/* Touch only. A keyboard has Escape and a gamepad has Start; a finger has
+   nothing, so this is the only way to pause on a touch device. */
 .hud-pause {
     width: 36;
     height: 36;
@@ -37,6 +32,13 @@
 
 .hud-pause:active {
     background-color: rgba(70, 70, 120, 1.0);
+}
+
+.hud-timer {
+    padding: 8 16;
+    font-size: 20;
+    color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
 .joystick {
@@ -61,4 +63,13 @@
     height: 110;
     background-image: circle256;
     opacity: 0.85;
+}
+
+/* Shown only while a session owns input, when the window is a mirror of what
+   the headset sees and nothing here can be operated. */
+.hud-tracking {
+    padding: 8 16;
+    font-size: 20;
+    color: rgba(140, 220, 255, 0.9);
+    background-color: rgba(0, 0, 0, 0.45);
 }

@@ -11,7 +11,6 @@ namespace CC::Gfx
     // ========================
     // Static translation tables
     // ========================
-
     static GLenum ToGlBufferTarget(BufferUsage usage)
     {
         GLenum result = GL_ARRAY_BUFFER;
@@ -277,7 +276,6 @@ namespace CC::Gfx
     // ========================
     // Lifecycle
     // ========================
-
     RenderApiGles::RenderApiGles()
     {
     }
@@ -418,6 +416,7 @@ namespace CC::Gfx
         capabilities.supportsAstcTextureFormats    = true;
         capabilities.supportsAnisotropicFiltering  = false;  // EXT_texture_filter_anisotropic; not gated in v1.
         capabilities.supportsHalfFloatRenderTargets = HasGlExtension("GL_EXT_color_buffer_half_float");
+        capabilities.supportsExternalTextures       = true;
         capabilities.supportsDebugMarkers          = false;  // KHR_debug; not gated in v1.
         capabilities.supportsGpuTimestamps         = false;  // EXT_disjoint_timer_query; not gated in v1.
 
@@ -440,7 +439,6 @@ namespace CC::Gfx
     // ========================
     // Frame
     // ========================
-
     void RenderApiGles::BeginFrame()
     {
     }
@@ -453,7 +451,6 @@ namespace CC::Gfx
     // ========================
     // Backbuffer
     // ========================
-
     void RenderApiGles::ConfigureBackbuffer(const BackbufferDescription& description)
     {
         // Rebuilding the framebuffers rebinds, so an open pass would
@@ -650,7 +647,6 @@ namespace CC::Gfx
     // ========================
     // Buffers
     // ========================
-
     BufferHandle RenderApiGles::CreateBuffer(const BufferDescription& description)
     {
         CC_ASSERT(description.sizeBytes > 0, "BufferDescription.sizeBytes must be > 0");
@@ -695,6 +691,10 @@ namespace CC::Gfx
                 glDeleteBuffers(1, &entry.glHandle);
                 entry = GlBuffer();
                 freeBufferSlots.push_back(slotIndex);
+
+                // The next create can be handed the GL name just released, and
+                // a cached bind would match it as though nothing had changed.
+                InvalidateCachedState();
             }
         }
     }
@@ -739,7 +739,6 @@ namespace CC::Gfx
     // ========================
     // Textures
     // ========================
-
     TextureHandle RenderApiGles::CreateTexture(const TextureDescription& description)
     {
         CC_ASSERT(description.width > 0 && description.height > 0, "TextureDescription: width/height must be > 0");
@@ -825,6 +824,47 @@ namespace CC::Gfx
 
         glBindTexture(entry.target, 0);
 
+        // The binds above landed on whichever texture unit was active, so what
+        // the cache records for that unit is no longer what is bound there.
+        InvalidateCachedState();
+
+        uint32_t slotIndex = GlCommon::AcquireSlot(freeTextureSlots, static_cast<uint32_t>(textures.size()));
+        if (slotIndex == textures.size())
+        {
+            textures.push_back(entry);
+        }
+        else
+        {
+            textures[slotIndex] = entry;
+        }
+
+        TextureHandle handle;
+        handle.id = slotIndex;
+        return handle;
+    }
+
+    TextureHandle RenderApiGles::RegisterExternalTexture(const ExternalTextureDescription& description)
+    {
+        CC_ASSERT(description.nativeHandle != 0, "ExternalTextureDescription: nativeHandle must be set");
+        CC_ASSERT(description.width > 0 && description.height > 0,
+                  "ExternalTextureDescription: width/height must be > 0");
+        // A multisampled external image would need a different GL target and
+        // a resolve on the way out. The scene is antialiased in the engine's
+        // own target and resolved into this one, so it is always single
+        // sample.
+        CC_ASSERT(description.sampleCount == 1,
+                  "ExternalTextureDescription: multisampled external textures are not supported");
+
+        GlTexture entry;
+        entry.glHandle     = static_cast<GLuint>(description.nativeHandle);
+        entry.format       = description.format;
+        entry.width        = description.width;
+        entry.height       = description.height;
+        entry.layerCount   = description.arrayLayers;
+        entry.target       = (description.arrayLayers > 1) ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D;
+        entry.isAlive      = true;
+        entry.ownsGlHandle = false;
+
         uint32_t slotIndex = GlCommon::AcquireSlot(freeTextureSlots, static_cast<uint32_t>(textures.size()));
         if (slotIndex == textures.size())
         {
@@ -849,9 +889,16 @@ namespace CC::Gfx
             GlTexture& entry = textures[slotIndex];
             if (entry.isAlive)
             {
-                glDeleteTextures(1, &entry.glHandle);
+                if (entry.ownsGlHandle)
+                {
+                    glDeleteTextures(1, &entry.glHandle);
+                }
                 entry = GlTexture();
                 freeTextureSlots.push_back(slotIndex);
+
+                // The next create can be handed the GL name just released, and
+                // a cached bind would match it as though nothing had changed.
+                InvalidateCachedState();
             }
         }
     }
@@ -870,12 +917,15 @@ namespace CC::Gfx
         glTexSubImage2D(entry.target, mipLevel, x, y, width, height,
                         formatInfo.pixelFormat, formatInfo.pixelType, data);
         glBindTexture(entry.target, 0);
+
+        // The binds above landed on whichever texture unit was active, so what
+        // the cache records for that unit is no longer what is bound there.
+        InvalidateCachedState();
     }
 
     // ========================
     // Samplers
     // ========================
-
     SamplerHandle RenderApiGles::CreateSampler(const SamplerDescription& description)
     {
         GlSampler entry;
@@ -920,6 +970,10 @@ namespace CC::Gfx
                 glDeleteSamplers(1, &entry.glHandle);
                 entry = GlSampler();
                 freeSamplerSlots.push_back(slotIndex);
+
+                // The next create can be handed the GL name just released, and
+                // a cached bind would match it as though nothing had changed.
+                InvalidateCachedState();
             }
         }
     }
@@ -927,7 +981,6 @@ namespace CC::Gfx
     // ========================
     // Shaders
     // ========================
-
     static const char* GlShaderStageName(GLenum stage)
     {
         const char* result = "Unknown";
@@ -1070,7 +1123,6 @@ namespace CC::Gfx
     // ========================
     // Pipelines
     // ========================
-
     static bool IsNormalizedAttribType(VertexAttribType type)
     {
         return type == VertexAttribType::Uint8Norm;
@@ -1107,6 +1159,10 @@ namespace CC::Gfx
             glBindVertexArray(0);
         }
 
+        // Building the vertex array object left it unbound, dropping the
+        // vertex buffer bindings any currently bound pipeline relies on.
+        InvalidateCachedState();
+
         uint32_t slotIndex = GlCommon::AcquireSlot(freePipelineSlots, static_cast<uint32_t>(pipelines.size()));
         if (slotIndex == pipelines.size())
         {
@@ -1140,7 +1196,7 @@ namespace CC::Gfx
             }
             if (currentPipeline.id == slotIndex)
             {
-                currentPipeline = PipelineHandle();
+                InvalidateCachedState();
             }
         }
     }
@@ -1148,7 +1204,6 @@ namespace CC::Gfx
     // ========================
     // Render targets
     // ========================
-
     RenderTargetHandle RenderApiGles::CreateRenderTarget(const RenderTargetDescription& description)
     {
         CC_ASSERT(description.colorAttachmentCount >= 0 && description.colorAttachmentCount <= MAX_COLOR_ATTACHMENTS,
@@ -1317,7 +1372,6 @@ namespace CC::Gfx
     // ========================
     // Command recording
     // ========================
-
     void RenderApiGles::BindPipeline(PipelineHandle pipeline)
     {
         CC_ASSERT(pipeline.IsValid(), "BindPipeline: invalid handle");
@@ -1335,9 +1389,17 @@ namespace CC::Gfx
             uint32_t shaderSlot = desc.shader.id;
             glUseProgram(shaders[shaderSlot].program);
 
+            // Vertex buffer bindings belong to the vertex array object, so the
+            // cached ones stop describing what is in force the moment a
+            // different object is bound.
             if (entry.vao != 0)
             {
                 glBindVertexArray(entry.vao);
+                if (entry.vao != bindCache.vertexArrayObject)
+                {
+                    bindCache.ResetVertexBuffers();
+                    bindCache.vertexArrayObject = entry.vao;
+                }
             }
 
             if (desc.rasterizer.cullMode == CullMode::None)
@@ -1383,12 +1445,23 @@ namespace CC::Gfx
     void RenderApiGles::BindVertexBuffer(int slot, BufferHandle buffer, int offsetBytes, int strideBytes)
     {
         CC_ASSERT(buffer.IsValid(), "BindVertexBuffer: invalid handle");
+        CC_ASSERT(slot >= 0 && slot < MAX_BOUND_VERTEX_BUFFERS, "BindVertexBuffer: slot out of range");
         uint32_t slotIndex = buffer.id;
         CC_ASSERT(slotIndex < buffers.size(), "BufferHandle out of range");
         GlBuffer& entry = buffers[slotIndex];
         CC_ASSERT(entry.isAlive, "BindVertexBuffer: buffer destroyed");
 
-        glBindVertexBuffer(slot, entry.glHandle, offsetBytes, strideBytes);
+        GlCommon::VertexBufferBinding& cached = bindCache.vertexBuffers[slot];
+        bool alreadyBound = (cached.buffer      == entry.glHandle
+                          && cached.offsetBytes == offsetBytes
+                          && cached.strideBytes == strideBytes);
+        if (!alreadyBound)
+        {
+            glBindVertexBuffer(slot, entry.glHandle, offsetBytes, strideBytes);
+            cached.buffer      = entry.glHandle;
+            cached.offsetBytes = offsetBytes;
+            cached.strideBytes = strideBytes;
+        }
     }
 
     void RenderApiGles::BindIndexBuffer(BufferHandle buffer, IndexType type)
@@ -1406,37 +1479,64 @@ namespace CC::Gfx
     void RenderApiGles::BindTexture(int slot, TextureHandle texture, SamplerHandle sampler)
     {
         CC_ASSERT(texture.IsValid(), "BindTexture: invalid texture handle");
+        CC_ASSERT(slot >= 0 && slot < MAX_BOUND_TEXTURES, "BindTexture: slot out of range");
         uint32_t textureSlot = texture.id;
         CC_ASSERT(textureSlot < textures.size(), "TextureHandle out of range");
         GlTexture& texEntry = textures[textureSlot];
         CC_ASSERT(texEntry.isAlive, "BindTexture: texture destroyed");
 
-        glActiveTexture(GL_TEXTURE0 + slot);
-        glBindTexture(texEntry.target, texEntry.glHandle);
-
+        GLuint samplerGlHandle = 0;
         if (sampler.IsValid())
         {
             uint32_t samplerSlot = sampler.id;
             CC_ASSERT(samplerSlot < samplers.size(), "SamplerHandle out of range");
             GlSampler& samplerEntry = samplers[samplerSlot];
             CC_ASSERT(samplerEntry.isAlive, "BindTexture: sampler destroyed");
-            glBindSampler(slot, samplerEntry.glHandle);
+            samplerGlHandle = samplerEntry.glHandle;
         }
-        else
+
+        GlCommon::TextureUnitBinding& cached = bindCache.textureUnits[slot];
+        if (cached.texture != texEntry.glHandle || cached.target != texEntry.target)
         {
-            glBindSampler(slot, 0);
+            if (bindCache.activeTextureUnit != slot)
+            {
+                glActiveTexture(GL_TEXTURE0 + slot);
+                bindCache.activeTextureUnit = slot;
+            }
+            glBindTexture(texEntry.target, texEntry.glHandle);
+            cached.target  = texEntry.target;
+            cached.texture = texEntry.glHandle;
+        }
+
+        // The sampler bound at a unit is state of its own, unaffected by
+        // which texture sits there, so it is compared separately.
+        if (cached.sampler != samplerGlHandle)
+        {
+            glBindSampler(slot, samplerGlHandle);
+            cached.sampler = samplerGlHandle;
         }
     }
 
     void RenderApiGles::BindUniformBuffer(int slot, BufferHandle buffer, int offsetBytes, int sizeBytes)
     {
         CC_ASSERT(buffer.IsValid(), "BindUniformBuffer: invalid handle");
+        CC_ASSERT(slot >= 0 && slot < MAX_BOUND_UNIFORM_BUFFERS, "BindUniformBuffer: slot out of range");
         uint32_t slotIndex = buffer.id;
         CC_ASSERT(slotIndex < buffers.size(), "BufferHandle out of range");
         GlBuffer& entry = buffers[slotIndex];
         CC_ASSERT(entry.isAlive, "BindUniformBuffer: buffer destroyed");
 
-        glBindBufferRange(GL_UNIFORM_BUFFER, slot, entry.glHandle, offsetBytes, sizeBytes);
+        GlCommon::UniformBufferBinding& cached = bindCache.uniformBuffers[slot];
+        bool alreadyBound = (cached.buffer      == entry.glHandle
+                          && cached.offsetBytes == offsetBytes
+                          && cached.sizeBytes   == sizeBytes);
+        if (!alreadyBound)
+        {
+            glBindBufferRange(GL_UNIFORM_BUFFER, slot, entry.glHandle, offsetBytes, sizeBytes);
+            cached.buffer      = entry.glHandle;
+            cached.offsetBytes = offsetBytes;
+            cached.sizeBytes   = sizeBytes;
+        }
     }
 
     void RenderApiGles::BindStorageBuffer(int slot, BufferHandle buffer)
@@ -1468,6 +1568,13 @@ namespace CC::Gfx
             glBindBuffer(GL_UNIFORM_BUFFER, pushConstantsUbo);
             glBufferData(GL_UNIFORM_BUFFER, OBJECT_UNIFORMS_SIZE_BYTES, nullptr, GL_DYNAMIC_DRAW);
             glBindBufferBase(GL_UNIFORM_BUFFER, OBJECT_UNIFORMS_BINDING_SLOT, pushConstantsUbo);
+
+            // This binds the push-constant slot without going through
+            // BindUniformBuffer; record it so the cache still describes it.
+            GlCommon::UniformBufferBinding& cachedPushConstants = bindCache.uniformBuffers[OBJECT_UNIFORMS_BINDING_SLOT];
+            cachedPushConstants.buffer      = pushConstantsUbo;
+            cachedPushConstants.offsetBytes = 0;
+            cachedPushConstants.sizeBytes   = OBJECT_UNIFORMS_SIZE_BYTES;
         }
         else
         {
@@ -1523,7 +1630,6 @@ namespace CC::Gfx
     // ========================
     // Compute
     // ========================
-
     void RenderApiGles::DispatchCompute(int groupsX, int groupsY, int groupsZ)
     {
         glDispatchCompute(groupsX, groupsY, groupsZ);
@@ -1543,7 +1649,6 @@ namespace CC::Gfx
     // ========================
     // Synchronisation
     // ========================
-
     void RenderApiGles::MemoryBarrier(unsigned int barrierBits)
     {
         glMemoryBarrier(ToGlBarrierBits(barrierBits));
@@ -1552,5 +1657,6 @@ namespace CC::Gfx
     void RenderApiGles::InvalidateCachedState()
     {
         currentPipeline = PipelineHandle();
+        bindCache.Reset();
     }
 }

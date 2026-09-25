@@ -36,10 +36,55 @@ namespace CC
         static FrameTimer* Get();
 
         void FrameStart();
+
+        // Hands the frame clock to something that owns frame pacing itself.
+        // An XR runtime predicts when a frame will actually be displayed, and
+        // animation advanced against any other clock lands at the wrong
+        // moment on screen.
+        //
+        // Affects FrameStart only. The intra-frame profiling timestamps stay
+        // on the platform clock, which is a running measure rather than a
+        // single predicted instant.
+        //
+        // seconds must be relative to the caller's own start, not an absolute
+        // runtime timestamp: a float holds too few digits for an epoch-based
+        // value to resolve a frame.
+        void SetExternalFrameTime(float seconds);
+        void ClearExternalFrameTime();
+
         float DeltaTime() const;
         float DeltaTimeUnclamped() const;
         float TimeSinceStartup() const;
         float GetFramesPerSecond() const;
+
+        // ========================
+        // Simulation clock
+        // ========================
+        // The world's own time. It advances with real time scaled by the time
+        // scale, and stands still while paused. Components that pause read
+        // this clock; everything that runs through a pause reads real time,
+        // so a paused component resumes from where it stopped rather than
+        // jumping to where it would have been.
+        float SimulationDeltaTime() const { return simulationDeltaTime; }
+        float SimulationTime() const { return simulationTime; }
+
+        void SetSimulationPaused(bool isPaused) { isSimulationPaused = isPaused; }
+        bool IsSimulationPaused() const { return isSimulationPaused; }
+
+        void SetSimulationTimeScale(float timeScale);
+        float GetSimulationTimeScale() const { return simulationTimeScale; }
+
+        // Simulation time wrapped to a fixed period for shaders. A float of
+        // seconds loses precision as it grows, and fast periodic animation
+        // visibly steps after a long session.
+        float ShaderSimulationTime() const;
+
+        // The frame start and frame interval on the platform clock, which is
+        // the clock every profiling timestamp is taken on. Under an external
+        // frame clock these differ from TimeSinceStartup and DeltaTime, and a
+        // profile mixing the two subtracts one clock from another.
+        float PlatformFrameStartTime() const { return platformFrameStartTime; }
+        float PlatformDeltaTime() const { return platformDeltaTime; }
 
         void AddTimestamp(const char* label);
         void AddTimestamp(StandardTimestamp id, const char* label);
@@ -83,8 +128,19 @@ namespace CC
 
         static constexpr float MAX_DELTA_TIME_SECONDS = 0.1f;
 
+        // A power of two, so the wrapped value keeps sub-millisecond
+        // resolution across the whole period.
+        static constexpr float SHADER_TIME_WRAP_SECONDS = 4096.0f;
+
+        float simulationTime = 0.0f;
+        float simulationDeltaTime = 0.0f;
+        float simulationTimeScale = 1.0f;
+        bool  isSimulationPaused = false;
+
         float currentTime = 0.0f;
         float previousTime = 0.0f;
+        float platformFrameStartTime = 0.0f;
+        float platformDeltaTime = 0.0f;
         float deltaTime = 0.0f;
         float deltaTimeClamped = 0.0f;
         float framesPerSecond = 0.0f;
@@ -103,6 +159,9 @@ namespace CC
         int previousStandardIndices[StandardTimestampCount];
 
         float GetCurrentTime() const;
+
+        float externalFrameTime = 0.0f;
+        bool  hasExternalFrameTime = false;
 
         // Profile ring buffer
         float profileTotalMs[PROFILE_HISTORY_SIZE];

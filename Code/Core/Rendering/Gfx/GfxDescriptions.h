@@ -1,6 +1,8 @@
 #ifndef GFXDESCRIPTIONS_H
 #define GFXDESCRIPTIONS_H
 
+#include <stdint.h>
+
 #include "GfxHandles.h"
 #include "GfxEnums.h"
 
@@ -9,17 +11,16 @@ namespace CC::Gfx
     // ========================
     // Limits
     // ========================
-
     static constexpr int MAX_VERTEX_ATTRIBUTES = 8;
     static constexpr int MAX_COLOR_ATTACHMENTS = 4;
     static constexpr int MAX_BOUND_TEXTURES = 16;
+    static constexpr int MAX_BOUND_VERTEX_BUFFERS = 4;
     static constexpr int MAX_BOUND_UNIFORM_BUFFERS = 8;
     static constexpr int MAX_BOUND_STORAGE_BUFFERS = 8;
 
     // ========================
     // Buffer description
     // ========================
-
     struct BufferDescription
     {
         int          sizeBytes    = 0;
@@ -32,7 +33,6 @@ namespace CC::Gfx
     // ========================
     // Texture description
     // ========================
-
     struct TextureDescription
     {
         int           width          = 0;
@@ -51,7 +51,6 @@ namespace CC::Gfx
     // ========================
     // Sampler description
     // ========================
-
     struct SamplerDescription
     {
         FilterMode  minFilter    = FilterMode::Linear;
@@ -67,7 +66,6 @@ namespace CC::Gfx
     // ========================
     // Vertex input layout
     // ========================
-
     struct VertexAttribute
     {
         int              location   = 0;
@@ -102,7 +100,6 @@ namespace CC::Gfx
     // ========================
     // Blend state
     // ========================
-
     struct BlendState
     {
         bool        enabled        = false;
@@ -117,7 +114,6 @@ namespace CC::Gfx
     // ========================
     // Depth / stencil state
     // ========================
-
     struct DepthStencilState
     {
         bool      depthTestEnabled  = true;
@@ -128,7 +124,6 @@ namespace CC::Gfx
     // ========================
     // Rasterizer state
     // ========================
-
     struct RasterizerState
     {
         CullMode  cullMode  = CullMode::Back;
@@ -160,6 +155,25 @@ namespace CC::Gfx
     // ========================
     // Render target description
     // ========================
+    // A texture whose storage another API already owns — an XR runtime's
+    // swapchain image being the case this exists for. Registering one yields
+    // an ordinary TextureHandle that render targets and binds accept;
+    // destroying it releases the pool slot and leaves the storage alone.
+    //
+    // nativeHandle is the backend's own object, widened to fit any of them:
+    // a GL texture name, a VkImage, an ID3D11Texture2D*. Nothing above the
+    // backend interprets it — the value comes from the API that owns it and
+    // is passed straight back.
+    struct ExternalTextureDescription
+    {
+        uint64_t      nativeHandle = 0;
+        TextureFormat format       = TextureFormat::Unknown;
+        int           width        = 0;
+        int           height       = 0;
+        int           arrayLayers  = 1;
+        int           sampleCount  = 1;
+        const char*   debugName    = nullptr;
+    };
 
     struct RenderTargetAttachment
     {

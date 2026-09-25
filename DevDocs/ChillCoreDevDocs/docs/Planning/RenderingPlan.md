@@ -1,20 +1,8 @@
 # Rendering Plan
 
-**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is three unimplemented optimisations and three features — compute, shadows and particles.
+**Status:** The graphics abstraction and rendering frontend are built and shipping. What remains is two unimplemented optimisations and three features — compute, shadows and particles.
 **Current state:** AGD-0070 (Rendering Pipeline) and AGD-0080 (Graphics API Abstraction) describe what exists. This plan covers only what does not.
 **Scope:** the rendering work that is in plan, in the order below. Rendering work that is not in plan — occlusion culling, photometric light units, specular antialiasing, camera registration, the open design questions — is not covered here.
-
----
-
-## Dirty-state cache beyond pipelines
-
-Binding a pipeline compares against the last one bound and returns early. Binding a vertex buffer, a texture, or a uniform buffer does not.
-
-**Why it matters.** It is the cheapest remaining call-count win, and the invalidation discipline that makes caching safe already exists. It also closes a real gap: the opaque list is sorted so same-material draws are adjacent, but nothing exploits that below the pipeline level, so same-material objects still re-bind their uniform block and textures every draw.
-
-**Watch out.** Any newly cached bind inherits the raw-graphics-API hazard. Developer-overlay drawing, the render-pass clear, and the resolve blit all bypass `Gfx::RenderApi`. Anything cached must be reset by the cache-invalidation call, or stale state shows up as a wrong-texture or black-frame bug.
-
-**Done when:** redundant vertex-buffer, texture, and uniform-buffer binds are skipped and frame output is unchanged.
 
 ---
 

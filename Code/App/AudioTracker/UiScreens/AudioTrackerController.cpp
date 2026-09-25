@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-#include "UiManager.h"
+#include "UiSurface.h"
 #include "UiElement.h"
 #include "UiPanel.h"
 #include "UiText.h"
@@ -83,7 +83,7 @@ AudioTrackerController::~AudioTrackerController()
 
 void AudioTrackerController::Init()
 {
-    CC::UiManager* ui = CC::UiManager::Get();
+    CC::UiSurface* ui = GetSurface();
 
     prototypeLoopButton  = ui->GetElementById("prototypeLoopButton");
     samplesListContainer = ui->GetElementById("samplesList");
@@ -352,7 +352,7 @@ void AudioTrackerController::RebuildSampleList()
 {
     if (samplesListContainer != nullptr)
     {
-        CC::UiManager* ui = CC::UiManager::Get();
+        CC::UiSurface* ui = GetSurface();
         samplesListContainer->ClearChildren();
 
         const std::vector<CC::SampleEntry>& entries = CC::SampleLibrary::Get()->GetEntries();
@@ -467,11 +467,11 @@ void AudioTrackerController::RebuildSampleList()
         // active screen's CSS rules so they pick up the same .sample-*
         // classes the static HTML uses. Without this they render
         // unstyled (no font, no background) and effectively invisible.
-        CC::UiManager::Get()->ApplyStylesToDynamicSubtree(samplesListContainer);
+        GetSurface()->ApplyStylesToDynamicSubtree(samplesListContainer);
 
         lastLibraryVersion = CC::SampleLibrary::Get()->GetVersion();
         UpdateMemoryLabel();
-        CC::UiManager::Get()->InvalidateLayout();
+        GetSurface()->InvalidateLayout();
     }
 }
 
@@ -479,7 +479,7 @@ void AudioTrackerController::RebuildPatternTabs()
 {
     if (patternTabsContainer != nullptr && project != nullptr)
     {
-        CC::UiManager* ui = CC::UiManager::Get();
+        CC::UiSurface* ui = GetSurface();
         patternTabsContainer->ClearChildren();
 
         for (size_t patternIndex = 0; patternIndex < project->patterns.size(); patternIndex++)
@@ -519,7 +519,7 @@ void AudioTrackerController::RebuildPatternTabs()
             patternTabsContainer->AddChild(tab);
         }
 
-        CC::UiManager::Get()->ApplyStylesToDynamicSubtree(patternTabsContainer);
+        GetSurface()->ApplyStylesToDynamicSubtree(patternTabsContainer);
     }
 }
 
@@ -527,7 +527,7 @@ void AudioTrackerController::RebuildPatternEditor()
 {
     if (patternGridContainer != nullptr && project != nullptr)
     {
-        CC::UiManager* ui = CC::UiManager::Get();
+        CC::UiSurface* ui = GetSurface();
         patternGridContainer->ClearChildren();
 
         if (project->patterns.empty()
@@ -754,10 +754,10 @@ void AudioTrackerController::RebuildPatternEditor()
             }
         }
 
-        CC::UiManager::Get()->ApplyStylesToDynamicSubtree(patternGridContainer);
+        GetSurface()->ApplyStylesToDynamicSubtree(patternGridContainer);
 
         lastProjectVersion = project->version;
-        CC::UiManager::Get()->InvalidateLayout();
+        GetSurface()->InvalidateLayout();
     }
 }
 
@@ -765,7 +765,7 @@ void AudioTrackerController::RebuildSongView()
 {
     if (songGridContainer != nullptr && project != nullptr)
     {
-        CC::UiManager* ui = CC::UiManager::Get();
+        CC::UiSurface* ui = GetSurface();
         songGridContainer->ClearChildren();
 
         if (project->songTracks.empty())
@@ -879,7 +879,7 @@ void AudioTrackerController::RebuildSongView()
             }
         }
 
-        CC::UiManager::Get()->ApplyStylesToDynamicSubtree(songGridContainer);
+        GetSurface()->ApplyStylesToDynamicSubtree(songGridContainer);
     }
 }
 

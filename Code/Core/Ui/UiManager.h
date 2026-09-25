@@ -2,16 +2,19 @@
 #define UIMANAGER_H
 
 #include <string>
-#include <unordered_map>
-#include <functional>
 #include <vector>
+
 #include "UiCssParser.h"
-#include "UiInputHandler.h"
+#include "UiPointerRouter.h"
 
 namespace CC
 {
     class UiElement;
+    class UiSurface;
 
+    // Owns every UI surface and creates them on request. The engine owns the
+    // window's surface, because the UI is an engine feature rather than
+    // something an application assembles.
     class UiManager
     {
     public:
@@ -19,58 +22,48 @@ namespace CC
         ~UiManager();
         static UiManager* Get();
 
-        UiElement* BuildScreen(const std::string& htmlPath, const std::string& cssPath, std::vector<UiCssRule>& outCssRules);
-        void LoadScreen(UiElement* root);
-        void LoadScreen(UiElement* root, const std::vector<UiCssRule>& cssRules);
-        void LoadScreen(const std::string& htmlPath, const std::string& cssPath);
+        // Parses markup and styles into an element tree. Belongs to no
+        // surface: the tree is bound to one when it is loaded.
+        static UiElement* BuildScreen(const std::string& htmlPath, const std::string& cssPath,
+                                      std::vector<UiCssRule>& outCssRules);
 
-        // Applies the active screen's CSS rules to a subtree of newly
-        // built elements. Required when controllers add elements at
-        // runtime — UiHtmlParser only applies rules at parse time, so
-        // dynamic subtrees would otherwise render with empty styles.
-        void ApplyStylesToDynamicSubtree(UiElement* element);
+        // ========================
+        // Surfaces
+        // ========================
+        // The window's surface. Where no window exists this is real and has
+        // nothing behind it, so application code never branches on it.
+        UiSurface* GetWindowSurface() const { return windowSurface; }
 
+        // An offscreen surface of this size in pixels. The caller states a
+        // size and gets back a surface whose output texture is the result;
+        // the target behind it is the surface's own business.
+        UiSurface* CreateSurface(const std::string& name, int width, int height);
+        void DestroySurface(UiSurface* surface);
+
+        // Resolves world pointers to whichever hit-testable target is nearest.
+        UiPointerRouter& GetPointerRouter() { return pointerRouter; }
+
+        // ========================
+        // Per-frame
+        // ========================
+        // Screen stacks and their transitions, every surface.
+        void UpdateScreens();
+
+        // Layout resize checks and pointer input, every surface.
         void Update();
+
+        // Offscreen surfaces, drawn before the scene that samples them.
+        void RenderSurfaces();
+
+        // The window surface, drawn into whatever the frame has bound.
         void Render();
-
-        UiElement* GetElementById(const std::string& id) const;
-
-        // ========================
-        // Callback registration
-        // ========================
-
-        void RegisterButtonAction(const std::string& key, std::function<void()> callback);
-        void RegisterSliderAction(const std::string& key, std::function<void(float)> callback);
-        void RegisterToggleAction(const std::string& key, std::function<void(bool)> callback);
-        void RegisterDropdownAction(const std::string& key, std::function<void(int)> callback);
-        void RegisterJoystickAction(const std::string& key, std::function<void(float, float)> callback);
-
-        UiInputHandler& GetInputHandler() { return inputHandler; }
-
-        // Force the next Render pass to re-run UiLayoutEngine. Use after
-        // mutations that affect element rects (e.g. SetVisible toggling)
-        // since layout otherwise only re-runs on screen resize.
-        void InvalidateLayout() { isLayoutDirty = true; }
 
     private:
         static UiManager* instance;
 
-        UiElement* rootElement = nullptr;
-        bool isLayoutDirty = true;
-
-        int lastScreenWidth = 0;
-        int lastScreenHeight = 0;
-
-        std::unordered_map<std::string, UiElement*> elementIdMap;
-        std::vector<UiCssRule> activeCssRules;
-        UiInputHandler inputHandler;
-
-        void UnloadScreen();
-        void BuildIdMap(UiElement* element);
-        void RenderElement(UiElement* element);
-        void RenderDropdownOptions(class UiDropdown* dropdown);
-
-        class UiDropdown* pendingDropdown = nullptr;
+        UiSurface*              windowSurface = nullptr;
+        std::vector<UiSurface*> surfaces;
+        UiPointerRouter         pointerRouter;
     };
 }
 

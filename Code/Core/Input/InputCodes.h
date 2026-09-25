@@ -7,7 +7,10 @@ namespace CC
     {
         KeyboardMouse,
         Gamepad,
-        Touch
+        Touch,
+        // Tracked controllers. Distinct from Gamepad because a prompt has to
+        // name the button the player is actually holding.
+        Xr
     };
 
     namespace KeyCode

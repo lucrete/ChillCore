@@ -28,6 +28,12 @@ namespace CC
         const GamepadState& GetGamepadState() const override;
 
     private:
+        // Captured at construction, which runs after the window is created
+        // and its context made current. Resolving the window through
+        // glfwGetCurrentContext() on every query breaks the moment anything
+        // else makes another context current.
+        GLFWwindow* window;
+
         GamepadState gamepadState;
         int activeGamepadIndex;
 

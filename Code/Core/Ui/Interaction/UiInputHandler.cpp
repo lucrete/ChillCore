@@ -1,17 +1,17 @@
 #include "UiInputHandler.h"
 
-#include "UiElement.h"
-#include "UiSlider.h"
-#include "UiToggle.h"
 #include "UiDropdown.h"
+#include "UiElement.h"
 #include "UiJoystick.h"
-#include "InputManager.h"
-#include "RenderManager.h"
-#include "PrintManager.h"
+#include "UiSlider.h"
+#include "UiSurface.h"
+#include "UiToggle.h"
+
 #include "AudioManager.h"
-#include "UiScreenSystem.h"
+#include "InputManager.h"
 #include "StateMachine.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace CC
@@ -24,6 +24,22 @@ namespace CC
     {
     }
 
+    void UiInputHandler::SetPointer(int pointerId, const UiPointerState& pointer)
+    {
+        if (pointerId >= 0 && pointerId < MAX_POINTERS)
+        {
+            pointers[pointerId].state = pointer;
+        }
+    }
+
+    void UiInputHandler::ClearPointer(int pointerId)
+    {
+        if (pointerId >= 0 && pointerId < MAX_POINTERS)
+        {
+            pointers[pointerId].state = UiPointerState();
+        }
+    }
+
     void UiInputHandler::SetCallbackMap(UiCallbackMap* map)
     {
         callbackMap = map;
@@ -31,24 +47,20 @@ namespace CC
 
     void UiInputHandler::SetRootElement(UiElement* root)
     {
-        if (hoveredElement)
+        for (UiElement* element : statedElements)
         {
-            hoveredElement->SetState(UiElementState::Normal);
+            element->SetState(UiElementState::Normal);
         }
-        if (pressedElement)
-        {
-            pressedElement->SetState(UiElementState::Normal);
-        }
+        statedElements.clear();
 
         rootElement = root;
-        hoveredElement = nullptr;
-        pressedElement = nullptr;
         expandedDropdown = nullptr;
         selectedIndex = -1;
         navigationList.clear();
-        for (int i = 0; i < PlatformInput::MAX_TOUCH_POINTERS; i++)
+
+        for (int pointer = 0; pointer < MAX_POINTERS; pointer++)
         {
-            joystickTouchTracks[i] = nullptr;
+            pointers[pointer] = UiPointer();
         }
 
         if (rootElement)
@@ -84,159 +96,266 @@ namespace CC
         }
     }
 
-    void UiInputHandler::Update()
+    bool UiInputHandler::IsHovered() const
     {
-        if (!rootElement || !callbackMap)
+        bool isHovered = expandedDropdown != nullptr;
+
+        for (int pointer = 0; pointer < MAX_POINTERS && !isHovered; pointer++)
         {
-            return;
+            isHovered = pointers[pointer].hoveredElement != nullptr;
         }
 
-        UpdateMouse();
-        UpdateTouchPointers();
-
-        // Keyboard/gamepad navigation is only meaningful when the screen is
-        // the focus (UI mode). HUD overlays running in World mode get mouse
-        // and touch input only.
-        if (InputManager::Get()->IsUiInteractable())
-        {
-            UpdateNavigation();
-        }
+        return isHovered;
     }
 
     // ========================
-    // Mouse interaction
+    // Per-frame
     // ========================
+    void UiInputHandler::Update()
+    {
+        if (rootElement != nullptr && callbackMap != nullptr)
+        {
+            if (pointerSource == UiPointerSource::Platform)
+            {
+                SamplePlatformPointers();
+            }
 
-    void UiInputHandler::UpdateMouse()
+            for (int pointer = 0; pointer < MAX_POINTERS; pointer++)
+            {
+                UpdatePointer(pointer);
+            }
+
+            ApplyPointerStates();
+
+            // Directional navigation is one input stream with no spatial
+            // origin, so only the surface reading the platform consumes it.
+            // Panels are pointed at. The window only reaches here while it
+            // holds the Window target.
+            if (pointerSource == UiPointerSource::Platform)
+            {
+                UpdateNavigation();
+            }
+        }
+    }
+
+    // The mouse abstraction is slot 0; extra fingers take the slots above
+    // it. Both go through the same path from here on, so multi-touch is no
+    // longer a case of its own.
+    void UiInputHandler::SamplePlatformPointers()
     {
         InputManager* input = InputManager::Get();
 
-        if (input->IsMouseCursorLocked())
+        UiPointerState primary;
+        if (!input->IsMouseCursorLocked())
         {
-            return;
+            int mouseX = 0;
+            int mouseY = 0;
+            input->GetMousePosition(mouseX, mouseY);
+
+            primary.x        = (float)mouseX;
+            primary.y        = (float)mouseY;
+            primary.isDown   = input->IsMouseButtonDown(MouseButton::Left);
+            primary.isActive = true;
         }
+        pointers[0].state = primary;
 
-        // World-mode HUD overlays only accept joystick interactions.
-        // Other elements (buttons, sliders, etc.) need full UI focus.
-        bool joystickOnly = !input->IsUiInteractable();
-
-        int mouseX, mouseY;
-        input->GetMousePosition(mouseX, mouseY);
-
-        bool isMouseDown = input->IsMouseButtonDown(MouseButton::Left);
-        bool mouseJustPressed = isMouseDown && !wasMouseDown;
-        bool mouseJustReleased = !isMouseDown && wasMouseDown;
-
-        // Handle expanded dropdown hover and clicks (UI mode only)
-        if (expandedDropdown && !joystickOnly)
+        for (int slot = 1; slot < MAX_POINTERS; slot++)
         {
-            int optionIndex = HitTestDropdownOptions(expandedDropdown, (float)mouseX, (float)mouseY);
-            expandedDropdown->SetHoveredOption(optionIndex);
-
-            if (mouseJustPressed)
+            UiPointerState touch;
+            if (input->IsTouchPointerActive(slot))
             {
-                if (optionIndex >= 0)
-                {
-                    expandedDropdown->SetSelectedOption(optionIndex);
-                    expandedDropdown->SetExpanded(false);
-                    expandedDropdown->SetHoveredOption(-1);
+                int x = 0;
+                int y = 0;
+                input->GetTouchPointer(slot, x, y);
 
-                    const std::string& action = expandedDropdown->GetDataAction();
-                    if (!action.empty())
-                    {
-                        callbackMap->InvokeDropdown(action, expandedDropdown->GetSelectedOption());
-                    }
-
-                    expandedDropdown = nullptr;
-                    wasMouseDown = isMouseDown;
-                    return;
-                }
-                else
-                {
-                    // Clicked outside the option list — close it
-                    expandedDropdown->SetHoveredOption(-1);
-                    expandedDropdown->SetExpanded(false);
-                    expandedDropdown = nullptr;
-                }
+                touch.x        = (float)x;
+                touch.y        = (float)y;
+                touch.isDown   = true;
+                touch.isActive = true;
             }
+            pointers[slot].state = touch;
         }
-
-        // Hit test
-        UiElement* hitElement = HitTest(rootElement, (float)mouseX, (float)mouseY, joystickOnly);
-
-        // Update hover state
-        if (hitElement != hoveredElement)
-        {
-            if (hoveredElement && hoveredElement->GetState() == UiElementState::Hovered)
-            {
-                hoveredElement->SetState(UiElementState::Normal);
-            }
-            hoveredElement = hitElement;
-            if (hoveredElement && hoveredElement->IsNavigable() && hoveredElement->IsEnabled() &&
-                hoveredElement->GetState() == UiElementState::Normal)
-            {
-                hoveredElement->SetState(UiElementState::Hovered);
-
-                // Sync navigation selection to hovered element
-                for (int i = 0; i < (int)navigationList.size(); i++)
-                {
-                    if (navigationList[i] == hoveredElement)
-                    {
-                        selectedIndex = i;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Press state
-        if (mouseJustPressed && hoveredElement && hoveredElement->IsNavigable() && hoveredElement->IsEnabled())
-        {
-            pressedElement = hoveredElement;
-            pressedElement->SetState(UiElementState::Pressed);
-        }
-
-        // Slider drag: update value while mouse is held
-        if (isMouseDown && pressedElement && pressedElement->GetType() == UiElementType::Slider)
-        {
-            UpdateSliderFromMouse(static_cast<UiSlider*>(pressedElement), (float)mouseX);
-        }
-
-        // Joystick drag: update knob and invoke callback while mouse is held
-        if (isMouseDown && pressedElement && pressedElement->GetType() == UiElementType::Joystick)
-        {
-            UpdateJoystickFromMouse(static_cast<UiJoystick*>(pressedElement),
-                (float)mouseX, (float)mouseY);
-        }
-
-        // Release -> activate (or snap joystick back to centre)
-        if (mouseJustReleased && pressedElement)
-        {
-            UiElementType pressedType = pressedElement->GetType();
-            bool isDragType = pressedType == UiElementType::Slider || pressedType == UiElementType::Joystick;
-
-            if (pressedElement == hoveredElement && !isDragType)
-            {
-                ActivateElement(pressedElement);
-            }
-
-            if (pressedType == UiElementType::Joystick)
-            {
-                ReleaseJoystick(static_cast<UiJoystick*>(pressedElement));
-            }
-
-            if (pressedElement->GetState() == UiElementState::Pressed)
-            {
-                pressedElement->SetState(hoveredElement == pressedElement ?
-                    UiElementState::Hovered : UiElementState::Normal);
-            }
-            pressedElement = nullptr;
-        }
-
-        wasMouseDown = isMouseDown;
     }
 
-    UiElement* UiInputHandler::HitTest(UiElement* element, float px, float py, bool joystickOnly)
+    void UiInputHandler::UpdatePointer(int pointerId)
+    {
+        UiPointer& pointer = pointers[pointerId];
+
+        if (!pointer.state.isActive)
+        {
+            ReleasePointer(pointerId);
+        }
+        else
+        {
+            const float pointerX = pointer.state.x;
+            const float pointerY = pointer.state.y;
+            const bool isDown = pointer.state.isDown;
+            const bool justPressed = isDown && !pointer.wasDown;
+            const bool justReleased = !isDown && pointer.wasDown;
+
+            bool isDropdownConsumed = false;
+
+            // Expanded dropdown hover and clicks.
+            if (expandedDropdown != nullptr)
+            {
+                int optionIndex = HitTestDropdownOptions(expandedDropdown, pointerX, pointerY);
+                if (optionIndex != expandedDropdown->GetHoveredOption())
+                {
+                    expandedDropdown->SetHoveredOption(optionIndex);
+                }
+
+                if (justPressed)
+                {
+                    if (optionIndex >= 0)
+                    {
+                        expandedDropdown->SetSelectedOption(optionIndex);
+                        expandedDropdown->SetExpanded(false);
+                        expandedDropdown->SetHoveredOption(-1);
+
+                        const std::string& action = expandedDropdown->GetDataAction();
+                        if (!action.empty())
+                        {
+                            callbackMap->InvokeDropdown(action, expandedDropdown->GetSelectedOption());
+                        }
+
+                        expandedDropdown = nullptr;
+                        isDropdownConsumed = true;
+                    }
+                    else
+                    {
+                        // Clicked outside the option list — close it.
+                        expandedDropdown->SetHoveredOption(-1);
+                        expandedDropdown->SetExpanded(false);
+                        expandedDropdown = nullptr;
+                    }
+                }
+            }
+
+            if (!isDropdownConsumed)
+            {
+                pointer.hoveredElement = HitTest(rootElement, pointerX, pointerY);
+
+                // Keyboard focus follows the platform pointer, so a click
+                // after a hover carries on from where the hand was.
+                if (pointerSource == UiPointerSource::Platform && pointer.hoveredElement != nullptr
+                    && pointer.hoveredElement->IsNavigable() && pointer.hoveredElement->IsEnabled())
+                {
+                    for (int i = 0; i < (int)navigationList.size(); i++)
+                    {
+                        if (navigationList[i] == pointer.hoveredElement)
+                        {
+                            selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (justPressed && pointer.hoveredElement != nullptr
+                    && pointer.hoveredElement->IsNavigable() && pointer.hoveredElement->IsEnabled())
+                {
+                    pointer.pressedElement = pointer.hoveredElement;
+                }
+
+                if (isDown && pointer.pressedElement != nullptr)
+                {
+                    if (pointer.pressedElement->GetType() == UiElementType::Slider)
+                    {
+                        UpdateSliderFromPointer(static_cast<UiSlider*>(pointer.pressedElement), pointerX);
+                    }
+                    else if (pointer.pressedElement->GetType() == UiElementType::Joystick)
+                    {
+                        UpdateJoystickFromPointer(static_cast<UiJoystick*>(pointer.pressedElement),
+                                                  pointerX, pointerY);
+                    }
+                }
+
+                if (justReleased && pointer.pressedElement != nullptr)
+                {
+                    UiElementType pressedType = pointer.pressedElement->GetType();
+                    bool isDragType = pressedType == UiElementType::Slider
+                                   || pressedType == UiElementType::Joystick;
+
+                    if (pointer.pressedElement == pointer.hoveredElement && !isDragType)
+                    {
+                        ActivateElement(pointer.pressedElement);
+                    }
+
+                    if (pressedType == UiElementType::Joystick)
+                    {
+                        ReleaseJoystick(static_cast<UiJoystick*>(pointer.pressedElement));
+                    }
+
+                    pointer.pressedElement = nullptr;
+                }
+            }
+
+            pointer.wasDown = isDown;
+        }
+    }
+
+    // A pointer that has left the surface releases whatever it was holding
+    // rather than leaving it stuck pressed.
+    void UiInputHandler::ReleasePointer(int pointerId)
+    {
+        UiPointer& pointer = pointers[pointerId];
+
+        if (pointer.pressedElement != nullptr
+            && pointer.pressedElement->GetType() == UiElementType::Joystick)
+        {
+            ReleaseJoystick(static_cast<UiJoystick*>(pointer.pressedElement));
+        }
+
+        pointer.hoveredElement = nullptr;
+        pointer.pressedElement = nullptr;
+        pointer.wasDown = false;
+    }
+
+    // An element is pressed if any pointer presses it, hovered if any
+    // pointer hovers it, and back to normal when none does.
+    void UiInputHandler::ApplyPointerStates()
+    {
+        std::vector<UiElement*> nextStated;
+
+        for (int pointer = 0; pointer < MAX_POINTERS; pointer++)
+        {
+            UiElement* pressed = pointers[pointer].pressedElement;
+            if (pressed != nullptr && pressed->IsEnabled())
+            {
+                pressed->SetState(UiElementState::Pressed);
+                nextStated.push_back(pressed);
+            }
+        }
+
+        for (int pointer = 0; pointer < MAX_POINTERS; pointer++)
+        {
+            UiElement* hovered = pointers[pointer].hoveredElement;
+            bool isAlreadyStated = hovered != nullptr
+                && std::find(nextStated.begin(), nextStated.end(), hovered) != nextStated.end();
+
+            if (hovered != nullptr && !isAlreadyStated
+                && hovered->IsNavigable() && hovered->IsEnabled())
+            {
+                hovered->SetState(UiElementState::Hovered);
+                nextStated.push_back(hovered);
+            }
+        }
+
+        for (UiElement* element : statedElements)
+        {
+            bool isStillStated = std::find(nextStated.begin(), nextStated.end(), element) != nextStated.end();
+
+            // Anything that has since been disabled keeps its Disabled
+            // state rather than being pulled back to Normal.
+            if (!isStillStated && element->GetState() != UiElementState::Disabled)
+            {
+                element->SetState(UiElementState::Normal);
+            }
+        }
+
+        statedElements.swap(nextStated);
+    }
+
+    UiElement* UiInputHandler::HitTest(UiElement* element, float px, float py)
     {
         UiElement* result = nullptr;
 
@@ -246,17 +365,13 @@ namespace CC
             const std::vector<UiElement*>& children = element->GetChildren();
             for (int i = (int)children.size() - 1; i >= 0 && result == nullptr; i--)
             {
-                result = HitTest(children[i], px, py, joystickOnly);
+                result = HitTest(children[i], px, py);
             }
 
             // Test this element
             if (result == nullptr && element->IsNavigable() && element->layoutRect.Contains(px, py))
             {
-                bool typeAllowed = !joystickOnly || element->GetType() == UiElementType::Joystick;
-                if (typeAllowed)
-                {
-                    result = element;
-                }
+                result = element;
             }
         }
 
@@ -266,7 +381,6 @@ namespace CC
     // ========================
     // Keyboard/gamepad navigation
     // ========================
-
     void UiInputHandler::UpdateNavigation()
     {
         if (navigationList.empty())
@@ -449,10 +563,10 @@ namespace CC
             // Suppress UiMove when this click triggers a screen transition or
             // an app-state transition — UiAdvance / UiBack play instead via
             // UiScreenSystem / StateMachine.
-            bool wasUiTransitioning = UiScreenSystem::Get()->IsTransitioning();
+            bool wasUiTransitioning = surface->Screens().IsTransitioning();
             bool wasStateTransitioning = StateMachine::Get()->IsTransitioning();
             callbackMap->InvokeButton(action);
-            bool didStartUiTransition = !wasUiTransitioning && UiScreenSystem::Get()->IsTransitioning();
+            bool didStartUiTransition = !wasUiTransitioning && surface->Screens().IsTransitioning();
             bool didStartStateTransition = !wasStateTransitioning && StateMachine::Get()->IsTransitioning();
             if (!didStartUiTransition && !didStartStateTransition)
             {
@@ -480,11 +594,12 @@ namespace CC
         }
     }
 
-    void UiInputHandler::UpdateSliderFromMouse(UiSlider* slider, float mouseX)
+    void UiInputHandler::UpdateSliderFromPointer(UiSlider* slider, float pointerX)
     {
-        int screenWidth, screenHeight;
-        RenderManager::Get()->GetWindowSize(screenWidth, screenHeight);
-        float scaleFactor = (float)screenHeight / 1080.0f;
+        int surfaceWidth = 0;
+        int surfaceHeight = 0;
+        surface->GetSize(surfaceWidth, surfaceHeight);
+        float scaleFactor = (float)surfaceHeight / 1080.0f;
 
         const UiRect& rect = slider->layoutRect;
         float trackPadding = slider->computedStyle.padding.left * scaleFactor;
@@ -496,7 +611,7 @@ namespace CC
             return;
         }
 
-        float normalized = (mouseX - trackStart) / trackWidth;
+        float normalized = (pointerX - trackStart) / trackWidth;
         if (normalized < 0.0f) normalized = 0.0f;
         if (normalized > 1.0f) normalized = 1.0f;
 
@@ -510,53 +625,7 @@ namespace CC
         }
     }
 
-    // ========================
-    // Multi-touch (extra fingers beyond the primary mouse pointer)
-    // ========================
-
-    void UiInputHandler::UpdateTouchPointers()
-    {
-        InputManager* input = InputManager::Get();
-
-        // Slot 0 is the mouse abstraction and is already driven by
-        // UpdateMouse. Slots 1..MAX-1 are extra fingers.
-        for (int slot = 1; slot < PlatformInput::MAX_TOUCH_POINTERS; slot++)
-        {
-            bool active = input->IsTouchPointerActive(slot);
-            UiJoystick* tracked = joystickTouchTracks[slot];
-
-            if (active)
-            {
-                int x = 0;
-                int y = 0;
-                input->GetTouchPointer(slot, x, y);
-
-                // First time we see this finger: hit-test for a joystick.
-                // Non-joystick UI is reachable via the primary pointer only.
-                if (tracked == nullptr)
-                {
-                    UiElement* hit = HitTest(rootElement, (float)x, (float)y, true);
-                    if (hit != nullptr && hit->GetType() == UiElementType::Joystick)
-                    {
-                        tracked = static_cast<UiJoystick*>(hit);
-                        joystickTouchTracks[slot] = tracked;
-                    }
-                }
-
-                if (tracked != nullptr)
-                {
-                    UpdateJoystickFromMouse(tracked, (float)x, (float)y);
-                }
-            }
-            else if (tracked != nullptr)
-            {
-                ReleaseJoystick(tracked);
-                joystickTouchTracks[slot] = nullptr;
-            }
-        }
-    }
-
-    void UiInputHandler::UpdateJoystickFromMouse(UiJoystick* joystick, float mouseX, float mouseY)
+    void UiInputHandler::UpdateJoystickFromPointer(UiJoystick* joystick, float pointerX, float pointerY)
     {
         const UiRect& rect = joystick->layoutRect;
         float halfWidth = rect.width * 0.5f;
@@ -571,9 +640,9 @@ namespace CC
             float centerX = rect.x + halfWidth;
             float centerY = rect.y + halfHeight;
 
-            float deltaX = (mouseX - centerX) / radius;
+            float deltaX = (pointerX - centerX) / radius;
             // Screen y grows downward; negate so up = +y to match analog stick convention.
-            float deltaY = -(mouseY - centerY) / radius;
+            float deltaY = -(pointerY - centerY) / radius;
 
             float magnitude = sqrtf(deltaX * deltaX + deltaY * deltaY);
             if (magnitude > 1.0f)
@@ -608,9 +677,10 @@ namespace CC
 
     int UiInputHandler::HitTestDropdownOptions(UiDropdown* dropdown, float px, float py)
     {
-        int screenWidth, screenHeight;
-        RenderManager::Get()->GetWindowSize(screenWidth, screenHeight);
-        float scaleFactor = (float)screenHeight / 1080.0f;
+        int surfaceWidth = 0;
+        int surfaceHeight = 0;
+        surface->GetSize(surfaceWidth, surfaceHeight);
+        float scaleFactor = (float)surfaceHeight / 1080.0f;
 
         const UiRect& rect = dropdown->layoutRect;
         const UiStyleProperties& style = dropdown->computedStyle;

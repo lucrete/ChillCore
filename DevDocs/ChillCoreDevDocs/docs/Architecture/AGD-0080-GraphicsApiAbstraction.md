@@ -48,7 +48,9 @@ Passes do not nest. Both pass boundaries bind framebuffers outside the tracked b
 
 A target's colour attachment is an ordinary texture. A later pass samples it through the normal texture binding path; no separate mechanism exists for reading rendered output.
 
-**Binding a pipeline** compares against the last one bound and returns immediately if unchanged. Because pipelines carry all fixed state, this single check subsumes what would otherwise be many individual state comparisons.
+**Binding compares against what is already bound.** The backend records the pipeline, the vertex buffer at each slot, the texture and sampler at each unit, and the uniform buffer range at each slot, and skips a bind that would set what is already set. Because pipelines carry all fixed state, that one comparison subsumes what would otherwise be many individual state comparisons.
+
+The record describes what the backend itself bound, so it is dropped wherever something else can have moved the state: at both pass boundaries, after the developer overlay draws, and in the resource paths that bind directly to create, upload to, or destroy an object. Vertex buffer bindings belong to the vertex array object rather than to the context, so those entries are dropped again whenever a pipeline brings a different one into use.
 
 **Timing** works by punctual markers rather than paired brackets. Each marker closes the previous span and opens a new one, so a frame's spans form an ordered sequence. Results are read back by index some frames later, once the GPU has caught up.
 
@@ -100,6 +102,14 @@ They are separate classes rather than one class full of conditionals, with genui
 
 The cost is that a change to the shared layer must be considered against both, and every new graphics feature has to be thought about twice.
 
+### Redundant binds are compared against a record, not queried from the driver
+
+The backend keeps its own record of what it last bound at each slot and compares against that. It never asks the graphics API what is bound.
+
+Querying is what the record replaces: a driver-side query costs more than the bind it would save, and on some drivers it stalls the pipeline. The record also stays honest about intent — it holds what the backend asked for, so a comparison is against a value the backend can reason about rather than against whatever the driver reports.
+
+The cost is that correctness now depends on invalidation discipline. Any path reaching the graphics API directly leaves the record describing state that is no longer set, and a stale entry does not fail loudly — it surfaces as a wrong texture or a black frame. The mitigation is that every such path in this layer resets the record, and callers outside it are required to.
+
 ### Timing uses punctual markers, not bracket pairs
 
 A marker names a point; the span runs from that marker to the next. Results are read by index over an ordered per-frame sequence, not looked up by name.
@@ -143,7 +153,7 @@ They differ by operating system rather than by graphics API, and a backend has n
 - Texture creation covers 2D, array and cubemap shapes. There is no 3D texture, and no cubemap array.
 - An array texture cannot be given initial data; it can only be rendered into.
 - A multisampled target resolves colour attachment 0 only, so a layered target that also wants multisampling is not covered.
-- Redundancy elimination covers pipeline binds only. Vertex buffer, texture, and uniform buffer binds are not compared against current state.
+- Redundancy elimination covers pipeline, vertex buffer, texture, and uniform buffer binds. Index buffer and storage buffer binds are issued every time.
 - GPU spans are a flat ordered sequence per frame, with no nesting.
 - Any code path bypassing this interface to call the graphics API directly must invalidate the cached bind state, or stale state becomes visible as incorrect rendering.
 - The compute surface is implemented but unreachable. Shader compilation does not recognise a compute stage, so no compute shader can be authored, and the dispatch, storage-buffer, image-binding, and barrier methods have no callers.

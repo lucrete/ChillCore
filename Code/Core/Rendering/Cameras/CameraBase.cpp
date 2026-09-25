@@ -3,33 +3,23 @@
 #include "CCMath.h"
 namespace CC
 {
-    CameraBase::CameraBase() 
+    CameraBase::CameraBase()
     {
         cameraLookAt = cameraPos + Vector3(0.0f, 0.0f, -1.0f);
     }
 
-    CameraBase::~CameraBase() 
+    CameraBase::~CameraBase()
     {
     }
 
     void CameraBase::Update()
-    {        
+    {
     }
 
     void CameraBase::UpdateViewProjectionMatrix()
     {
-        Mat4x4 view;
         view.LookAt(cameraPos, cameraLookAt, cameraUp);
-
-        int width = 0;
-        int height = 0;
-        RenderManager::Get()->GetWindowSize(width, height);
-        float ratio = width / (float)height;
-
-        // Todo only recalculate projection matrix if fov has changed
-        Mat4x4 projection;
-        float fov = 75;
-        projection.Perspective(fov * (float)PI / 180.0f, ratio, 0.1f, 100.0f);
+        projection.Perspective(fieldOfViewDegrees * (float)PI / 180.0f, ResolveAspectRatio(), nearDistance, farDistance);
         viewProjection = projection * view;
     }
 
@@ -38,8 +28,77 @@ namespace CC
         return viewProjection;
     }
 
+    const Mat4x4& CameraBase::GetViewMatrix() const
+    {
+        return view;
+    }
+
+    const Mat4x4& CameraBase::GetProjectionMatrix() const
+    {
+        return projection;
+    }
+
     Vector3 CameraBase::GetCameraPosition()
     {
         return cameraPos;
+    }
+
+    void CameraBase::SetFieldOfViewDegrees(float degrees)
+    {
+        fieldOfViewDegrees = degrees;
+    }
+
+    float CameraBase::GetFieldOfViewDegrees() const
+    {
+        return fieldOfViewDegrees;
+    }
+
+    void CameraBase::SetNearDistance(float distance)
+    {
+        nearDistance = distance;
+    }
+
+    float CameraBase::GetNearDistance() const
+    {
+        return nearDistance;
+    }
+
+    void CameraBase::SetFarDistance(float distance)
+    {
+        farDistance = distance;
+    }
+
+    float CameraBase::GetFarDistance() const
+    {
+        return farDistance;
+    }
+
+    void CameraBase::SetViewportSize(int width, int height)
+    {
+        viewportWidth = width;
+        viewportHeight = height;
+    }
+
+    void CameraBase::GetViewportSize(int& outWidth, int& outHeight) const
+    {
+        outWidth = viewportWidth;
+        outHeight = viewportHeight;
+    }
+
+    float CameraBase::ResolveAspectRatio() const
+    {
+        int width = viewportWidth;
+        int height = viewportHeight;
+        if (width <= 0 || height <= 0)
+        {
+            RenderManager::Get()->GetWindowSize(width, height);
+        }
+
+        float result = 1.0f;
+        if (width > 0 && height > 0)
+        {
+            result = width / (float)height;
+        }
+        return result;
     }
 }

@@ -42,6 +42,7 @@ namespace CC
     };
 
     class Font;
+    class UiSurface;
 
     struct CachedTextDraw
     {
@@ -79,9 +80,22 @@ namespace CC
         virtual ~UiElement();
 
         // ========================
+        // Surface
+        // ========================
+        // The surface this element is currently loaded on. Set when a tree
+        // is loaded, and how a setter marks the right surface for redraw
+        // without anything having to know which one is current.
+        void SetSurface(UiSurface* _surface) { surface = _surface; }
+        UiSurface* GetSurface() const { return surface; }
+
+        // Marks this element's surface as having something new to draw.
+        // Called by the setters below; specialized elements call it from
+        // their own.
+        void MarkSurfaceDirty();
+
+        // ========================
         // Tree structure
         // ========================
-
         void AddChild(UiElement* child);
         void ClearChildren();
         const std::vector<UiElement*>& GetChildren() const;
@@ -90,7 +104,6 @@ namespace CC
         // ========================
         // Identity
         // ========================
-
         UiElementType GetType() const { return type; }
         const std::string& GetId() const { return id; }
         void SetId(const std::string& _id) { id = _id; }
@@ -103,7 +116,6 @@ namespace CC
         // ========================
         // Style
         // ========================
-
         static constexpr int STATE_COUNT = static_cast<int>(UiElementState::StateMax);
         UiStyleProperties stateStyles[STATE_COUNT];
         UiStyleProperties computedStyle;
@@ -113,20 +125,18 @@ namespace CC
         // ========================
         // State
         // ========================
-
         UiElementState GetState() const { return currentState; }
         void SetState(UiElementState state);
         bool IsEnabled() const { return isEnabled; }
         void SetEnabled(bool enabled);
         bool IsVisible() const { return isVisible; }
-        void SetVisible(bool visible) { isVisible = visible; }
+        void SetVisible(bool visible);
         bool IsNavigable() const { return isNavigable; }
         void SetNavigable(bool navigable) { isNavigable = navigable; }
 
         // ========================
         // Layout
         // ========================
-
         UiRect layoutRect;
         bool isLayoutDirty = true;
 
@@ -148,17 +158,14 @@ namespace CC
         // ========================
         // Content
         // ========================
-
         const std::string& GetTextContent() const { return textContent; }
-        void SetTextContent(const std::string& text)
-        {
-            textContent = text;
-            cachedTextHeight = -1.0f;
-            cachedTextDraw.Invalidate();
-        }
+        void SetTextContent(const std::string& text);
 
     protected:
         UiElementType type;
+
+        // Surface
+        UiSurface* surface = nullptr;
 
         // Tree
         UiElement* parent = nullptr;

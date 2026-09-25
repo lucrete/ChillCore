@@ -25,7 +25,6 @@ namespace CC
     // ========================
     // Pointer routing
     // ========================
-
     int PlatformInputAndroid::FindSlotByAndroidId(int androidId) const
     {
         int result = -1;
@@ -105,7 +104,6 @@ namespace CC
     // ========================
     // PlatformInput interface
     // ========================
-
     bool PlatformInputAndroid::IsKeyDown(KeyCode::Key key) const
     {
         (void)key;
@@ -163,7 +161,6 @@ namespace CC
     // ========================
     // Multi-touch
     // ========================
-
     bool PlatformInputAndroid::IsTouchPointerActive(int slot) const
     {
         bool result = false;

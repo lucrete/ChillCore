@@ -3,6 +3,7 @@
 #include "FrameTimer.h"
 #include "InputManager.h"
 #include "RenderManager.h"
+#include "SceneHierarchy.h"
 #include "AudioManager.h"
 #include "stddef.h"
 
@@ -142,6 +143,20 @@ namespace CC
         {
             activeState->Shutdown();
         }
+
+        // Pausing is a decision one state makes, but the mechanism behind it
+        // is global, so a state left while paused would hand its pause to
+        // whatever runs next. The incoming state gets a running Simulation
+        // and default input targets, and sets its own in Init. The leaving
+        // state is not called back: what it shows goes with its Shutdown.
+        if (NULL != activeState)
+        {
+            activeState->isPaused = false;
+        }
+        SceneHierarchy::Get()->SetPaused(false);
+        FrameTimer::Get()->SetSimulationPaused(false);
+        FrameTimer::Get()->SetSimulationTimeScale(1.0f);
+        InputManager::Get()->ResetInputTargets();
 
         activeState = stateMap[pendingState];
         pendingState.clear();

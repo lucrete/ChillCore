@@ -19,13 +19,11 @@ namespace CC
     // ========================
     // Constants
     // ========================
-
     static const int TRACKER_YAML_VERSION = 1;
 
     // ========================
     // Helpers
     // ========================
-
     static std::string NodeToString(ryml::ConstNodeRef node)
     {
         std::string result;
@@ -52,7 +50,6 @@ namespace CC
     // ========================
     // Construction
     // ========================
-
     SampleLibrary::SampleLibrary()
     {
         CC_ASSERT(instance == nullptr, "SampleLibrary already created");
@@ -73,7 +70,6 @@ namespace CC
     // ========================
     // Public methods
     // ========================
-
     bool SampleLibrary::LoadAndVerify()
     {
         bool succeeded = false;
@@ -363,7 +359,6 @@ namespace CC
     // ========================
     // Private helpers
     // ========================
-
     bool SampleLibrary::ReadAndParseTrackerYaml(std::string& outYamlText, bool& outDidExist) const
     {
         outYamlText.clear();

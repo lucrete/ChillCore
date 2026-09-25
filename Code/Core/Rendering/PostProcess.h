@@ -53,7 +53,6 @@ namespace CC
         // ========================
         // Effects
         // ========================
-
         PostProcessEffect& GetEffect(PostProcessEffectId id);
         const PostProcessEffect& GetEffect(PostProcessEffectId id) const;
         int GetEffectCount() const;
@@ -107,7 +106,6 @@ namespace CC
         // ========================
         // Authoring
         // ========================
-
         // Writes the current stack to the log as a scene-file postProcess
         // block, ready to paste. Nothing is written to disk.
         void PrintYaml() const;
@@ -115,13 +113,15 @@ namespace CC
         // ========================
         // Frame
         // ========================
-
-        // Runs bloom's passes if it is enabled, then the fused pass into the
-        // backbuffer. sceneColorTexture is the offscreen scene target.
+        // Runs bloom's passes if it is enabled, then the fused pass into
+        // destinationTarget. sceneColorTexture is the offscreen scene target.
+        // The destination is the backbuffer for a flat frame and an eye
+        // target where a frame renders more than one view.
         void Execute(Gfx::TextureHandle sceneColorTexture,
                      Gfx::SamplerHandle sampler,
                      int width,
-                     int height);
+                     int height,
+                     Gfx::RenderTargetHandle destinationTarget);
 
     private:
         void ConfigureEffects();

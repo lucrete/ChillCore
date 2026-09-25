@@ -29,6 +29,9 @@ namespace CC
     RenderManager::RenderManager()
         : renderableCount(0)
         , transparentRenderableCount(0)
+        , viewCount(0)
+        , hasExternalViews(false)
+        , mirrorQuad(nullptr)
         , fullscreenQuad(false)
         , fadeOverlay(nullptr)
         , fadeColor(0.0f, 0.0f, 0.0f, 0.0f)
@@ -131,6 +134,11 @@ namespace CC
         {
             gfxApi->DestroySampler(postProcessSampler);
         }
+        if (mirrorSampler.IsValid())
+        {
+            gfxApi->DestroySampler(mirrorSampler);
+        }
+        delete mirrorQuad;
         delete postProcess;
         delete fadeOverlay;
         delete renderableFullscreenQuad;
@@ -186,21 +194,58 @@ namespace CC
         // A fullscreen quad is the opposite. It writes finished, display-
         // referred pixels, so it goes straight to the backbuffer with nothing
         // applied, and the target it would have rendered into is released.
-        if (fullscreenQuad)
+        // An external view brings its own scene target, sized to whatever it
+        // renders into rather than to the window.
+        if (!hasExternalViews)
         {
-            DestroyPostProcessTarget();
-        }
-        else
-        {
-            EnsurePostProcessTarget(width, height);
+            if (fullscreenQuad)
+            {
+                DestroyPostProcessTarget();
+            }
+            else
+            {
+                EnsurePostProcessTarget(width, height);
+            }
+
+            BuildDefaultViewList();
         }
 
-        // The backbuffer is also the fallback for a zero-sized framebuffer
-        // (a minimised window), where there is nothing to present.
-        gfxApi->BeginRenderPass(SceneTargetForFrame(),
-                                fullscreenQuad ? "FullscreenQuad" : "Opaque");
-
+        // Runs between passes. Hot reload rebuilds pipelines, which must not
+        // happen with a pass open.
         shaderManager->Update();
+    }
+
+    // One view: the offscreen scene target resolving into the backbuffer.
+    // The backbuffer is also the scene target's fallback for a zero-sized
+    // framebuffer (a minimised window), where there is nothing to present.
+    void RenderManager::BuildDefaultViewList()
+    {
+        views[0] = RenderView();
+        views[0].sceneTarget       = SceneTargetForFrame();
+        views[0].sceneColorTexture = postProcessColorTexture;
+        views[0].outputTarget      = gfxApi->GetBackbuffer();
+        views[0].width             = postProcessTargetWidth;
+        views[0].height            = postProcessTargetHeight;
+        viewCount = 1;
+    }
+
+    void RenderManager::SetRenderViews(const RenderView* viewArray, int count)
+    {
+        CC_ASSERT(viewArray != nullptr, "SetRenderViews called with a null array");
+        CC_ASSERT(count > 0 && count <= MAX_RENDER_VIEWS, "SetRenderViews count out of range");
+
+        for (int i = 0; i < count; i++)
+        {
+            views[i] = viewArray[i];
+        }
+        viewCount = count;
+        hasExternalViews = true;
+    }
+
+    void RenderManager::ClearRenderViews()
+    {
+        hasExternalViews = false;
+        viewCount = 0;
     }
 
     Gfx::RenderTargetHandle RenderManager::SceneTargetForFrame() const
@@ -228,7 +273,7 @@ namespace CC
         frameUniforms.cameraPositionAndTime[0] = cameraPosition.x;
         frameUniforms.cameraPositionAndTime[1] = cameraPosition.y;
         frameUniforms.cameraPositionAndTime[2] = cameraPosition.z;
-        frameUniforms.cameraPositionAndTime[3] = FrameTimer::Get()->TimeSinceStartup();
+        frameUniforms.cameraPositionAndTime[3] = FrameTimer::Get()->ShaderSimulationTime();
 
         Vector3 ambientColor = lightManager->GetAmbientLightColor();
         frameUniforms.ambientLightColorAndIntensity[0] = ambientColor.x;
@@ -284,7 +329,6 @@ namespace CC
     // ========================
     // Post-processing
     // ========================
-
     bool RenderManager::IsPostProcessEnabled() const
     {
         return postProcessTarget.IsValid();
@@ -401,13 +445,55 @@ namespace CC
         postProcessTargetSamples = 1;
     }
 
-    void RenderManager::DrawPostProcessPass()
+    void RenderManager::DrawPostProcessPass(const RenderView& view)
     {
         // A fullscreen quad has already presented itself.
-        if (!fullscreenQuad && IsPostProcessEnabled())
+        if (!fullscreenQuad && view.sceneColorTexture.IsValid())
         {
-            postProcess->Execute(postProcessColorTexture, postProcessSampler,
-                                 postProcessTargetWidth, postProcessTargetHeight);
+            postProcess->Execute(view.sceneColorTexture, postProcessSampler,
+                                 view.width, view.height, view.outputTarget);
+        }
+    }
+
+    void RenderManager::EnsureMirrorResources()
+    {
+        if (mirrorQuad == nullptr)
+        {
+            materialManager->CreateMaterial("XrMirror", "FullScreenBlit");
+            Material* mirrorMaterial = materialManager->GetMaterial("XrMirror");
+            mirrorMaterial->SetDepthTestEnabled(false);
+            mirrorQuad = new RenderableFullscreenQuad(mirrorMaterial);
+        }
+
+        if (!mirrorSampler.IsValid())
+        {
+            Gfx::SamplerDescription samplerDesc;
+            samplerDesc.minFilter  = Gfx::FilterMode::Linear;
+            samplerDesc.magFilter  = Gfx::FilterMode::Linear;
+            samplerDesc.mipmapMode = Gfx::MipmapMode::None;
+            samplerDesc.addressU   = Gfx::AddressMode::ClampToEdge;
+            samplerDesc.addressV   = Gfx::AddressMode::ClampToEdge;
+            samplerDesc.addressW   = Gfx::AddressMode::ClampToEdge;
+            samplerDesc.debugName  = "RenderManager::MirrorSampler";
+            mirrorSampler = gfxApi->CreateSampler(samplerDesc);
+        }
+    }
+
+    void RenderManager::DrawMirrorPass()
+    {
+        // Nothing to mirror where the first view wrote somewhere unsampleable.
+        if (viewCount > 0 && views[0].outputColorTexture.IsValid())
+        {
+            EnsureMirrorResources();
+
+            gfxApi->BeginRenderPass(gfxApi->GetBackbuffer(), "XrMirror");
+            gfxApi->InvalidateCachedState();
+
+            mirrorQuad->PreRender();
+            gfxApi->BindTexture(0, views[0].outputColorTexture, mirrorSampler);
+            mirrorQuad->Render(nullptr);
+
+            gfxApi->EndRenderPass();
         }
     }
 
@@ -433,15 +519,48 @@ namespace CC
         // (rather than in StartFrame) so camera-follow components and any
         // other transform changes from appMain / sceneHierarchy update
         // are reflected. UBO upload is non-blocking; cost is microseconds.
+        //
+        // Once per frame, not once per view: it drives the free camera
+        // toggle off this frame's input, which must not fire twice.
         if (!fullscreenQuad)
         {
             cameraManager->Update();
         }
+
+        // The renderable list was collected once, before this call. Each
+        // view submits it again against its own camera and targets.
+        for (int i = 0; i < viewCount; i++)
+        {
+            RenderSingleView(views[i]);
+        }
+
+        // Without this the last view's target is still the destination, and
+        // the UI drawn after Render would land there instead of on screen.
+        if (hasExternalViews)
+        {
+            DrawMirrorPass();
+        }
+    }
+
+    void RenderManager::RenderSingleView(const RenderView& view)
+    {
+        // A view naming its own camera owns its matrices: the manager only
+        // updated the one it had active.
+        if (view.camera != nullptr)
+        {
+            cameraManager->SetActiveCamera(view.camera);
+            view.camera->Update();
+            view.camera->UpdateViewProjectionMatrix();
+        }
+
+        gfxApi->BeginRenderPass(view.sceneTarget,
+                                fullscreenQuad ? "FullscreenQuad" : "Opaque");
+
         UploadFrameUniforms();
 
         // BeginRenderPass and any third-party (ImGui) raw GL between frames
-        // may have mutated state behind the Gfx backend's pipeline cache.
-        // Drop the cache so the first bind of this frame always goes to
+        // may have mutated state behind the Gfx backend's bind cache.
+        // Drop the cache so the first bind of this view always goes to
         // the driver.
         gfxApi->InvalidateCachedState();
 
@@ -450,7 +569,6 @@ namespace CC
             renderableFullscreenQuad->PreRender();
             renderableFullscreenQuad->Render(nullptr);
             gfxApi->EndRenderPass();
-            DrawPostProcessPass();
         }
         else
         {
@@ -467,7 +585,7 @@ namespace CC
 
             // Pass 2: Transparent objects (sorted back-to-front).
             // Each transparent renderable's pipeline bakes blend=on, depth-write=off.
-            // State is self-restored by the next frame's BeginRenderPass
+            // State is self-restored by the next pass's BeginRenderPass
             // (depth mask) and EndRenderPass (blend, via the blit pipeline) —
             // RenderManager no longer manages transitional state.
             if (transparentRenderableCount > 0)
@@ -483,9 +601,9 @@ namespace CC
             // Ends the scene pass, which resolves its multisampled storage.
             gfxApi->AddGpuTimestamp("MSAA");
             gfxApi->EndRenderPass();
-
-            DrawPostProcessPass();
         }
+
+        DrawPostProcessPass(view);
     }
 
     void RenderManager::GetWindowSize(int& width, int& height)

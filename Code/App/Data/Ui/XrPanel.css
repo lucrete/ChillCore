@@ -1,0 +1,53 @@
+.root {
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: robotoRegular;
+    font-size: 24;
+    color: #FFFFFF;
+}
+
+.panel {
+    width: 640;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 40;
+    gap: 24;
+    background-color: rgba(18, 18, 34, 0.96);
+}
+
+.panel-title {
+    font-size: 48;
+    text-align: center;
+    color: #E0E0FF;
+    padding-bottom: 8;
+}
+
+.panel-readout {
+    height: 30;
+    font-size: 18;
+    text-align: center;
+    color: rgba(200, 200, 230, 0.8);
+    padding-bottom: 8;
+}
+
+/* Sized for a pointer held at arm's length rather than a mouse: the ray
+   shakes with the hand, so the target has to be generous. */
+.panel-button {
+    padding: 22 28;
+    background-color: rgba(50, 50, 85, 0.95);
+    text-align: center;
+    font-size: 30;
+    color: #CCCCEE;
+}
+
+.panel-button:hover {
+    background-color: rgba(80, 80, 140, 1.0);
+    color: #FFFFFF;
+}
+
+.panel-button:active {
+    background-color: rgba(110, 110, 190, 1.0);
+}

@@ -1,9 +1,8 @@
 #include "UiScreenSystem.h"
 #include "UiScreenController.h"
 #include "UiManager.h"
+#include "UiSurface.h"
 #include "UiElement.h"
-#include "UiRenderer.h"
-#include "TextRenderer.h"
 #include "InputManager.h"
 #include "InputActionMap.h"
 #include "CCAssert.h"
@@ -13,30 +12,20 @@
 
 namespace CC
 {
-    UiScreenSystem* UiScreenSystem::instance = nullptr;
-
-    UiScreenSystem::UiScreenSystem()
+    UiScreenSystem::UiScreenSystem(UiSurface* _surface)
+        : surface(_surface)
     {
-        CC_ASSERT(instance == nullptr, "UiScreenSystem already created");
-        instance = this;
+        CC_ASSERT(surface != nullptr, "Screen system needs a surface");
     }
 
     UiScreenSystem::~UiScreenSystem()
     {
         ClearAllScreens();
-        instance = nullptr;
-    }
-
-    UiScreenSystem* UiScreenSystem::Get()
-    {
-        CC_ASSERT(instance != nullptr, "UiScreenSystem not created yet");
-        return instance;
     }
 
     // ========================
     // Registration
     // ========================
-
     void UiScreenSystem::RegisterScreen(const std::string& screenId, const std::string& htmlPath,
                                         const std::string& cssPath, UiScreenController* controller)
     {
@@ -51,20 +40,27 @@ namespace CC
 
         // Build the element tree at registration time. The CSS rules
         // are captured into screenDef so dynamic-subtree restyling
-        // (UiManager::ApplyStylesToDynamicSubtree) works on this screen.
-        screenDef.rootElement = UiManager::Get()->BuildScreen(htmlPath, cssPath, screenDef.cssRules);
+        // (UiSurface::ApplyStylesToDynamicSubtree) works on this screen.
+        screenDef.rootElement = UiManager::BuildScreen(htmlPath, cssPath, screenDef.cssRules);
         CC_ASSERT(screenDef.rootElement != nullptr, "Failed to build screen");
 
-        // Temporarily make this tree active so controller->Init() can access elements via UiManager
-        UiManager::Get()->LoadScreen(screenDef.rootElement, screenDef.cssRules);
-        UiManager::Get()->GetInputHandler().SetCallbackMap(&screenDef.callbackMap);
+        // The controller belongs to this surface for its whole life, so it
+        // resolves elements and callbacks against it rather than against
+        // whatever happens to be active.
+        controller->SetSurface(surface);
+
+        // Temporarily make this tree active so controller->Init() can reach
+        // its elements through the surface.
+        surface->LoadScreen(screenDef.rootElement, screenDef.cssRules);
+        surface->GetInputHandler().SetCallbackMap(&screenDef.callbackMap);
         controller->Init();
 
-        // Detach tree from UiManager (it stays owned by the screen def)
-        UiManager::Get()->GetInputHandler().SetCallbackMap(nullptr);
-        UiManager::Get()->LoadScreen(static_cast<UiElement*>(nullptr));
+        // Detach the tree from the surface; it stays owned by the screen def.
+        surface->GetInputHandler().SetCallbackMap(nullptr);
+        surface->LoadScreen(static_cast<UiElement*>(nullptr));
 
-        CCPrint(PrintManager::CHANNEL_ALWAYS, "Screen registered: %s", screenId.c_str());
+        CCPrint(PrintManager::CHANNEL_ALWAYS, "Screen registered: %s (%s)",
+                screenId.c_str(), surface->GetName().c_str());
     }
 
     void UiScreenSystem::ClearAllScreens()
@@ -93,7 +89,6 @@ namespace CC
     // ========================
     // Navigation
     // ========================
-
     void UiScreenSystem::SetScreen(const std::string& screenId)
     {
         UiScreenDef* screenDef = FindScreenDef(screenId);
@@ -138,7 +133,6 @@ namespace CC
     // ========================
     // State queries
     // ========================
-
     bool UiScreenSystem::IsTransitioning() const
     {
         return transitionState != TransitionState::Idle;
@@ -147,7 +141,6 @@ namespace CC
     // ========================
     // Per-frame
     // ========================
-
     void UiScreenSystem::Update()
     {
         float deltaTime = FrameTimer::Get()->DeltaTime();
@@ -165,8 +158,11 @@ namespace CC
                     }
                 }
 
-                // Auto-back on Cancel when stack has more than one screen
-                if (stackDepth > 1 && InputManager::Get()->IsUiInteractable()
+                // Auto-back on Cancel when the stack has more than one
+                // screen. Cancel is one input stream with no spatial origin,
+                // so only the window consumes it; panels are pointed at.
+                if (stackDepth > 1 && surface->GetKind() == UiSurfaceKind::Window
+                    && InputManager::Get()->DoesSurfaceReceiveInput(InputDomain::Window, surface)
                     && InputManager::Get()->EdgePositive(InputAction::UiCancel))
                 {
                     TransitionBack();
@@ -208,15 +204,11 @@ namespace CC
                 break;
             }
         }
-
-        UiRenderer::Get()->SetGlobalAlpha(fadeAlpha);
-        TextRenderer::Get()->SetGlobalAlpha(fadeAlpha);
     }
 
     // ========================
     // Private helpers
     // ========================
-
     void UiScreenSystem::ActivateCurrentScreen()
     {
         if (stackDepth > 0)
@@ -224,8 +216,8 @@ namespace CC
             UiScreenDef* screenDef = FindScreenDef(screenStack[stackDepth - 1]);
             if (screenDef)
             {
-                UiManager::Get()->LoadScreen(screenDef->rootElement, screenDef->cssRules);
-                UiManager::Get()->GetInputHandler().SetCallbackMap(&screenDef->callbackMap);
+                surface->LoadScreen(screenDef->rootElement, screenDef->cssRules);
+                surface->GetInputHandler().SetCallbackMap(&screenDef->callbackMap);
                 if (screenDef->controller)
                 {
                     screenDef->controller->OnEnter();
@@ -244,9 +236,9 @@ namespace CC
                 screenDef->controller->OnExit();
             }
 
-            // Detach tree and callback map from UiManager without destroying them
-            UiManager::Get()->GetInputHandler().SetCallbackMap(nullptr);
-            UiManager::Get()->LoadScreen(static_cast<UiElement*>(nullptr));
+            // Detach the tree and callback map without destroying them.
+            surface->GetInputHandler().SetCallbackMap(nullptr);
+            surface->LoadScreen(static_cast<UiElement*>(nullptr));
         }
     }
 
